@@ -1,47 +1,37 @@
-# Lunchbench - Claude Instructions
+# Lunchbench Claude Instructions
 
-## Mandatory: Read Before Starting Any Work
+@AGENTS.md
 
-This project has a mandatory E2E testing policy. See **[docs/e2e-testing.md](docs/e2e-testing.md)**.
+Lunchbench is a greenfield lunch comparison app with Elo rankings.
 
-### Key rules:
-- Never push code without running E2E tests (`./scripts/run-e2e.sh`)
-- Never use `git push --no-verify`
-- If tests fail for an unknown reason:
-  1. Create a GitHub issue (label: `testing`, `pm`)
-  2. Fix the issue immediately
-  3. Do not bypass - fix it
+## Required Reading
 
-## Project Summary
+Before code changes, read the docs relevant to the task:
 
-Lunchbench is a lunch comparison web app with Elo rankings, deployed on Cloudflare.
+- Architecture: `docs/architecture.md`
+- API contract: `docs/api-contract.md`
+- Local setup: `docs/local-dev.md`
+- E2E policy: `docs/e2e-testing.md`
+- Development flow: `docs/10-agent-development-flow.md`
+- CI: `docs/11-continuous-integration.md`
+- D1 migrations: `docs/12-database-migrations.md`
+- Environment config: `docs/13-environment-and-deployment-config.md`
+- Communication style: `docs/15-caveman-compression-spec.md`
 
-- **Worker API**: `worker/` (Hono + TypeScript)
-- **Frontend SPA**: `frontend/` (Vite + TypeScript, no framework)
-- **E2E Tests**: `e2e/` (Playwright in Docker)
-- **Migrations**: `migrations/`
-- **Docs**: `docs/`
+## Hard Rules
 
-## Architecture
+- Work in a git worktree.
+- Keep changes scoped.
+- Never commit secrets.
+- Never bypass validation with `--no-verify`.
+- Complete the review protocol in `docs/10-agent-development-flow.md` before merging.
+- Run E2E before pushing product changes.
+- Update docs when behavior, API, schema, deployment, or validation changes.
 
-See [docs/architecture.md](docs/architecture.md).
+## Project Map
 
-## API Contract
-
-See [docs/api-contract.md](docs/api-contract.md).
-
-## Design Spec
-
-See [docs/design-spec.md](docs/design-spec.md). Claude makes all UI/UX decisions. Do not deviate from the spec without PM review.
-
-## Secrets
-
-See [docs/secrets.md](docs/secrets.md). Never commit secrets.
-
-## Local Development
-
-See [docs/local-dev.md](docs/local-dev.md).
-
-## Deployment
-
-See [docs/deployment.md](docs/deployment.md).
+- `frontend/`: Vite + TypeScript SPA.
+- `worker/`: Cloudflare Worker API using Hono.
+- `migrations/`: D1 SQL migrations and local seed data.
+- `e2e/`: Playwright tests.
+- `scripts/run-e2e.sh`: Dockerized E2E harness.

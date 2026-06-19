@@ -1,4 +1,5 @@
 import { getMatchup, submitVote, type Lunch } from '../api'
+import { isVeganMode } from '../vegan-mode'
 
 function truncate(s: string, n = 20): string {
   return s.length > n ? s.slice(0, n - 1) + '…' : s
@@ -40,13 +41,13 @@ function renderSkeleton(): HTMLElement {
   return wrap
 }
 
-function renderEmpty(navigate: (p: string) => void): HTMLElement {
+function renderEmpty(navigate: (p: string) => void, veganOnly: boolean): HTMLElement {
   const div = document.createElement('div')
   div.className = 'state-center'
   div.innerHTML = `
     <div class="state-icon">🍽</div>
     <div class="state-title">No matchups yet!</div>
-    <div class="state-desc">Add at least two lunches to start voting.</div>
+    <div class="state-desc">${veganOnly ? 'No vegan dishes to compare yet! Add some vegan options.' : 'Add at least two lunches to start voting.'}</div>
   `
   const btn = document.createElement('button')
   btn.className = 'btn btn-primary'
@@ -86,7 +87,7 @@ export function renderHome(container: HTMLElement, navigate: (p: string) => void
       // Initial load - show skeleton.
       content.appendChild(renderSkeleton())
       try {
-        const data = await getMatchup()
+        const data = await getMatchup(isVeganMode())
         await load(data)
       } catch {
         content.innerHTML = ''
@@ -96,7 +97,7 @@ export function renderHome(container: HTMLElement, navigate: (p: string) => void
     }
 
     if (!matchup) {
-      content.appendChild(renderEmpty(navigate))
+      content.appendChild(renderEmpty(navigate, isVeganMode()))
       return
     }
 

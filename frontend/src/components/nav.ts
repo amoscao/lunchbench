@@ -8,7 +8,10 @@ export function createNav(navigate: (path: string) => void): HTMLElement {
       <span class="nav-link" data-path="/leaderboard">Leaderboard</span>
       <span class="nav-link" data-path="/add">Add Lunch</span>
     </div>
-    <button class="nav-theme-toggle" aria-label="Toggle theme">☾</button>
+    <div class="nav-actions">
+      <button class="nav-vegan-toggle" aria-label="Enable vegan mode">🌿</button>
+      <button class="nav-theme-toggle" aria-label="Toggle theme">☾</button>
+    </div>
   `
 
   nav.querySelectorAll('.nav-link').forEach((el) => {

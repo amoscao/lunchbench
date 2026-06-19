@@ -1,4 +1,5 @@
 import { getLeaderboard, type LeaderboardLunch } from '../api'
+import { isVeganMode } from '../vegan-mode'
 
 function rankBadgeClass(rank: number): string {
   if (rank === 1) return 'gold'
@@ -24,9 +25,11 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
   const content = document.createElement('div')
   content.className = 'page-content'
   container.appendChild(content)
+  const veganOnly = isVeganMode()
+  const heading = veganOnly ? 'Vegan Leaderboard' : 'Leaderboard'
 
   content.innerHTML = `
-    <h1 class="page-heading">Leaderboard</h1>
+    <h1 class="page-heading">${heading}</h1>
     <table class="leaderboard-table">
       <thead>
         <tr>
@@ -42,7 +45,7 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
 
   const tbody = content.querySelector<HTMLElement>('#lb-body')!
 
-  getLeaderboard()
+  getLeaderboard(veganOnly)
     .then((lunches) => {
       if (lunches.length === 0) {
         tbody.innerHTML = `

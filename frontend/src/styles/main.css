@@ -55,6 +55,31 @@
 }
 
 /* =====================
+   Vegan Mode
+   ===================== */
+[data-vegan="true"] {
+  --bg-primary: #f0fdf4;
+  --bg-surface: #ffffff;
+  --bg-hover: #dcfce7;
+  --accent: #16a34a;
+  --accent-hover: #15803d;
+  --accent-subtle: #dcfce7;
+  --border: #bbf7d0;
+  --border-accent: #86efac;
+}
+
+[data-theme="dark"][data-vegan="true"] {
+  --bg-primary: #0d1a0d;
+  --bg-surface: #141f14;
+  --bg-hover: #1a2a1a;
+  --accent: #4ade80;
+  --accent-hover: #22c55e;
+  --accent-subtle: #14290d;
+  --border: #1a2e1a;
+  --border-accent: #2a442a;
+}
+
+/* =====================
    Reset & Base
    ===================== */
 *, *::before, *::after {
@@ -169,11 +194,39 @@ img {
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.25s;
-  flex-shrink: 0;
 }
 
 .nav-theme-toggle:hover {
   background: var(--bg-hover);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.nav-vegan-toggle {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.nav-vegan-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.nav-vegan-toggle.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* =====================

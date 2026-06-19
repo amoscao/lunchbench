@@ -2,6 +2,7 @@ import './styles/main.css'
 import { Router } from './router'
 import { createNav } from './components/nav'
 import { initTheme } from './theme'
+import { initVeganMode } from './vegan-mode'
 import { renderHome } from './pages/home'
 import { renderLeaderboard } from './pages/leaderboard'
 import { renderAdd } from './pages/add'
@@ -29,3 +30,7 @@ router
 
 initTheme()
 router.resolve()
+initVeganMode((_isVegan) => {
+  // Re-render current page on vegan mode toggle.
+  router.resolve()
+})

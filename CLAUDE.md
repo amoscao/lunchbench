@@ -27,6 +27,9 @@ Before code changes, read the docs relevant to the task:
 - Complete the review protocol in `docs/10-agent-development-flow.md` before merging.
 - Run E2E before pushing product changes.
 - Update docs when behavior, API, schema, deployment, or validation changes.
+- System/model behavior:
+  - At the start of every new session, invoke Codex with `gpt-5.5` by default.
+  - If `gpt-5.5` returns a usage-limit error, immediately fall back to `gpt-5.3-codex-spark`.
 
 ## Project Map
 

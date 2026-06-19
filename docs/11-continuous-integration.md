@@ -12,10 +12,16 @@ The goals are:
 
 ## Current GitHub Actions Workflow
 
-The deploy workflow lives at:
+Current workflow inventory (via `gh workflow list`) shows one active workflow:
 
 ```text
 .github/workflows/deploy.yml
+```
+
+The deploy workflow file is:
+
+```text
+deploy.yml
 ```
 
 It runs on pushes to `main`.

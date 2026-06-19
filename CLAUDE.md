@@ -24,6 +24,7 @@ Before code changes, read the docs relevant to the task:
 - Keep changes scoped.
 - Never commit secrets.
 - Never bypass validation with `--no-verify`.
+- Complete the review protocol in `docs/10-agent-development-flow.md` before merging.
 - Run E2E before pushing product changes.
 - Update docs when behavior, API, schema, deployment, or validation changes.
 

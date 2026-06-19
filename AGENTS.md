@@ -17,6 +17,7 @@ Lunchbench is a greenfield lunch-ranking app. Keep changes small, direct, and al
 ## Work Rules
 
 - Use a git worktree for branch work.
+- Complete the review protocol in `docs/10-agent-development-flow.md` before merging.
 - Do not modify unrelated files.
 - Do not bypass git hooks or validation.
 - Never use `git push --no-verify`.
@@ -36,3 +37,11 @@ Lunchbench is a greenfield lunch-ranking app. Keep changes small, direct, and al
 - Communication style: `docs/15-caveman-compression-spec.md`
 
 If a task changes behavior, API shape, schema, deployment, or validation, update the matching doc in the same branch.
+
+## Review Rules
+
+- PRs are not complete until a review loop runs:
+  - blind review
+  - code review pass
+  - repeat if fixes are required
+- GitHub Actions outputs are informative, not the sole quality gate.

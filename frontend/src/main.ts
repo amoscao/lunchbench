@@ -6,6 +6,7 @@ import { initVeganMode } from './vegan-mode'
 import { renderHome } from './pages/home'
 import { renderLeaderboard } from './pages/leaderboard'
 import { renderAdd } from './pages/add'
+import { renderAdmin } from './pages/admin'
 
 const appEl = document.getElementById('app')!
 appEl.style.display = 'flex'
@@ -27,6 +28,7 @@ router
   .add('/', (c) => renderHome(c, (path) => router.navigate(path)))
   .add('/leaderboard', (c) => renderLeaderboard(c, (path) => router.navigate(path)))
   .add('/add', (c) => renderAdd(c))
+  .add('/admin', (c) => renderAdmin(c))
 
 initTheme()
 router.resolve()

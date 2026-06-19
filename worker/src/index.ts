@@ -6,6 +6,7 @@ import { matchupRouter } from './routes/matchup'
 import { voteRouter } from './routes/vote'
 import { imagesRouter } from './routes/images'
 import { handleImageUpload } from './routes/images'
+import { adminRouter } from './routes/admin'
 import { securityHeaders } from './middleware'
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -19,6 +20,7 @@ app.route('/api/lunches', lunchesRouter)
 app.route('/api/matchup', matchupRouter)
 app.route('/api/vote', voteRouter)
 app.route('/api/images', imagesRouter)
+app.route('/api/admin', adminRouter)
 
 // Image upload route (needs raw request access)
 app.post('/api/lunches/:id/image', async (c) => {

@@ -2,6 +2,7 @@ export type Bindings = {
   DB: D1Database
   IMAGES: R2Bucket | undefined
   VOTE_PASSWORD: string
+  ADMIN_MANAGER_PASSWORD: string
 }
 
 export type Lunch = {

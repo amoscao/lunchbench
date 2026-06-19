@@ -8,8 +8,6 @@ services:
     environment:
       - VOTE_PASSWORD=test-admin-token
       - CLOUDFLARE_ACCOUNT_ID=00000000000000000000000000000000
-    ports:
-      - "8787:8787"
     volumes:
       - wrangler-data:/data
     healthcheck:
@@ -23,12 +21,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
-    stdin_open: true
-    tty: true
     environment:
       - VITE_API_TARGET=http://api:8787
-    ports:
-      - "5173:5173"
     depends_on:
       api:
         condition: service_healthy
@@ -54,7 +48,7 @@ services:
       frontend:
         condition: service_healthy
     command: >
-      sh -c "npm install --no-package-lock && npx playwright install chromium && npx playwright test"
+      sh -c "npm install --no-package-lock && npx playwright test"
 
 volumes:
   wrangler-data:

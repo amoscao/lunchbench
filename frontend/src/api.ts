@@ -48,6 +48,13 @@ export async function getLeaderboard(veganOnly = false): Promise<LeaderboardLunc
   return data.lunches
 }
 
+export async function getLunches(): Promise<Lunch[]> {
+  const res = await fetch(`${BASE}/lunches`)
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
+  const data = await res.json()
+  return data.lunches
+}
+
 export async function getLunchesWithoutImages(): Promise<Lunch[]> {
   const res = await fetch(`${BASE}/lunches?missing_image=true`)
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)

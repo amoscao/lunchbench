@@ -1,4 +1,5 @@
-import { createLunch, getLunchesWithoutImages, uploadImage, type Lunch } from '../api'
+import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch } from '../api'
+import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 
 type Mode = 'text' | 'text-image' | 'add-image'
@@ -63,6 +64,49 @@ export function renderAdd(container: HTMLElement): void {
     nameGroup.className = 'form-group'
     nameGroup.innerHTML = `<label class="form-label">Lunch Name</label><input class="form-input" type="text" placeholder="e.g. Margherita Pizza" maxlength="100" />`
 
+    // Duplicate detection state
+    let allLunches: Lunch[] = []
+    let selectedExistingId: number | null = null
+    let warnDuplicates: { id: number; name: string; score: number }[] = []
+
+    // Fetch all lunches for dupe detection (once, cached)
+    getLunches().then((l) => { allLunches = l }).catch(() => {})
+
+    // Add duplicate warning element
+    const dupeWarning = document.createElement('div')
+    dupeWarning.className = 'duplicate-warning'
+    dupeWarning.style.display = 'none'
+    nameGroup.appendChild(dupeWarning)
+
+    // Debounced input listener on name field
+    const nameInput = nameGroup.querySelector('input') as HTMLInputElement
+    let dupeTimer: ReturnType<typeof setTimeout>
+    nameInput.addEventListener('input', () => {
+      clearTimeout(dupeTimer)
+      dupeTimer = setTimeout(() => {
+        const val = nameInput.value.trim()
+        if (!val || val.length < 2) {
+          dupeWarning.style.display = 'none'
+          warnDuplicates = []
+          return
+        }
+        warnDuplicates = findSimilar(val, allLunches, 0.6)
+        if (warnDuplicates.length > 0) {
+          dupeWarning.style.display = 'block'
+          dupeWarning.textContent = '⚠ Similar dishes already exist:'
+          const list = document.createElement('ul')
+          warnDuplicates.forEach((d) => {
+            const item = document.createElement('li')
+            item.textContent = `${d.name} (${Math.round(d.score * 100)}% match)`
+            list.appendChild(item)
+          })
+          dupeWarning.appendChild(list)
+        } else {
+          dupeWarning.style.display = 'none'
+        }
+      }, 300)
+    })
+
     const descriptionGroup = document.createElement('div')
     descriptionGroup.className = 'form-group'
     descriptionGroup.innerHTML = `<label class="form-label">Description</label><textarea class="form-input" placeholder="Optional notes about the lunch" maxlength="500" rows="3"></textarea>`
@@ -113,18 +157,74 @@ export function renderAdd(container: HTMLElement): void {
     if (currentMode === 'add-image') {
       selectGroup = document.createElement('div')
       selectGroup.className = 'form-group'
-      selectGroup.innerHTML = `<label class="form-label">Select Lunch</label><select class="form-input form-select"><option>Loading…</option></select>`
-      const select = selectGroup.querySelector('select')!
+      selectGroup.innerHTML = `<label class="form-label">Select Lunch</label>`
+
+      const dropdownWrap = document.createElement('div')
+      dropdownWrap.className = 'search-dropdown-wrap'
+
+      const searchInput = document.createElement('input')
+      searchInput.className = 'form-input'
+      searchInput.placeholder = 'Search lunches…'
+      searchInput.type = 'text'
+      searchInput.autocomplete = 'off'
+
+      const dropdownList = document.createElement('div')
+      dropdownList.className = 'search-dropdown-list'
+      dropdownList.style.display = 'none'
+
+      dropdownWrap.appendChild(searchInput)
+      dropdownWrap.appendChild(dropdownList)
+      selectGroup.appendChild(dropdownWrap)
+
+      let imagelessLunches: Lunch[] = []
 
       getLunchesWithoutImages()
         .then((lunches: Lunch[]) => {
-          if (lunches.length === 0) {
-            select.innerHTML = '<option>No lunches without images</option>'
-          } else {
-            select.innerHTML = lunches.map((l) => `<option value="${l.id}">${l.name}</option>`).join('')
-          }
+          imagelessLunches = lunches
+          renderDropdown('')
         })
-        .catch(() => { select.innerHTML = '<option>Failed to load</option>' })
+        .catch(() => {
+          dropdownList.innerHTML = '<div class="search-dropdown-empty">Failed to load lunches</div>'
+        })
+
+      function renderDropdown(query: string): void {
+        const filtered = fuzzyFilter(query, imagelessLunches)
+        dropdownList.innerHTML = ''
+        if (filtered.length === 0) {
+          const empty = document.createElement('div')
+          empty.className = 'search-dropdown-empty'
+          empty.textContent = 'No matches found'
+          dropdownList.appendChild(empty)
+        } else {
+          filtered.forEach((l) => {
+            const item = document.createElement('div')
+            item.className = 'search-dropdown-item'
+            item.dataset.id = String(l.id)
+            item.textContent = l.name
+            item.addEventListener('click', () => {
+              selectedExistingId = Number(item.dataset.id)
+              searchInput.value = item.textContent ?? ''
+              dropdownList.style.display = 'none'
+            })
+            dropdownList.appendChild(item)
+          })
+        }
+      }
+
+      searchInput.addEventListener('focus', () => {
+        dropdownList.style.display = 'block'
+        renderDropdown(searchInput.value)
+      })
+      searchInput.addEventListener('input', () => {
+        selectedExistingId = null
+        renderDropdown(searchInput.value)
+        dropdownList.style.display = 'block'
+      })
+      document.addEventListener('click', (e) => {
+        if (!dropdownWrap.contains(e.target as Node)) {
+          dropdownList.style.display = 'none'
+        }
+      }, { once: false })
     }
 
     const submitBtn = document.createElement('button')
@@ -158,6 +258,17 @@ export function renderAdd(container: HTMLElement): void {
         if (!name) { showAlert('Lunch name is required.', 'error'); return }
         submitBtn.disabled = true
         submitBtn.textContent = 'Submitting…'
+        const highMatch = warnDuplicates.find((d) => d.score >= 0.75)
+        if (highMatch) {
+          const proceed = window.confirm(
+            `A similar dish already exists: "${highMatch.name}". Add anyway?`
+          )
+          if (!proceed) {
+            submitBtn.disabled = false
+            submitBtn.textContent = 'Add Lunch'
+            return
+          }
+        }
         try {
           await createLunch(name, token, description || null, isVegan)
           nameInput!.value = ''
@@ -178,6 +289,17 @@ export function renderAdd(container: HTMLElement): void {
         if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
         submitBtn.disabled = true
         submitBtn.textContent = 'Submitting…'
+        const highMatch = warnDuplicates.find((d) => d.score >= 0.75)
+        if (highMatch) {
+          const proceed = window.confirm(
+            `A similar dish already exists: "${highMatch.name}". Add anyway?`
+          )
+          if (!proceed) {
+            submitBtn.disabled = false
+            submitBtn.textContent = 'Add Lunch'
+            return
+          }
+        }
         try {
           const lunch = await createLunch(name, token, description || null, isVegan)
           await uploadImage(lunch.id, selectedFile, token)
@@ -194,9 +316,8 @@ export function renderAdd(container: HTMLElement): void {
           submitBtn.textContent = 'Add Lunch'
         }
       } else if (currentMode === 'add-image') {
-        const select = selectGroup?.querySelector('select') as HTMLSelectElement | null
-        const lunchId = Number(select?.value)
-        if (!lunchId) { showAlert('Select a lunch.', 'error'); return }
+        const lunchId = selectedExistingId
+        if (!lunchId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
         if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
         const validation = await validateImageFile(selectedFile)
         if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }

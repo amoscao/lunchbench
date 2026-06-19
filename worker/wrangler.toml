@@ -8,7 +8,6 @@ binding = "DB"
 database_name = "lunchbench"
 database_id = "ab999e13-bac3-47b8-8246-b5e9aa82a8b3"
 
-# R2 binding — uncomment once R2 bucket 'lunchbench-images' is created in Cloudflare Dashboard
-# [[r2_buckets]]
-# binding = "IMAGES"
-# bucket_name = "lunchbench-images"
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "lunchbench-images"

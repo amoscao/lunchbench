@@ -14,6 +14,10 @@ Three Docker containers simulate the real Cloudflare infrastructure:
 | `frontend` | `vite dev` | Cloudflare Pages |
 | `playwright` | Playwright test runner | User browser (Chromium) |
 
+Each E2E run uses a unique Docker Compose project name prefixed with `lunchbench-e2e-`.
+The runner removes its containers, networks, volumes, and locally built E2E images on
+success, failure, or interruption.
+
 ## Running Tests
 
 ### Install the pre-push hook (one-time setup)
@@ -32,6 +36,18 @@ Three Docker containers simulate the real Cloudflare infrastructure:
 
 ```bash
 cd e2e && npx playwright show-report
+```
+
+### Clean up stale Docker resources
+
+The runner should clean up after itself. If a host crash or forced Docker shutdown leaves
+stale resources behind, remove only Lunchbench E2E resources with:
+
+```bash
+docker ps -a --filter 'name=lunchbench-e2e' --format '{{.ID}}' | xargs -r docker rm -f
+docker network ls --filter 'name=lunchbench-e2e' --format '{{.ID}}' | xargs -r docker network rm
+docker volume ls --filter 'name=lunchbench-e2e' --format '{{.Name}}' | xargs -r docker volume rm -f
+docker image ls --format '{{.Repository}}:{{.Tag}}' | grep '^lunchbench-e2e-' | xargs -r docker image rm -f
 ```
 
 ### Run tests in headed mode (debug)

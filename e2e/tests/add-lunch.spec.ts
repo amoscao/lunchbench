@@ -36,8 +36,9 @@ test.describe('Add Lunch', () => {
     await expect(firstMode).not.toHaveClass(/active/)
   })
 
-  test('text-only mode shows name input and token field', async ({ page }) => {
+  test('text-only mode shows name input and password field', async ({ page }) => {
     await expect(page.locator('input[type="text"]')).toBeVisible()
+    await expect(page.locator('label.form-label', { hasText: 'Password' })).toBeVisible()
     await expect(page.locator('input[type="password"]')).toBeVisible()
   })
 
@@ -87,10 +88,11 @@ test.describe('Add Lunch', () => {
     await expect(page.locator('.upload-area')).toBeVisible()
   })
 
-  test('add image to existing mode shows lunch dropdown', async ({ page }) => {
+  test('add image to existing mode shows searchable lunch input', async ({ page }) => {
     await page.locator('.mode-btn').nth(2).click()
     await page.waitForTimeout(1500)
-    await expect(page.locator('select')).toBeVisible()
+    await expect(page.locator('label.form-label', { hasText: 'Select Lunch' })).toBeVisible()
+    await expect(page.locator('.search-dropdown-wrap input[placeholder="Search lunches…"]')).toBeVisible()
   })
 
   test('client-side validation rejects wrong file type', async ({ page }) => {

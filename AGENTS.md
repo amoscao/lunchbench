@@ -1,5 +1,7 @@
 # Lunchbench Agent Guide
 
+@docs/15-caveman-compression-spec.md
+
 @/home/amos/.codex/RTK.md
 
 Lunchbench is a greenfield lunch-ranking app. Keep changes small, direct, and aligned with the docs in this repo.

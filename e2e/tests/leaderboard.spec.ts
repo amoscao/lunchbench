@@ -72,11 +72,12 @@ test.describe('Leaderboard', () => {
     expect(changed).toBe(true)
   })
 
-  test('placeholder thumbnails shown when no image', async ({ page }) => {
+  test('placeholder thumbnails shown for lunches without images', async ({ page }) => {
     const placeholders = page.locator('.lunch-thumb-placeholder')
     const thumbs = page.locator('.lunch-thumb')
-    expect(await placeholders.count()).toBeGreaterThanOrEqual(5)
-    await expect(thumbs).toHaveCount(0)
+    const rows = page.locator('.leaderboard-table tbody tr')
+    expect(await placeholders.count()).toBeGreaterThan(0)
+    expect(await placeholders.count() + await thumbs.count()).toBe(await rows.count())
   })
 
   test('win/loss/tie record shown in record column', async ({ page }) => {

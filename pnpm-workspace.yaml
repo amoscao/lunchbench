@@ -1,7 +1,14 @@
 packages:
   - 'worker'
   - 'frontend'
+  - 'e2e'
+allowedDeprecatedVersions:
+  '@types/node': '*'
 allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - workerd

@@ -5,9 +5,10 @@ export default defineConfig({
     outDir: 'dist',
   },
   server: {
+    allowedHosts: ['frontend', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:8787',
         changeOrigin: true,
       },
     },

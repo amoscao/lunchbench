@@ -1,0 +1,36 @@
+FROM node:22-bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  g++ \
+  make \
+  python3 \
+  wget \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY worker/package.json ./worker/
+
+RUN npm install -g pnpm@11
+
+RUN pnpm install --filter lunchbench-api
+
+COPY worker/ ./worker/
+COPY migrations/ ./migrations/
+
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'set -e' \
+  'echo "ADMIN_TOKEN=${ADMIN_TOKEN:-test-admin-token}" > /app/worker/.dev.vars' \
+  'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0001_initial.sql' \
+  'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/seed.sql' \
+  'cd /app/worker' \
+  'exec pnpm exec wrangler dev --local --ip 0.0.0.0 --port 8787 --persist-to /data' \
+  > /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 8787
+
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]

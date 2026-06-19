@@ -23,6 +23,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
+    stdin_open: true
+    tty: true
     environment:
       - VITE_API_TARGET=http://api:8787
     ports:

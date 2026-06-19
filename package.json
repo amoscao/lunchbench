@@ -1,0 +1,8 @@
+{
+  "name": "lunchbench",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm --filter lunchbench-api test"
+  }
+}

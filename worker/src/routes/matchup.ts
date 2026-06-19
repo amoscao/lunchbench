@@ -1,0 +1,29 @@
+import { Hono } from 'hono'
+import type { Bindings } from '../types'
+import { lunchFromRow } from '../helpers'
+import { selectMatchup } from '../matchup'
+import type { LunchRow } from '../types'
+
+const matchup = new Hono<{ Bindings: Bindings }>()
+
+matchup.get('/', async (c) => {
+  const allLunches = await c.env.DB.prepare('SELECT * FROM lunches').all<LunchRow>()
+  const recentVotes = await c.env.DB.prepare(
+    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC LIMIT 10'
+  ).all<{ left_lunch_id: number; right_lunch_id: number }>()
+
+  const recentPairs: [number, number][] = recentVotes.results.map(
+    (v) => [v.left_lunch_id, v.right_lunch_id]
+  )
+
+  const pair = selectMatchup(allLunches.results, recentPairs)
+  if (!pair) return c.body(null, 204)
+
+  const baseUrl = new URL(c.req.url).origin
+  return c.json({
+    left: lunchFromRow(pair[0], baseUrl),
+    right: lunchFromRow(pair[1], baseUrl),
+  })
+})
+
+export { matchup as matchupRouter }

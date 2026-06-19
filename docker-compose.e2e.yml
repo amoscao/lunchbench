@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.api
     environment:
-      - ADMIN_TOKEN=test-admin-token
+      - VOTE_PASSWORD=test-admin-token
       - CLOUDFLARE_ACCOUNT_ID=00000000000000000000000000000000
     ports:
       - "8787:8787"

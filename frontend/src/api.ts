@@ -1,8 +1,10 @@
 export type Lunch = {
   id: number
   name: string
+  description: string | null
   image_key: string | null
   image_url: string | null
+  is_vegan: number
   rating: number
   wins: number
   losses: number
@@ -15,8 +17,8 @@ export type LeaderboardLunch = Lunch & { rank: number }
 
 const BASE = '/api'
 
-export async function getMatchup(): Promise<{ left: Lunch; right: Lunch } | null> {
-  const res = await fetch(`${BASE}/matchup`)
+export async function getMatchup(veganOnly = false): Promise<{ left: Lunch; right: Lunch } | null> {
+  const res = await fetch(`${BASE}/matchup${veganOnly ? '?vegan=true' : ''}`)
   if (res.status === 204) return null
   if (!res.ok) throw new Error(`Matchup fetch failed: ${res.status}`)
   return res.json()
@@ -39,8 +41,8 @@ export async function submitVote(
   return res.json()
 }
 
-export async function getLeaderboard(): Promise<LeaderboardLunch[]> {
-  const res = await fetch(`${BASE}/lunches/leaderboard`)
+export async function getLeaderboard(veganOnly = false): Promise<LeaderboardLunch[]> {
+  const res = await fetch(`${BASE}/lunches/leaderboard${veganOnly ? '?vegan=true' : ''}`)
   if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`)
   const data = await res.json()
   return data.lunches
@@ -53,11 +55,16 @@ export async function getLunchesWithoutImages(): Promise<Lunch[]> {
   return data.lunches
 }
 
-export async function createLunch(name: string, token: string): Promise<Lunch> {
+export async function createLunch(
+  name: string,
+  token: string,
+  description?: string | null,
+  is_vegan = false
+): Promise<Lunch> {
   const res = await fetch(`${BASE}/lunches`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, description, is_vegan }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

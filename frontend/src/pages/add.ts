@@ -63,9 +63,17 @@ export function renderAdd(container: HTMLElement): void {
     nameGroup.className = 'form-group'
     nameGroup.innerHTML = `<label class="form-label">Lunch Name</label><input class="form-input" type="text" placeholder="e.g. Margherita Pizza" maxlength="100" />`
 
+    const descriptionGroup = document.createElement('div')
+    descriptionGroup.className = 'form-group'
+    descriptionGroup.innerHTML = `<label class="form-label">Description</label><textarea class="form-input" placeholder="Optional notes about the lunch" maxlength="500" rows="3"></textarea>`
+
+    const veganGroup = document.createElement('label')
+    veganGroup.className = 'checkbox-row'
+    veganGroup.innerHTML = `<input type="checkbox" /> <span>Vegan dish? 🌿</span>`
+
     const tokenGroup = document.createElement('div')
     tokenGroup.className = 'form-group'
-    tokenGroup.innerHTML = `<label class="form-label">Admin Token</label><input class="form-input" type="password" placeholder="Your admin token" />`
+    tokenGroup.innerHTML = `<label class="form-label">Password</label><input class="form-input" type="password" placeholder="Enter the password to add lunches" />`
 
     let uploadGroup: HTMLElement | null = null
     let selectGroup: HTMLElement | null = null
@@ -127,6 +135,8 @@ export function renderAdd(container: HTMLElement): void {
       if (selectGroup) formContainer.appendChild(selectGroup)
     } else {
       formContainer.appendChild(nameGroup)
+      formContainer.appendChild(descriptionGroup)
+      formContainer.appendChild(veganGroup)
     }
 
     if (uploadGroup) formContainer.appendChild(uploadGroup)
@@ -135,9 +145,13 @@ export function renderAdd(container: HTMLElement): void {
 
     submitBtn.addEventListener('click', async () => {
       const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
-      if (!token) { showAlert('Admin token is required.', 'error'); return }
+      if (!token) { showAlert('Password is required.', 'error'); return }
 
       const nameInput = nameGroup.querySelector('input') as HTMLInputElement | null
+      const descriptionInput = descriptionGroup.querySelector('textarea') as HTMLTextAreaElement | null
+      const veganInput = veganGroup.querySelector('input') as HTMLInputElement | null
+      const description = descriptionInput?.value.trim() ?? ''
+      const isVegan = veganInput?.checked ?? false
 
       if (currentMode === 'text') {
         const name = nameInput?.value.trim() ?? ''
@@ -145,8 +159,10 @@ export function renderAdd(container: HTMLElement): void {
         submitBtn.disabled = true
         submitBtn.textContent = 'Submitting…'
         try {
-          await createLunch(name, token)
+          await createLunch(name, token, description || null, isVegan)
           nameInput!.value = ''
+          if (descriptionInput) descriptionInput.value = ''
+          if (veganInput) veganInput.checked = false
           showAlert('Lunch added!', 'success')
         } catch (e: unknown) {
           showAlert((e as Error).message ?? 'Failed to add lunch.', 'error')
@@ -163,9 +179,11 @@ export function renderAdd(container: HTMLElement): void {
         submitBtn.disabled = true
         submitBtn.textContent = 'Submitting…'
         try {
-          const lunch = await createLunch(name, token)
+          const lunch = await createLunch(name, token, description || null, isVegan)
           await uploadImage(lunch.id, selectedFile, token)
           nameInput!.value = ''
+          if (descriptionInput) descriptionInput.value = ''
+          if (veganInput) veganInput.checked = false
           selectedFile = null
           if (imagePreview) imagePreview.style.display = 'none'
           showAlert('Lunch added with image!', 'success')

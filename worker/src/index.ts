@@ -22,7 +22,7 @@ app.route('/api/images', imagesRouter)
 app.post('/api/lunches/:id/image', async (c) => {
   const id = Number(c.req.param('id'))
   if (isNaN(id)) return c.json({ error: 'Invalid id', code: 'BAD_REQUEST' }, 400)
-  return handleImageUpload(c.req.raw, id, c.env.DB, c.env.IMAGES, c.env.ADMIN_TOKEN)
+  return handleImageUpload(c.req.raw, id, c.env.DB, c.env.IMAGES, c.env.VOTE_PASSWORD)
 })
 
 export default app

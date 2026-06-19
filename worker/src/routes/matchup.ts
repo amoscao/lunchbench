@@ -7,7 +7,11 @@ import type { LunchRow } from '../types'
 const matchup = new Hono<{ Bindings: Bindings }>()
 
 matchup.get('/', async (c) => {
-  const allLunches = await c.env.DB.prepare('SELECT * FROM lunches').all<LunchRow>()
+  const veganOnly = c.req.query('vegan') === 'true'
+  const query = veganOnly
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1'
+    : 'SELECT * FROM lunches'
+  const allLunches = await c.env.DB.prepare(query).all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
     'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC LIMIT 10'
   ).all<{ left_lunch_id: number; right_lunch_id: number }>()

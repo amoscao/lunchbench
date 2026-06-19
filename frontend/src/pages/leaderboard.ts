@@ -11,7 +11,7 @@ function renderThumb(lunch: LeaderboardLunch): string {
   if (lunch.image_url) {
     return `<img class="lunch-thumb" src="${lunch.image_url}" alt="${lunch.name}" loading="lazy" />`
   }
-  return `<div class="lunch-thumb-placeholder">${lunch.name[0]?.toUpperCase() ?? '?'}</div>`
+  return `<div class="lunch-thumb-placeholder">?</div>`
 }
 
 function renderSkeletonRows(): string {
@@ -69,7 +69,10 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
           <td class="col-name">
             <div class="name-cell">
               ${renderThumb(l)}
-              <span>${l.name}</span>
+              <div>
+                <div class="lunch-name-row"><span>${l.name}</span>${l.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}</div>
+                ${l.description ? `<div class="leaderboard-subtitle">${l.description}</div>` : ''}
+              </div>
             </div>
           </td>
           <td class="col-rating">${Math.round(l.rating)}</td>

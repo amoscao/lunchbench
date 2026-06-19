@@ -11,13 +11,19 @@ function renderCard(lunch: Lunch): HTMLElement {
   const mediaArea = lunch.image_url
     ? `<div class="lunch-card-image"><img src="${lunch.image_url}" alt="${lunch.name}" loading="lazy" /></div>`
     : `<div class="lunch-card-placeholder">
-        <span class="lunch-card-placeholder-letter">${lunch.name[0]?.toUpperCase() ?? '?'}</span>
+        <div class="placeholder-question">?</div>
+        <span class="placeholder-text">no picture yet</span>
        </div>`
+  const veganBadge = lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''
+  const description = lunch.description
+    ? `<div class="lunch-card-description">${lunch.description}</div>`
+    : ''
 
   card.innerHTML = `
     ${mediaArea}
     <div class="lunch-card-info">
-      <div class="lunch-card-name">${lunch.name}</div>
+      <div class="lunch-card-name">${lunch.name}${veganBadge}</div>
+      ${description}
       <div class="lunch-card-stats">Elo ${Math.round(lunch.rating)} · ${lunch.wins}W ${lunch.losses}L ${lunch.ties}T</div>
     </div>
   `

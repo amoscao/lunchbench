@@ -266,10 +266,35 @@ img {
   min-height: 240px;
   background: var(--bg-hover);
   display: flex;
+  flex-direction: column;
+  gap: 0;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+}
+
+.placeholder-question {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px dashed var(--border-accent);
+  color: var(--text-muted);
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.placeholder-text {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .lunch-card-placeholder::before {
@@ -278,15 +303,6 @@ img {
   inset: 0;
   background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
   background-size: 20px 20px;
-}
-
-.lunch-card-placeholder-letter {
-  font-size: 72px;
-  font-weight: 700;
-  color: var(--border-accent);
-  position: relative;
-  z-index: 1;
-  line-height: 1;
 }
 
 .lunch-card-info {
@@ -300,10 +316,22 @@ img {
   color: var(--text-primary);
 }
 
+.lunch-card-description {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 .lunch-card-stats {
   font-size: var(--text-sm);
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+.vegan-badge {
+  display: inline-block;
+  margin-left: 6px;
 }
 
 /* =====================
@@ -416,6 +444,16 @@ img {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+}
+
+.lunch-name-row {
+  font-weight: 600;
+}
+
+.leaderboard-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 /* =====================

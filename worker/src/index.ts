@@ -6,10 +6,12 @@ import { matchupRouter } from './routes/matchup'
 import { voteRouter } from './routes/vote'
 import { imagesRouter } from './routes/images'
 import { handleImageUpload } from './routes/images'
+import { securityHeaders } from './middleware'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('*', cors())
+app.use('*', securityHeaders)
 
 app.get('/api/health', (c) => c.json({ ok: true }))
 

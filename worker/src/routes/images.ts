@@ -3,6 +3,8 @@ import type { Bindings } from '../types'
 import { validateAdminToken } from '../helpers'
 import { checkRateLimit } from '../rate-limit'
 import { validateImageBuffer } from '../image-validator'
+import { resizeImage } from '../image-resize'
+import { isAllowedOrigin } from '../middleware'
 
 const images = new Hono<{ Bindings: Bindings }>()
 
@@ -36,6 +38,16 @@ export async function handleImageUpload(
 ): Promise<Response> {
   if (!validateAdminToken(request, adminToken)) {
     return Response.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
+  }
+
+  const contentLength = Number(request.headers.get('Content-Length') ?? '0')
+  if (contentLength > 5 * 1024 * 1024) {
+    return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+  }
+
+  const origin = request.headers.get('Origin')
+  if (origin && !isAllowedOrigin(origin)) {
+    return Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   if (!bucket) {
@@ -75,9 +87,10 @@ export async function handleImageUpload(
     return Response.json({ error: validation.error, code: 'INVALID_IMAGE' }, { status: validation.status })
   }
 
+  const resizedBuf = await resizeImage(buf, validation.contentType)
   const key = `images/${crypto.randomUUID()}.${validation.ext}`
 
-  await bucket.put(key, buf, {
+  await bucket.put(key, resizedBuf, {
     httpMetadata: { contentType: validation.contentType },
   })
 

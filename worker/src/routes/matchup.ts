@@ -21,13 +21,17 @@ matchup.get('/', async (c) => {
   )
 
   const pair = selectMatchup(allLunches.results, recentPairs)
-  if (!pair) return c.body(null, 204)
+  if (!pair) return c.body(null, 204, { 'Cache-Control': 'no-store' })
 
   const baseUrl = new URL(c.req.url).origin
-  return c.json({
-    left: lunchFromRow(pair[0], baseUrl),
-    right: lunchFromRow(pair[1], baseUrl),
-  })
+  return c.json(
+    {
+      left: lunchFromRow(pair[0], baseUrl),
+      right: lunchFromRow(pair[1], baseUrl),
+    },
+    200,
+    { 'Cache-Control': 'no-store' }
+  )
 })
 
 export { matchup as matchupRouter }

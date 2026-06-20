@@ -77,6 +77,8 @@ Returns all lunches sorted by `conservative_rating` descending, with rank.
       "glicko_volatility": 0.06,
       "conservative_rating": 1344.1,
       "confidence": 84,
+      "consistency": 88.9,
+      "consistency_band": "very-steady",
       "wins": 10,
       "losses": 3,
       "ties": 1,

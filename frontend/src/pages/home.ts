@@ -145,12 +145,15 @@ export function renderHome(
         delay,
       ])
       await load(res.next)
-    } catch {
+    } catch (e) {
       if (bar) bar.classList.remove('loading')
       buttons.forEach((b) => (b.disabled = false))
       const err = document.createElement('p')
       err.style.cssText = 'text-align:center;color:#dc2626;margin-top:12px;font-size:13px;'
-      err.textContent = 'Vote failed. Try again.'
+      err.textContent =
+        e instanceof Error && e.message === 'rate_limited'
+          ? 'Slow down! You\'ve voted a lot. Try again in a bit.'
+          : 'Vote failed. Try again.'
       const content = container.firstElementChild as HTMLElement
       content?.appendChild(err)
     } finally {

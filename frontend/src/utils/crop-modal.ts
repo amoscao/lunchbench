@@ -43,6 +43,7 @@ export function openCropModal(file: File): Promise<File | null> {
     const confirmBtn = document.createElement('button')
     confirmBtn.className = 'btn btn-primary'
     confirmBtn.textContent = 'Crop & Use'
+    confirmBtn.disabled = true
     actions.appendChild(cancelBtn)
     actions.appendChild(confirmBtn)
 
@@ -91,7 +92,10 @@ export function openCropModal(file: File): Promise<File | null> {
       applyBox()
     }
 
-    img.onload = () => setTimeout(initCrop, 30)
+    img.onload = () => setTimeout(() => {
+      initCrop()
+      confirmBtn.disabled = false
+    }, 30)
 
     // --- Drag ---
     type Handle = 'nw' | 'ne' | 'sw' | 'se' | 'move'
@@ -192,7 +196,7 @@ export function openCropModal(file: File): Promise<File | null> {
       const srcY = (cropY - iTop) * scaleY
       const srcW = cropSize * scaleX
       const srcH = cropSize * scaleY
-      const outputSize = Math.round(Math.min(srcW, srcH))
+      const outputSize = Math.max(1, Math.round(Math.min(srcW, srcH)))
 
       const canvas = document.createElement('canvas')
       canvas.width = outputSize

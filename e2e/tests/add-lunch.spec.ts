@@ -131,7 +131,8 @@ test.describe('Add Lunch', () => {
 
       // Crop modal should open
       await expect(page.locator('.crop-backdrop')).toBeVisible()
-      // Confirm the crop
+      // Wait for image to load and confirm button to enable
+      await expect(page.locator('.crop-actions .btn-primary')).toBeEnabled()
       await page.locator('.crop-actions .btn-primary').click()
 
       await page.waitForTimeout(500)

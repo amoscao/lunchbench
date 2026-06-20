@@ -463,11 +463,19 @@ img {
   padding: 0 var(--space-2);
 }
 
+@keyframes bar-fill {
+  from { width: 0%; box-shadow: 0 0 6px hsl(168 88% 52%), 0 0 16px hsl(168 88% 52% / 0.6); }
+  50%  { box-shadow: 0 0 10px hsl(282 82% 68%), 0 0 28px hsl(282 82% 68% / 0.7); }
+  to   { width: 100%; box-shadow: 0 0 6px hsl(168 88% 52%), 0 0 16px hsl(168 88% 52% / 0.6); }
+}
+
 .vote-gradient-bar {
   height: 2px;
   border-radius: 1px;
   margin: var(--space-6) auto 0;
   max-width: 600px;
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(
     90deg,
     transparent 0,
@@ -476,6 +484,27 @@ img {
     hsl(168 88% 52% / 0.45) 72%,
     transparent 100%
   );
+}
+
+.vote-gradient-bar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 0%;
+  background: linear-gradient(
+    90deg,
+    hsl(168 88% 70%) 0%,
+    hsl(282 82% 80%) 50%,
+    hsl(168 88% 70%) 100%
+  );
+  border-radius: 1px;
+  opacity: 0;
+}
+
+.vote-gradient-bar.loading::after {
+  opacity: 1;
+  animation: bar-fill 1s linear forwards;
 }
 
 .vote-buttons {

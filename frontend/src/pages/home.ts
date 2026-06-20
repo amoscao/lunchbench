@@ -134,20 +134,19 @@ export function renderHome(
     const buttons = document.querySelectorAll<HTMLButtonElement>('.vote-buttons .btn')
     buttons.forEach((b) => (b.disabled = true))
 
-    const arena = document.querySelector<HTMLDivElement>('.vote-arena')
-    if (arena) {
-      arena.style.transition = 'opacity 0.2s'
-      arena.style.opacity = '0'
-    }
+    const bar = document.querySelector<HTMLDivElement>('.vote-gradient-bar')
+    if (bar) bar.classList.add('loading')
+
+    const delay = new Promise<void>((r) => setTimeout(r, 1000))
 
     try {
-      const res = await submitVote(leftLunch.id, rightLunch.id, result)
-      await new Promise((r) => setTimeout(r, 200))
+      const [res] = await Promise.all([
+        submitVote(leftLunch.id, rightLunch.id, result),
+        delay,
+      ])
       await load(res.next)
     } catch {
-      if (arena) {
-        arena.style.opacity = '1'
-      }
+      if (bar) bar.classList.remove('loading')
       buttons.forEach((b) => (b.disabled = false))
       const err = document.createElement('p')
       err.style.cssText = 'text-align:center;color:#dc2626;margin-top:12px;font-size:13px;'

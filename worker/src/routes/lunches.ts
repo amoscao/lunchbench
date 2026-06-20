@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow, validateAdminToken } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
-import { confidenceFromRd } from '../elo'
+import { computeConsistency, confidenceFromRd, consistencyBand } from '../elo'
 import type { LunchRow } from '../types'
 
 const lunches = new Hono<{ Bindings: Bindings }>()
@@ -28,6 +28,9 @@ lunches.get('/leaderboard', async (c) => {
     rank: i + 1,
     ...lunchFromRow(r, baseUrl),
     confidence: confidenceFromRd(r.glicko_rd),
+    consistency: computeConsistency(r.wins, r.losses, r.ties),
+    consistency_band: consistencyBand(computeConsistency(r.wins, r.losses, r.ties)),
+    glicko_rd: r.glicko_rd,
   }))
   return c.json({ lunches: ranked })
 })

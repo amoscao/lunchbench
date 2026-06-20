@@ -1063,3 +1063,68 @@ img {
     display: none;
   }
 }
+
+/* =====================
+   Leaderboard tooltips
+   ===================== */
+.col-help {
+  position: relative;
+  cursor: help;
+}
+.col-help::after {
+  content: attr(data-help);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  max-width: 260px;
+  white-space: normal;
+  text-align: left;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 200;
+  line-height: 1.4;
+}
+.col-help[data-help-align="right"]::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.col-help:hover::after,
+.col-help:focus-visible::after {
+  opacity: 1;
+}
+
+/* =====================
+   Confidence cell
+   ===================== */
+.confidence-pct { font-size: var(--text-sm); font-weight: 600; }
+.confidence-rd  { font-size: 11px; color: var(--text-muted); }
+
+/* =====================
+   Consistency cell
+   ===================== */
+.consistency-row    { display: flex; align-items: center; gap: 8px; }
+.consistency-num    { font-size: var(--text-sm); font-weight: 600; width: 2.5rem; text-align: right; flex-shrink: 0; }
+.consistency-empty  { color: var(--text-muted); font-size: var(--text-sm); }
+.consistency-bar-track { flex: 1; height: 6px; border-radius: 3px; background: var(--border-accent); overflow: hidden; max-width: 8.5rem; }
+.consistency-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+.consistency-very-steady       { color: hsl(152, 60%, 45%); }
+.consistency-steady            { color: hsl(168, 88%, 52%); }
+.consistency-mixed             { color: hsl(40, 95%, 52%); }
+.consistency-high-swing        { color: hsl(0, 80%, 52%); }
+
+.consistency-fill-very-steady  { background: hsl(152, 60%, 45%); }
+.consistency-fill-steady       { background: hsl(168, 88%, 52%); }
+.consistency-fill-mixed        { background: hsl(40, 95%, 52%); }
+.consistency-fill-high-swing   { background: hsl(0, 80%, 52%); }

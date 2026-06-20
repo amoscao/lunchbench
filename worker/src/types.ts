@@ -39,3 +39,9 @@ export type LunchRow = {
   created_at: string
   updated_at: string
 }
+
+export type LeaderboardRow = Lunch & {
+  confidence: number
+  consistency: number | null
+  consistency_band: string | null
+}

@@ -13,7 +13,14 @@ export type Lunch = {
   updated_at: string
 }
 
-export type LeaderboardLunch = Lunch & { rank: number }
+export type LeaderboardLunch = Lunch & {
+  rank: number
+  confidence: number
+  consistency: number | null
+  consistency_band: string | null
+  glicko_rd: number
+  conservative_rating: number
+}
 
 const BASE = '/api'
 

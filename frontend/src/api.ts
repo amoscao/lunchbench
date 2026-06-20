@@ -22,6 +22,17 @@ export type LeaderboardLunch = Lunch & {
   conservative_rating: number
 }
 
+export type LunchDetail = Lunch & {
+  glicko_rd: number
+  glicko_volatility: number
+  conservative_rating: number
+  confidence: number
+  consistency: number | null
+  consistency_band: string | null
+  win_rate: number
+  momentum: number
+}
+
 const BASE = '/api'
 
 export async function getMatchup(veganOnly = false): Promise<{ left: Lunch; right: Lunch } | null> {
@@ -68,6 +79,12 @@ export async function getLunchesWithoutImages(): Promise<Lunch[]> {
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
   const data = await res.json()
   return data.lunches
+}
+
+export async function getLunch(id: number): Promise<LunchDetail> {
+  const res = await fetch(`${BASE}/lunches/${id}`)
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
+  return res.json()
 }
 
 export async function createLunch(

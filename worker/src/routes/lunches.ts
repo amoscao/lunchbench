@@ -17,6 +17,33 @@ lunches.get('/', async (c) => {
   return c.json({ lunches: result.results.map((r) => lunchFromRow(r, baseUrl)) })
 })
 
+lunches.get('/:id{[0-9]+}', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: 'Invalid id', code: 'BAD_REQUEST' }, 400)
+  }
+
+  const row = await c.env.DB.prepare('SELECT * FROM lunches WHERE id = ?').bind(id).first<LunchRow>()
+  if (!row) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
+
+  const momentum = 0
+  const baseUrl = new URL(c.req.url).origin
+  const lunch = lunchFromRow(row, baseUrl)
+  const consistency = computeConsistency(row.wins, row.losses, row.ties)
+
+  return c.json({
+    ...lunch,
+    glicko_rd: row.glicko_rd,
+    glicko_volatility: row.glicko_volatility,
+    conservative_rating: row.conservative_rating,
+    confidence: confidenceFromRd(row.glicko_rd),
+    consistency,
+    consistency_band: consistencyBand(consistency),
+    win_rate: (row.wins + row.losses + row.ties) > 0 ? row.wins / (row.wins + row.losses + row.ties) : 0,
+    momentum,
+  })
+})
+
 lunches.get('/leaderboard', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly

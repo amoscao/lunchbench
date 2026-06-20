@@ -34,6 +34,7 @@ export async function submitVote(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ left_lunch_id: leftId, right_lunch_id: rightId, result }),
   })
+  if (res.status === 429) throw new Error('rate_limited')
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as any).error ?? `Vote failed: ${res.status}`)

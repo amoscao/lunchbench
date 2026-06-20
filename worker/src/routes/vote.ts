@@ -10,7 +10,7 @@ const vote = new Hono<{ Bindings: Bindings }>()
 
 vote.post('/', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'vote', 30, 3600)
+  const rl = await checkRateLimit(c.env.DB, ip, 'vote', 300, 3600)
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },

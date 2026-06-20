@@ -114,6 +114,26 @@ html {
   transition: background-color 0.25s, color 0.25s;
 }
 
+/* Dark mode ambient glow — matches minebench radial gradient atmosphere */
+[data-theme="dark"] body {
+  background-image:
+    radial-gradient(ellipse 90% 70% at 88% -8%,  hsl(168 88% 52% / 0.18) 0, hsl(168 88% 52% / 0.07) 28%, transparent 62%),
+    radial-gradient(ellipse 70% 60% at 8% 102%,  hsl(282 82% 68% / 0.10) 0, transparent 58%);
+}
+
+/* Subtle dot-grid background pattern like minebench */
+[data-theme="dark"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right,  hsl(223 18% 22% / 0.3) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(223 18% 22% / 0.3) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
+}
+
 body {
   min-height: 100vh;
   display: flex;
@@ -145,6 +165,8 @@ img {
   margin: 0 auto;
   padding: var(--space-10) var(--space-5);
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 /* =====================
@@ -154,6 +176,7 @@ img {
   position: sticky;
   top: 0;
   z-index: 100;
+  isolation: isolate;
   height: 56px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
@@ -319,6 +342,14 @@ img {
   box-shadow: var(--shadow-md), 0 8px 24px rgba(0,0,0,0.12);
 }
 
+/* Dark mode card gradient overlay — teal top-left, purple top-right */
+[data-theme="dark"] .lunch-card {
+  background:
+    radial-gradient(520px 260px at 0 0,   hsl(168 88% 52% / 0.14), transparent 62%),
+    radial-gradient(640px 300px at 100% 0, hsl(282 82% 68% / 0.12), transparent 58%),
+    var(--bg-surface);
+}
+
 .lunch-card-image {
   flex: 0 0 60%;
   min-height: 240px;
@@ -428,11 +459,26 @@ img {
   padding: 0 var(--space-2);
 }
 
+.vote-gradient-bar {
+  height: 2px;
+  border-radius: 1px;
+  margin: var(--space-6) auto 0;
+  max-width: 600px;
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    hsl(168 88% 52% / 0.45) 28%,
+    hsl(282 82% 68% / 0.60) 52%,
+    hsl(168 88% 52% / 0.45) 72%,
+    transparent 100%
+  );
+}
+
 .vote-buttons {
   display: flex;
   gap: var(--space-3);
   justify-content: center;
-  margin-top: var(--space-6);
+  margin-top: var(--space-4);
 }
 
 .vote-button-wrap {

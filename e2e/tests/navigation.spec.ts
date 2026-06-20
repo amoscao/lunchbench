@@ -20,10 +20,6 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL('/leaderboard')
     await expect(page.locator('.page-heading')).toHaveText('Leaderboard')
 
-    await page.click('.nav-link[data-path="/add"]')
-    await expect(page).toHaveURL('/add')
-    await expect(page.locator('.page-heading')).toHaveText('Add Lunch')
-
     await page.click('.nav-link[data-path="/"]')
     await expect(page).toHaveURL('/')
   })

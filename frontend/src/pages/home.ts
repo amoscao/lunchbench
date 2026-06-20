@@ -219,6 +219,10 @@ export function renderHome(
     arena.appendChild(renderCard(rightLunch, 'DISH B'))
     content.appendChild(arena)
 
+    const gradientBar = document.createElement('div')
+    gradientBar.className = 'vote-gradient-bar'
+    content.appendChild(gradientBar)
+
     const voteRow = document.createElement('div')
     voteRow.className = 'vote-buttons'
 

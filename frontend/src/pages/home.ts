@@ -281,6 +281,18 @@ export function renderHome(
     voteRow.appendChild(left.wrapper)
     voteRow.appendChild(tie.wrapper)
     voteRow.appendChild(right.wrapper)
+
+    const hintPulse = (btn: HTMLButtonElement): void => {
+      btn.classList.remove('btn-hint-pulse')
+      // Force reflow so re-adding the class re-triggers the animation
+      void btn.offsetWidth
+      btn.classList.add('btn-hint-pulse')
+      btn.addEventListener('animationend', () => btn.classList.remove('btn-hint-pulse'), { once: true })
+    }
+
+    const arenaCards = arena.querySelectorAll<HTMLElement>('.lunch-card')
+    arenaCards[0]?.addEventListener('click', () => { if (!isSubmitting) hintPulse(left.button) })
+    arenaCards[1]?.addEventListener('click', () => { if (!isSubmitting) hintPulse(right.button) })
     content.appendChild(voteRow)
     content.appendChild(renderHowItWorks())
 

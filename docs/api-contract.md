@@ -240,3 +240,35 @@ type Lunch = {
   updated_at: string
 }
 ```
+
+### GET /api/lunches/:id
+Returns full stats for one lunch.
+
+**Response 200:**
+```json
+{
+  "id": 1,
+  "name": "Margherita Pizza",
+  "image_key": "images/abc123.jpg",
+  "image_url": "/api/images/images/abc123.jpg",
+  "rating": 1024.5,
+  "glicko_rd": 340.2,
+  "glicko_volatility": 0.06,
+  "conservative_rating": 1344.1,
+  "confidence": 84,
+  "consistency": 88.9,
+  "consistency_band": "very-steady",
+  "win_rate": 0.75,
+  "wins": 12,
+  "losses": 2,
+  "ties": 1,
+  "momentum": 0,
+  "is_vegan": 0,
+  "created_at": "2024-09-23T12:00:00Z",
+  "updated_at": "2024-09-23T14:00:00Z"
+}
+```
+
+**Errors:**
+- `400 BAD_REQUEST` — invalid id
+- `404 NOT_FOUND` — lunch not found

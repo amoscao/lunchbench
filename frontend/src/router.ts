@@ -23,7 +23,7 @@ export class Router {
     this.resolve()
   }
 
-  resolve(): void {
+  async resolve(): Promise<void> {
     const path = window.location.pathname
     const route = this.routes.find((r) => r.path === path) ?? this.routes.find((r) => r.path === '/')
     if (route) {
@@ -36,6 +36,26 @@ export class Router {
       if (typeof cleanup === 'function') {
         this.currentCleanup = cleanup
       }
+      this.updateNavLinks()
+      return
+    }
+
+    const lunchMatch = path.match(/^\/lunch\/(\d+)$/)
+    if (lunchMatch) {
+      const { renderLunchDetail } = await import('./pages/lunch-detail')
+      if (this.currentCleanup) {
+        this.currentCleanup()
+        this.currentCleanup = null
+      }
+      this.container.innerHTML = ''
+      const cleanup = renderLunchDetail(this.container, (target) => this.navigate(target), Number(lunchMatch[1]))
+      if (typeof cleanup === 'function') {
+        this.currentCleanup = cleanup
+      } else {
+        this.currentCleanup = null
+      }
+      this.updateNavLinks()
+      return
     }
     this.updateNavLinks()
   }

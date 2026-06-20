@@ -71,6 +71,8 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
       tbody.innerHTML = ''
       for (const lunch of lunches) {
         const row = document.createElement('tr')
+        row.style.cursor = 'pointer'
+        row.addEventListener('click', () => navigate(`/lunch/${lunch.id}`))
 
         const rankTd = document.createElement('td')
         rankTd.className = 'col-rank'

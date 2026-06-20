@@ -71,7 +71,7 @@ cd e2e && BASE_URL=http://localhost:5173 API_URL=http://localhost:8787 E2E_ADMIN
 - **Navigation**: all three pages accessible, active link highlighting, logo/link navigation, SPA routing
 - **Theme**: light/dark toggle, persistence, icon updates
 - **Home / Voting**: matchup loads, cards display, vote buttons work, vote submission, sequential voting, button disabled during submission
-- **Leaderboard**: all lunches shown, rank badges (gold/silver/bronze), ratings, Elo updates after voting, thumbnails/placeholders
+- **Leaderboard**: all lunches shown, rank badges (gold/silver/bronze), ratings, Glicko updates after voting, thumbnails/placeholders
 - **Add Lunch**: mode switching, text-only add, authentication, error states, image upload area, client-side file validation
 - **API**: health, matchup, vote (win + tie), invalid requests, auth, image upload rejection
 
@@ -93,7 +93,7 @@ If tests are failing, you have two options:
 ### Why this rule exists
 
 - The tests are the only thing that verifies the app works end-to-end after every change
-- A passing test suite gives confidence that voting, Elo, the leaderboard, image handling, and auth all work together
+- A passing test suite gives confidence that voting, Glicko ratings, the leaderboard, image handling, and auth all work together
 - Bypassing is irreversible once code is in main - bugs reach production
 
 ### If a test is flaky (intermittently fails without code changes)

@@ -113,7 +113,7 @@ Line height: 1.5 on body, 1.2 on headings.
 │                         │
 ├─────────────────────────┤
 │  Lunch Name             │  ← --text-md, --text-primary
-│  Elo: 1042 · 12W 3L 1T │  ← --text-sm, --text-muted
+│  Score: 1042 · 12W 3L 1T │  ← --text-sm, --text-muted
 └─────────────────────────┘
 ```
 

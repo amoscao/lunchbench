@@ -7,6 +7,152 @@ import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 
 const vote = new Hono<{ Bindings: Bindings }>()
+export const MAX_VOTE_WRITE_ATTEMPTS = 10
+
+type VoteResult = 'left_win' | 'right_win' | 'tie'
+type VoteWriteResult =
+  | { status: 'ok'; voteId: number }
+  | { status: 'not_found' }
+  | { status: 'conflict' }
+
+function uniqueIsoTimestamp(): string {
+  const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0')
+  return new Date().toISOString().replace('Z', `${suffix}Z`)
+}
+
+export async function recordVoteWithRetry(
+  db: D1Database,
+  left_lunch_id: number,
+  right_lunch_id: number,
+  result: VoteResult,
+  voterKey: string
+): Promise<VoteWriteResult> {
+  let voteId: number | null = null
+
+  for (let attempt = 0; attempt < MAX_VOTE_WRITE_ATTEMPTS && voteId === null; attempt++) {
+    const [leftRow, rightRow] = await Promise.all([
+      db.prepare('SELECT * FROM lunches WHERE id = ?').bind(left_lunch_id).first<LunchRow>(),
+      db.prepare('SELECT * FROM lunches WHERE id = ?').bind(right_lunch_id).first<LunchRow>(),
+    ])
+
+    if (!leftRow || !rightRow) {
+      return { status: 'not_found' }
+    }
+
+    const outcome = result === 'left_win' ? 'A_WIN' : result === 'right_win' ? 'B_WIN' : 'DRAW'
+    const updated = updateRatingPair({
+      a: { rating: leftRow.rating, rd: leftRow.glicko_rd, volatility: leftRow.glicko_volatility },
+      b: { rating: rightRow.rating, rd: rightRow.glicko_rd, volatility: rightRow.glicko_volatility },
+      outcome,
+    })
+    const newLeft = updated.a
+    const newRight = updated.b
+    const newLeftConservative = conservativeScore(newLeft.rating, newLeft.rd)
+    const newRightConservative = conservativeScore(newRight.rating, newRight.rd)
+
+    const leftWinIncrement = result === 'left_win' ? 1 : 0
+    const leftLossIncrement = result === 'right_win' ? 1 : 0
+    const leftTieIncrement = result === 'tie' ? 1 : 0
+
+    const rightWinIncrement = result === 'right_win' ? 1 : 0
+    const rightLossIncrement = result === 'left_win' ? 1 : 0
+    const rightTieIncrement = result === 'tie' ? 1 : 0
+
+    const now = uniqueIsoTimestamp()
+
+    // D1 batch is transactional. The guarded update only touches both rows if
+    // both still match the rating snapshot used for this Glicko update. The
+    // insert is tied to this update's unique timestamp, so stale attempts do
+    // not create vote rows.
+    const writeResults = await db.batch([
+      db.prepare(
+        `UPDATE lunches
+         SET
+          rating = CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE rating END,
+          glicko_rd = CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE glicko_rd END,
+          glicko_volatility = CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE glicko_volatility END,
+          conservative_rating = CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE conservative_rating END,
+          wins = wins + CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE 0 END,
+          losses = losses + CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE 0 END,
+          ties = ties + CASE id WHEN ? THEN ? WHEN ? THEN ? ELSE 0 END,
+          updated_at = ?
+         WHERE id IN (?, ?)
+          AND EXISTS (
+            SELECT 1 FROM lunches
+            WHERE id = ?
+              AND rating = ?
+              AND glicko_rd = ?
+              AND glicko_volatility = ?
+              AND conservative_rating = ?
+          )
+          AND EXISTS (
+            SELECT 1 FROM lunches
+            WHERE id = ?
+              AND rating = ?
+              AND glicko_rd = ?
+              AND glicko_volatility = ?
+              AND conservative_rating = ?
+          )
+         RETURNING id`
+      ).bind(
+        left_lunch_id, newLeft.rating, right_lunch_id, newRight.rating,
+        left_lunch_id, newLeft.rd, right_lunch_id, newRight.rd,
+        left_lunch_id, newLeft.volatility, right_lunch_id, newRight.volatility,
+        left_lunch_id, newLeftConservative, right_lunch_id, newRightConservative,
+        left_lunch_id, leftWinIncrement, right_lunch_id, rightWinIncrement,
+        left_lunch_id, leftLossIncrement, right_lunch_id, rightLossIncrement,
+        left_lunch_id, leftTieIncrement, right_lunch_id, rightTieIncrement,
+        now,
+        left_lunch_id, right_lunch_id,
+        left_lunch_id,
+        leftRow.rating,
+        leftRow.glicko_rd,
+        leftRow.glicko_volatility,
+        leftRow.conservative_rating,
+        right_lunch_id,
+        rightRow.rating,
+        rightRow.glicko_rd,
+        rightRow.glicko_volatility,
+        rightRow.conservative_rating
+      ),
+      db.prepare(
+        `INSERT INTO votes (
+          left_lunch_id,
+          right_lunch_id,
+          result,
+          left_rating_before,
+          right_rating_before,
+          left_rating_after,
+          right_rating_after,
+          voter_key
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE
+          (SELECT updated_at FROM lunches WHERE id = ?) = ?
+          AND (SELECT updated_at FROM lunches WHERE id = ?) = ?
+        RETURNING id`
+      ).bind(
+        left_lunch_id,
+        right_lunch_id,
+        result,
+        leftRow.rating,
+        rightRow.rating,
+        newLeft.rating,
+        newRight.rating,
+        voterKey,
+        left_lunch_id,
+        now,
+        right_lunch_id,
+        now
+      ),
+    ])
+
+    const voteRow = writeResults[1]?.results?.[0] as { id: number } | undefined
+    voteId = voteRow?.id ?? null
+  }
+
+  return voteId === null ? { status: 'conflict' } : { status: 'ok', voteId }
+}
 
 vote.post('/', async (c) => {
   const ip = getClientIp(c.req.raw)
@@ -40,85 +186,26 @@ vote.post('/', async (c) => {
   const { left_lunch_id, right_lunch_id, result } = body as {
     left_lunch_id: number
     right_lunch_id: number
-    result: 'left_win' | 'right_win' | 'tie'
+    result: VoteResult
   }
 
-  const [leftRow, rightRow] = await Promise.all([
-    c.env.DB.prepare('SELECT * FROM lunches WHERE id = ?').bind(left_lunch_id).first<LunchRow>(),
-    c.env.DB.prepare('SELECT * FROM lunches WHERE id = ?').bind(right_lunch_id).first<LunchRow>(),
-  ])
+  if (left_lunch_id === right_lunch_id) {
+    return c.json({ error: 'Lunches must be different', code: 'BAD_REQUEST' }, 400)
+  }
 
-  if (!leftRow || !rightRow) {
+  const writeResult = await recordVoteWithRetry(c.env.DB, left_lunch_id, right_lunch_id, result, ip)
+  if (writeResult.status === 'not_found') {
     return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
   }
-
-  const outcome = result === 'left_win' ? 'A_WIN' : result === 'right_win' ? 'B_WIN' : 'DRAW'
-  const updated = updateRatingPair({
-    a: { rating: leftRow.rating, rd: leftRow.glicko_rd, volatility: leftRow.glicko_volatility },
-    b: { rating: rightRow.rating, rd: rightRow.glicko_rd, volatility: rightRow.glicko_volatility },
-    outcome,
-  })
-  const newLeft = updated.a
-  const newRight = updated.b
-  const newLeftConservative = conservativeScore(newLeft.rating, newLeft.rd)
-  const newRightConservative = conservativeScore(newRight.rating, newRight.rd)
-
-  const leftWins = result === 'left_win' ? leftRow.wins + 1 : leftRow.wins
-  const leftLosses = result === 'right_win' ? leftRow.losses + 1 : leftRow.losses
-  const leftTies = result === 'tie' ? leftRow.ties + 1 : leftRow.ties
-
-  const rightWins = result === 'right_win' ? rightRow.wins + 1 : rightRow.wins
-  const rightLosses = result === 'left_win' ? rightRow.losses + 1 : rightRow.losses
-  const rightTies = result === 'tie' ? rightRow.ties + 1 : rightRow.ties
-
-  const now = new Date().toISOString()
-
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      'UPDATE lunches SET rating = ?, glicko_rd = ?, glicko_volatility = ?, conservative_rating = ?, wins = ?, losses = ?, ties = ?, updated_at = ? WHERE id = ?'
-    ).bind(
-      newLeft.rating,
-      newLeft.rd,
-      newLeft.volatility,
-      newLeftConservative,
-      leftWins,
-      leftLosses,
-      leftTies,
-      now,
-      left_lunch_id
-    ),
-    c.env.DB.prepare(
-      'UPDATE lunches SET rating = ?, glicko_rd = ?, glicko_volatility = ?, conservative_rating = ?, wins = ?, losses = ?, ties = ?, updated_at = ? WHERE id = ?'
-    ).bind(
-      newRight.rating,
-      newRight.rd,
-      newRight.volatility,
-      newRightConservative,
-      rightWins,
-      rightLosses,
-      rightTies,
-      now,
-      right_lunch_id
-    ),
-    c.env.DB.prepare(
-      `INSERT INTO votes (left_lunch_id, right_lunch_id, result, left_rating_before, right_rating_before, left_rating_after, right_rating_after, voter_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      left_lunch_id, right_lunch_id, result,
-      leftRow.rating, rightRow.rating,
-      newLeft.rating, newRight.rating,
-      ip
-    ),
-  ])
-
-  const voteRow = await c.env.DB.prepare(
-    'SELECT id FROM votes ORDER BY id DESC LIMIT 1'
-  ).first<{ id: number }>()
+  if (writeResult.status === 'conflict') {
+    return c.json({ error: 'Vote conflict, please retry', code: 'CONFLICT' }, 409)
+  }
 
   // Get next matchup
   const allLunches = await c.env.DB.prepare('SELECT * FROM lunches').all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
-    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC LIMIT 10'
+    // id DESC makes same-second D1 timestamps deterministic.
+    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
   ).all<{ left_lunch_id: number; right_lunch_id: number }>()
 
   const recentPairs: [number, number][] = recentVotes.results.map(
@@ -129,7 +216,7 @@ vote.post('/', async (c) => {
   const baseUrl = new URL(c.req.url).origin
 
   return c.json({
-    vote_id: voteRow?.id ?? null,
+    vote_id: writeResult.voteId,
     next: nextPair
       ? { left: lunchFromRow(nextPair[0], baseUrl), right: lunchFromRow(nextPair[1], baseUrl) }
       : null,

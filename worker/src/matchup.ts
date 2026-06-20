@@ -1,12 +1,14 @@
 export type LunchForMatchup = {
   id: number
+  rating: number
+  glicko_rd: number
   [key: string]: unknown
 }
 
 /**
  * Selects two distinct lunches for a voting matchup.
- * Tries to avoid pairs that appeared in recentPairs (list of [idA, idB] tuples).
- * Falls back to any random pair if all are recent.
+ * Weights anchor selection by uncertainty, then picks the closest-rated opponent.
+ * Tries to avoid pairs that appeared in recentPairs, falling back only when needed.
  */
 export function selectMatchup<T extends LunchForMatchup>(
   lunches: T[],
@@ -15,23 +17,40 @@ export function selectMatchup<T extends LunchForMatchup>(
   if (lunches.length < 2) return null
 
   const recentSet = new Set(recentPairs.map(([a, b]) => pairKey(a, b)))
+  const anchorPool = lunches.filter((lunch) =>
+    lunches.some((other) => other.id !== lunch.id && !recentSet.has(pairKey(lunch.id, other.id)))
+  )
+  const anchor = weightedByRd(anchorPool.length > 0 ? anchorPool : lunches)
+  const opponentPool = lunches.filter((lunch) =>
+    lunch.id !== anchor.id && (
+      anchorPool.length === 0 || !recentSet.has(pairKey(anchor.id, lunch.id))
+    )
+  )
+  const opponent = closestRated(anchor, opponentPool)
+  const pair: [T, T] = [anchor, opponent]
 
-  // Shuffle a copy
-  const shuffled = [...lunches].sort(() => Math.random() - 0.5)
+  return Math.random() < 0.5 ? [pair[1], pair[0]] : pair
+}
 
-  // Try to find a pair not in recentPairs
-  for (let i = 0; i < shuffled.length; i++) {
-    for (let j = i + 1; j < shuffled.length; j++) {
-      const a = shuffled[i]
-      const b = shuffled[j]
-      if (!recentSet.has(pairKey(a.id, b.id))) {
-        return [a, b]
-      }
-    }
+function weightedByRd<T extends LunchForMatchup>(lunches: T[]): T {
+  const weights = lunches.map((lunch) => Math.max(0, lunch.glicko_rd))
+  const total = weights.reduce((sum, weight) => sum + weight, 0)
+  if (total <= 0) return lunches[Math.floor(Math.random() * lunches.length)]
+
+  const target = Math.random() * total
+  let cumulative = 0
+  for (let i = 0; i < lunches.length; i++) {
+    cumulative += weights[i]
+    if (target < cumulative) return lunches[i]
   }
+  return lunches[lunches.length - 1]
+}
 
-  // All pairs are recent - fall back to first shuffled pair
-  return [shuffled[0], shuffled[1]]
+function closestRated<T extends LunchForMatchup>(anchor: T, lunches: T[]): T {
+  return [...lunches].sort((a, b) => {
+    const ratingDiff = Math.abs(a.rating - anchor.rating) - Math.abs(b.rating - anchor.rating)
+    return ratingDiff || a.id - b.id
+  })[0]
 }
 
 function pairKey(a: number, b: number): string {

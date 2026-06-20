@@ -25,6 +25,11 @@ test.describe('API', () => {
     expect(body.lunches).toBeInstanceOf(Array)
     expect(body.lunches.length).toBeGreaterThan(0)
     expect(body.lunches[0].rank).toBe(1)
+    for (let i = 1; i < body.lunches.length; i++) {
+      const prev = body.lunches[i - 1]
+      const current = body.lunches[i]
+      expect(prev.conservative_rating).toBeGreaterThanOrEqual(current.conservative_rating)
+    }
   })
 
   test('POST /api/vote updates ratings', async ({ request }) => {
@@ -44,6 +49,10 @@ test.describe('API', () => {
     const updatedRight = lunches.find((l: any) => l.id === right.id)
     expect(updatedLeft.rating).not.toBe(left.rating)
     expect(updatedRight.rating).not.toBe(right.rating)
+    expect(updatedLeft.glicko_rd).not.toBe(left.glicko_rd)
+    expect(updatedRight.glicko_rd).not.toBe(right.glicko_rd)
+    expect(updatedLeft.conservative_rating).toBeCloseTo(updatedLeft.rating - (2 * updatedLeft.glicko_rd), 5)
+    expect(updatedRight.conservative_rating).toBeCloseTo(updatedRight.rating - (2 * updatedRight.glicko_rd), 5)
     expect(updatedLeft.wins).toBe(left.wins + 1)
     expect(updatedRight.losses).toBe(right.losses + 1)
   })
@@ -72,6 +81,38 @@ test.describe('API', () => {
     expect(res.status()).toBe(400)
   })
 
+  test('POST /api/vote rejects self match', async ({ request }) => {
+    const matchupRes = await request.get(`${API_URL}/api/matchup`)
+    const { left } = await matchupRes.json()
+
+    const res = await request.post(`${API_URL}/api/vote`, {
+      data: { left_lunch_id: left.id, right_lunch_id: left.id, result: 'left_win' },
+    })
+    expect(res.status()).toBe(400)
+  })
+
+  test('POST /api/vote counts accepted concurrent votes and rejects stale conflicts', async ({ request }) => {
+    const matchupRes = await request.get(`${API_URL}/api/matchup`)
+    const { left, right } = await matchupRes.json()
+
+    const votes = await Promise.all(Array.from({ length: 5 }, () =>
+      request.post(`${API_URL}/api/vote`, {
+        data: { left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' },
+      })
+    ))
+    const accepted = votes.filter((res) => res.ok()).length
+    const conflicts = votes.filter((res) => res.status() === 409).length
+    expect(accepted).toBeGreaterThan(0)
+    expect(accepted + conflicts).toBe(5)
+
+    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard?per_page=50`)
+    const { lunches } = await lbRes.json()
+    const updatedLeft = lunches.find((l: any) => l.id === left.id)
+    const updatedRight = lunches.find((l: any) => l.id === right.id)
+    expect(updatedLeft.wins).toBe(left.wins + accepted)
+    expect(updatedRight.losses).toBe(right.losses + accepted)
+  })
+
   test('POST /api/lunches requires auth', async ({ request }) => {
     const res = await request.post(`${API_URL}/api/lunches`, {
       data: { name: 'Unauthorized Lunch' },
@@ -88,7 +129,29 @@ test.describe('API', () => {
     expect(res.ok()).toBe(true)
     const body = await res.json()
     expect(body.lunch.name).toBe(uniqueName)
-    expect(body.lunch.rating).toBe(1000)
+    expect(body.lunch.rating).toBe(1500)
+    expect(body.lunch.glicko_rd).toBe(350)
+    expect(body.lunch.glicko_volatility).toBe(0.06)
+    expect(body.lunch.conservative_rating).toBe(800)
+  })
+
+  test('leaderboard uses deterministic same-name ordering', async ({ request }) => {
+    const sameName = `Same Name ${Date.now()}`
+    const firstRes = await request.post(`${API_URL}/api/lunches`, {
+      data: { name: sameName },
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    })
+    const secondRes = await request.post(`${API_URL}/api/lunches`, {
+      data: { name: sameName },
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    })
+    const { lunch: first } = await firstRes.json()
+    const { lunch: second } = await secondRes.json()
+
+    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard?per_page=50`)
+    const { lunches } = await lbRes.json()
+    const matches = lunches.filter((l: any) => l.name === sameName)
+    expect(matches.map((l: any) => l.id)).toEqual([first.id, second.id].sort((a, b) => a - b))
   })
 
   test('POST /api/lunches rejects empty name', async ({ request }) => {

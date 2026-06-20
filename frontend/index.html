@@ -11,7 +11,7 @@
   <script>
     (function() {
       var saved = localStorage.getItem('theme');
-      var preferred = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      var preferred = saved || 'dark';
       document.documentElement.setAttribute('data-theme', preferred);
       if (localStorage.getItem('vegan-mode') === 'true') {
         document.documentElement.setAttribute('data-vegan', 'true');

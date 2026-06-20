@@ -127,7 +127,7 @@ export function renderAdd(container: HTMLElement): void {
       uploadGroup = document.createElement('div')
       uploadGroup.className = 'form-group'
 
-      const uploadArea = document.createElement('label')
+      const uploadArea = document.createElement('div')
       uploadArea.className = 'upload-area'
       uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP · max 5MB</p>`
 
@@ -136,6 +136,8 @@ export function renderAdd(container: HTMLElement): void {
       fileInput.accept = 'image/jpeg,image/png,image/webp'
       fileInput.style.display = 'none'
       uploadArea.appendChild(fileInput)
+
+      uploadArea.addEventListener('click', () => fileInput.click())
 
       imagePreview = document.createElement('img')
       imagePreview.className = 'upload-preview'

@@ -161,6 +161,15 @@ export function renderHome(
         submitVote(leftLunch.id, rightLunch.id, result),
         delay,
       ])
+
+      // Fade out the arena, then load next matchup
+      const arena = document.querySelector<HTMLElement>('.vote-arena')
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (arena && !reducedMotion) {
+        arena.classList.add('fading-out')
+        await new Promise<void>((r) => setTimeout(r, 260))
+      }
+
       await load(res.next)
     } catch (e) {
       if (bar) bar.classList.remove('loading')
@@ -241,6 +250,8 @@ export function renderHome(
     vs.textContent = 'VS'
     arena.appendChild(vs)
     arena.appendChild(renderCard(rightLunch, 'DISH B'))
+    const reducedMotionFadeIn = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!reducedMotionFadeIn) arena.classList.add('fading-in')
     content.appendChild(arena)
 
     const gradientBar = document.createElement('div')

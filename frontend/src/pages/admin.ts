@@ -102,17 +102,59 @@ async function fetchAdminLunches(): Promise<Lunch[]> {
   return data.lunches
 }
 
+async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number; votes_30d: number }> {
+  const res = await fetch(`${API_URL}/admin/stats`, {
+    headers: { Authorization: `Bearer ${state.token}` },
+  })
+  if (res.status === 401) {
+    state.token = null
+    sessionStorage.removeItem('admin-token')
+    throw new Error('Session expired')
+  }
+  if (!res.ok) throw new Error('Failed to load stats')
+  return res.json()
+}
+
 function renderDashboard(container: HTMLElement): void {
+  let activeTab: 'lunches' | 'stats' = 'lunches'
+
   container.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <h1 class="page-heading" style="margin:0">Admin Dashboard</h1>
       <button class="btn btn-secondary" id="logout-btn">Logout</button>
     </div>
+    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
+      <button class="admin-tab admin-tab-active" id="tab-lunches" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px">Lunches</button>
+      <button class="admin-tab" id="tab-stats" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Stats</button>
+    </div>
     <div id="admin-alert" style="display:none" class="alert"></div>
-    <div id="admin-table-wrap">
-      <div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div>
+    <div id="admin-tab-content">
+      <div id="admin-table-wrap">
+        <div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div>
+      </div>
     </div>
   `
+
+  const tabLunches = container.querySelector<HTMLButtonElement>('#tab-lunches')!
+  const tabStats = container.querySelector<HTMLButtonElement>('#tab-stats')!
+  const tabContent = container.querySelector<HTMLElement>('#admin-tab-content')!
+
+  function setTab(tab: 'lunches' | 'stats'): void {
+    activeTab = tab
+    const accentStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px`
+    const inactiveStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px`
+    tabLunches.style.cssText = tab === 'lunches' ? accentStyle : inactiveStyle
+    tabStats.style.cssText   = tab === 'stats'   ? accentStyle : inactiveStyle
+    if (tab === 'lunches') {
+      tabContent.innerHTML = `<div id="admin-table-wrap"><div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div></div>`
+      loadTable()
+    } else {
+      loadStats()
+    }
+  }
+
+  tabLunches.addEventListener('click', () => setTab('lunches'))
+  tabStats.addEventListener('click',   () => setTab('stats'))
 
   container.querySelector('#logout-btn')!.addEventListener('click', () => {
     state.token = null
@@ -257,6 +299,42 @@ function renderDashboard(container: HTMLElement): void {
       row.innerHTML = originalHTML
       renderTable()
     })
+  }
+
+  function loadStats(): void {
+    tabContent.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:680px">
+        <div class="card" style="padding:28px 24px;text-align:center">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:12px">Last 24 Hours</div>
+          <div id="stat-24h" class="skeleton" style="height:48px;border-radius:var(--radius-md);width:80px;margin:0 auto"></div>
+        </div>
+        <div class="card" style="padding:28px 24px;text-align:center">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:12px">Last 7 Days</div>
+          <div id="stat-7d" class="skeleton" style="height:48px;border-radius:var(--radius-md);width:80px;margin:0 auto"></div>
+        </div>
+        <div class="card" style="padding:28px 24px;text-align:center">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:12px">Last 30 Days</div>
+          <div id="stat-30d" class="skeleton" style="height:48px;border-radius:var(--radius-md);width:80px;margin:0 auto"></div>
+        </div>
+      </div>
+    `
+
+    fetchAdminStats()
+      .then(({ votes_24h, votes_7d, votes_30d }) => {
+        const fmt = (n: number): string =>
+          `<div style="font-size:42px;font-weight:800;color:var(--accent);line-height:1">${n.toLocaleString()}</div><div style="font-size:12px;color:var(--text-secondary);margin-top:6px">votes</div>`
+        tabContent.querySelector('#stat-24h')!.outerHTML = `<div id="stat-24h">${fmt(votes_24h)}</div>`
+        tabContent.querySelector('#stat-7d')!.outerHTML  = `<div id="stat-7d">${fmt(votes_7d)}</div>`
+        tabContent.querySelector('#stat-30d')!.outerHTML = `<div id="stat-30d">${fmt(votes_30d)}</div>`
+      })
+      .catch((e: unknown) => {
+        if ((e as Error).message === 'Session expired') {
+          container.innerHTML = ''
+          renderLogin(container)
+          return
+        }
+        tabContent.innerHTML = `<div class="alert alert-error">Failed to load stats</div>`
+      })
   }
 
   loadTable()

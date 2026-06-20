@@ -134,4 +134,23 @@ admin.delete('/lunches/:id', requireAdminSession, async (c) => {
   return c.json({ deleted: true })
 })
 
+admin.get('/stats', requireAdminSession, async (c) => {
+  const now = new Date()
+  const ts24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+  const ts7d  = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000).toISOString()
+  const ts30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [r24h, r7d, r30d] = await c.env.DB.batch([
+    c.env.DB.prepare('SELECT COUNT(*) as n FROM votes WHERE created_at >= ?').bind(ts24h),
+    c.env.DB.prepare('SELECT COUNT(*) as n FROM votes WHERE created_at >= ?').bind(ts7d),
+    c.env.DB.prepare('SELECT COUNT(*) as n FROM votes WHERE created_at >= ?').bind(ts30d),
+  ])
+
+  return c.json({
+    votes_24h: (r24h.results[0] as { n: number }).n,
+    votes_7d:  (r7d.results[0]  as { n: number }).n,
+    votes_30d: (r30d.results[0] as { n: number }).n,
+  })
+})
+
 export { admin as adminRouter }

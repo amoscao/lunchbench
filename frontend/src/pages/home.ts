@@ -35,7 +35,7 @@ function renderHowItWorks(): HTMLElement {
     <div class="hiw-step">
       <span class="hiw-num">01</span>
       <h3 class="hiw-title">Vote</h3>
-      <p class="hiw-desc">Two lunch dishes go head to head. Pick the one you'd rather eat — or call it a tie.</p>
+      <p class="hiw-desc">Two lunch dishes go head to head. Pick the one you'd rather eat or call it a tie.</p>
     </div>
     <div class="hiw-step">
       <span class="hiw-num">02</span>

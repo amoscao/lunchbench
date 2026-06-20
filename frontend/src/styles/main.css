@@ -1557,3 +1557,25 @@ img {
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+
+@media (max-width: 600px) {
+  .vote-result-overlay {
+    flex-direction: row;
+    gap: 16px;
+    padding: 0 8px;
+  }
+
+  .overlay-rank-label,
+  .overlay-rating-label {
+    font-size: 10px;
+    margin-top: 0;
+  }
+
+  .overlay-rank-value {
+    font-size: 18px;
+  }
+
+  .overlay-rating-value {
+    font-size: 22px;
+  }
+}

@@ -147,10 +147,8 @@ export type ConsistencyBand = 'very-steady' | 'steady' | 'mixed' | 'high-swing'
 export function computeConsistency(wins: number, losses: number, ties: number): number | null {
   const votes = wins + losses + ties
   if (votes < 5) return null
-  const winRate = wins / votes
-  const spread = Math.abs(winRate - 0.5) * 200
-  const consistency = 100 - spread - (0.75 * spread * spread) / 100
-  return Math.max(0, Math.min(100, consistency))
+  const dominantShare = Math.max(wins, losses, ties) / votes
+  return Math.round(dominantShare * 1000) / 10
 }
 
 export function consistencyBand(consistency: number | null): ConsistencyBand | null {

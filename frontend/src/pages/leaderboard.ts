@@ -29,10 +29,10 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
           <tr>
             <th class="col-rank col-help" data-help="Current position on the leaderboard." tabindex="0">Rank</th>
             <th class="col-name col-help" data-help="Lunch dish name." tabindex="0">Lunch</th>
-            <th class="col-rating col-help" data-help="Primary rank score used for ordering. Gray subtext shows raw Glicko-2 rating before uncertainty adjustment." tabindex="0">Rating</th>
+            <th class="col-rating col-help" data-help="Primary rank score used for ordering: raw Glicko-2 rating minus uncertainty." tabindex="0">Rating</th>
             <th class="col-record col-help" data-help="Win-loss-tie totals." data-help-align="right" tabindex="0">Record</th>
             <th class="col-confidence col-help" data-help="Top percent is confidence. Gray RD is rating deviation (uncertainty): lower RD means more reliable rating." tabindex="0">Confidence</th>
-            <th class="col-consistency col-help" data-help="Number and bar show how evenly this dish performs. Higher means it wins and loses in a predictable pattern rather than swinging wildly." tabindex="0">Consistency</th>
+            <th class="col-consistency col-help" data-help="Number and bar show how often this dish has the same outcome type. Higher means results are less split across wins, losses, and ties." tabindex="0">Consistency</th>
           </tr>
         </thead>
         <tbody id="lb-body">${renderSkeletonRows()}</tbody>

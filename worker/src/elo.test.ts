@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { updateRatingPair, conservativeScore, confidenceFromRd, GLICKO_DEFAULTS } from './elo'
+import {
+  updateRatingPair,
+  conservativeScore,
+  confidenceFromRd,
+  GLICKO_DEFAULTS,
+  computeConsistency,
+  consistencyBand,
+} from './elo'
 
 const player = () => ({ rating: GLICKO_DEFAULTS.rating, rd: GLICKO_DEFAULTS.rd, volatility: GLICKO_DEFAULTS.volatility })
 
@@ -64,5 +71,43 @@ describe('confidenceFromRd', () => {
     const mid = confidenceFromRd(190)
     expect(mid).toBeGreaterThan(0)
     expect(mid).toBeLessThan(100)
+  })
+})
+
+describe('computeConsistency', () => {
+  it('returns null when there is not enough data', () => {
+    expect(computeConsistency(4, 0, 0)).toBeNull()
+    expect(computeConsistency(2, 1, 1)).toBeNull()
+  })
+
+  it('scores undefeated records as very consistent', () => {
+    expect(computeConsistency(6, 0, 0)).toBe(100)
+  })
+
+  it('does not score split win-loss records as perfectly consistent', () => {
+    expect(computeConsistency(4, 4, 0)).toBe(50)
+  })
+
+  it('does not score split win-tie records as perfectly consistent', () => {
+    expect(computeConsistency(3, 0, 3)).toBe(50)
+  })
+
+  it('scores all ties as consistent neutral results', () => {
+    expect(computeConsistency(0, 0, 6)).toBe(100)
+  })
+
+  it('returns the dominant outcome share as a 0-100 score', () => {
+    expect(computeConsistency(5, 1, 0)).toBeCloseTo(83.3, 1)
+    expect(computeConsistency(3, 2, 0)).toBe(60)
+  })
+})
+
+describe('consistencyBand', () => {
+  it('maps consistency scores into display bands', () => {
+    expect(consistencyBand(null)).toBeNull()
+    expect(consistencyBand(90)).toBe('very-steady')
+    expect(consistencyBand(75)).toBe('steady')
+    expect(consistencyBand(60)).toBe('mixed')
+    expect(consistencyBand(50)).toBe('high-swing')
   })
 })

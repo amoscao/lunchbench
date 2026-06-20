@@ -4,7 +4,7 @@ test.describe('Navigation', () => {
   test('nav bar is present on all pages', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('.nav')).toBeVisible()
-    await expect(page.locator('.nav-logo')).toHaveText('Lunchbench')
+    await expect(page.locator('.nav-logo')).toHaveText('🍱 LunchBench')
 
     await page.goto('/leaderboard')
     await expect(page.locator('.nav')).toBeVisible()

@@ -26,13 +26,18 @@ The script does not delete Docker images.
 
 ## Running Tests
 
-### Install the pre-push hook (one-time setup)
+### Git hook (automatic — runs on every `git push`)
+
+The pre-push hook runs `scripts/run-e2e.sh` automatically before every push.
+**You do not need to run tests manually before pushing.** The hook does it for you.
+
+The hook is installed at `.git/hooks/pre-push`. To re-install it:
 
 ```bash
 ./scripts/install-hooks.sh
 ```
 
-### Run tests manually
+### Run tests manually (debugging only)
 
 ```bash
 ./scripts/run-e2e.sh

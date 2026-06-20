@@ -194,7 +194,12 @@ img {
   cursor: pointer;
 }
 
-.nav-logo-text {
+.logo-lunch {
+  color: #fff;
+  background: none;
+}
+
+.logo-bench {
   background: linear-gradient(90deg, hsl(168, 88%, 52%) 0%, hsl(282, 82%, 68%) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

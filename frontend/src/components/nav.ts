@@ -2,7 +2,7 @@ export function createNav(navigate: (path: string) => void): HTMLElement {
   const nav = document.createElement('nav')
   nav.className = 'nav'
   nav.innerHTML = `
-    <span class="nav-logo">🍱 LunchBench</span>
+    <span class="nav-logo">🥪 LunchBench</span>
     <div class="nav-links">
       <span class="nav-link" data-path="/">Arena</span>
       <span class="nav-link" data-path="/leaderboard">Leaderboard</span>

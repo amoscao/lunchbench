@@ -2,7 +2,7 @@ import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lun
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 
-type Mode = 'text' | 'text-image' | 'add-image'
+type Mode = 'new' | 'add-image'
 
 export function renderAdd(container: HTMLElement): void {
   const content = document.createElement('div')
@@ -12,7 +12,7 @@ export function renderAdd(container: HTMLElement): void {
 
   content.innerHTML = `<h1 class="page-heading">Add Lunch</h1>`
 
-  let currentMode: Mode = 'text'
+  let currentMode: Mode = 'new'
   let selectedFile: File | null = null
 
   const alertEl = document.createElement('div')
@@ -32,8 +32,7 @@ export function renderAdd(container: HTMLElement): void {
   modeSelector.className = 'mode-selector'
 
   const modes: { label: string; value: Mode }[] = [
-    { label: 'New Lunch', value: 'text' },
-    { label: 'New Lunch + Image', value: 'text-image' },
+    { label: 'New Lunch', value: 'new' },
     { label: 'Add Image to Existing', value: 'add-image' },
   ]
 
@@ -60,72 +59,63 @@ export function renderAdd(container: HTMLElement): void {
   async function renderForm(): Promise<void> {
     formContainer.innerHTML = ''
 
-    const nameGroup = document.createElement('div')
-    nameGroup.className = 'form-group'
-    nameGroup.innerHTML = `<label class="form-label">Lunch Name</label><input class="form-input" type="text" placeholder="e.g. Margherita Pizza" maxlength="100" />`
+    if (currentMode === 'new') {
+      // --- Name field with duplicate detection ---
+      const nameGroup = document.createElement('div')
+      nameGroup.className = 'form-group'
+      nameGroup.innerHTML = `<label class="form-label">Lunch Name</label><input class="form-input" type="text" placeholder="e.g. Margherita Pizza" maxlength="100" />`
 
-    // Duplicate detection state
-    let allLunches: Lunch[] = []
-    let selectedExistingId: number | null = null
-    let warnDuplicates: { id: number; name: string; score: number }[] = []
+      let allLunches: Lunch[] = []
+      let warnDuplicates: { id: number; name: string; score: number }[] = []
+      getLunches().then((l) => { allLunches = l }).catch(() => {})
 
-    // Fetch all lunches for dupe detection (once, cached)
-    getLunches().then((l) => { allLunches = l }).catch(() => {})
+      const dupeWarning = document.createElement('div')
+      dupeWarning.className = 'duplicate-warning'
+      dupeWarning.style.display = 'none'
+      nameGroup.appendChild(dupeWarning)
 
-    // Add duplicate warning element
-    const dupeWarning = document.createElement('div')
-    dupeWarning.className = 'duplicate-warning'
-    dupeWarning.style.display = 'none'
-    nameGroup.appendChild(dupeWarning)
+      const nameInput = nameGroup.querySelector('input') as HTMLInputElement
+      let dupeTimer: ReturnType<typeof setTimeout>
+      nameInput.addEventListener('input', () => {
+        clearTimeout(dupeTimer)
+        dupeTimer = setTimeout(() => {
+          const val = nameInput.value.trim()
+          if (!val || val.length < 2) {
+            dupeWarning.style.display = 'none'
+            warnDuplicates = []
+            return
+          }
+          warnDuplicates = findSimilar(val, allLunches, 0.6)
+          if (warnDuplicates.length > 0) {
+            dupeWarning.style.display = 'block'
+            dupeWarning.textContent = '⚠ Similar dishes already exist:'
+            const list = document.createElement('ul')
+            warnDuplicates.forEach((d) => {
+              const item = document.createElement('li')
+              item.textContent = `${d.name} (${Math.round(d.score * 100)}% match)`
+              list.appendChild(item)
+            })
+            dupeWarning.appendChild(list)
+          } else {
+            dupeWarning.style.display = 'none'
+          }
+        }, 300)
+      })
 
-    // Debounced input listener on name field
-    const nameInput = nameGroup.querySelector('input') as HTMLInputElement
-    let dupeTimer: ReturnType<typeof setTimeout>
-    nameInput.addEventListener('input', () => {
-      clearTimeout(dupeTimer)
-      dupeTimer = setTimeout(() => {
-        const val = nameInput.value.trim()
-        if (!val || val.length < 2) {
-          dupeWarning.style.display = 'none'
-          warnDuplicates = []
-          return
-        }
-        warnDuplicates = findSimilar(val, allLunches, 0.6)
-        if (warnDuplicates.length > 0) {
-          dupeWarning.style.display = 'block'
-          dupeWarning.textContent = '⚠ Similar dishes already exist:'
-          const list = document.createElement('ul')
-          warnDuplicates.forEach((d) => {
-            const item = document.createElement('li')
-            item.textContent = `${d.name} (${Math.round(d.score * 100)}% match)`
-            list.appendChild(item)
-          })
-          dupeWarning.appendChild(list)
-        } else {
-          dupeWarning.style.display = 'none'
-        }
-      }, 300)
-    })
+      // --- Description ---
+      const descriptionGroup = document.createElement('div')
+      descriptionGroup.className = 'form-group'
+      descriptionGroup.innerHTML = `<label class="form-label">Description</label><textarea class="form-input" placeholder="Optional notes about the lunch" maxlength="500" rows="3"></textarea>`
 
-    const descriptionGroup = document.createElement('div')
-    descriptionGroup.className = 'form-group'
-    descriptionGroup.innerHTML = `<label class="form-label">Description</label><textarea class="form-input" placeholder="Optional notes about the lunch" maxlength="500" rows="3"></textarea>`
+      // --- Vegan checkbox ---
+      const veganGroup = document.createElement('label')
+      veganGroup.className = 'checkbox-row'
+      veganGroup.innerHTML = `<input type="checkbox" /> <span>Vegan dish? 🌿</span>`
 
-    const veganGroup = document.createElement('label')
-    veganGroup.className = 'checkbox-row'
-    veganGroup.innerHTML = `<input type="checkbox" /> <span>Vegan dish? 🌿</span>`
-
-    const tokenGroup = document.createElement('div')
-    tokenGroup.className = 'form-group'
-    tokenGroup.innerHTML = `<label class="form-label">Password</label><input class="form-input" type="password" placeholder="Enter the password to add lunches" />`
-
-    let uploadGroup: HTMLElement | null = null
-    let selectGroup: HTMLElement | null = null
-    let imagePreview: HTMLImageElement | null = null
-
-    if (currentMode === 'text-image' || currentMode === 'add-image') {
-      uploadGroup = document.createElement('div')
+      // --- Optional image upload ---
+      const uploadGroup = document.createElement('div')
       uploadGroup.className = 'form-group'
+      uploadGroup.innerHTML = `<label class="form-label">Image <span style="font-weight:400;opacity:0.6">(optional)</span></label>`
 
       const uploadArea = document.createElement('div')
       uploadArea.className = 'upload-area'
@@ -137,206 +127,221 @@ export function renderAdd(container: HTMLElement): void {
       fileInput.style.display = 'none'
       uploadArea.appendChild(fileInput)
 
-      uploadArea.addEventListener('click', () => fileInput.click())
-
-      imagePreview = document.createElement('img')
+      const imagePreview = document.createElement('img')
       imagePreview.className = 'upload-preview'
       imagePreview.style.display = 'none'
       uploadArea.appendChild(imagePreview)
 
+      uploadArea.addEventListener('click', () => fileInput.click())
       fileInput.addEventListener('change', () => {
         const file = fileInput.files?.[0]
         if (!file) return
         selectedFile = file
-        imagePreview!.src = URL.createObjectURL(file)
-        imagePreview!.style.display = 'block'
+        imagePreview.src = URL.createObjectURL(file)
+        imagePreview.style.display = 'block'
         uploadArea.querySelector('p')!.textContent = file.name
       })
-
       uploadGroup.appendChild(uploadArea)
-    }
 
-    if (currentMode === 'add-image') {
-      selectGroup = document.createElement('div')
-      selectGroup.className = 'form-group'
-      selectGroup.innerHTML = `<label class="form-label">Select Lunch</label>`
+      // --- Password ---
+      const tokenGroup = document.createElement('div')
+      tokenGroup.className = 'form-group'
+      tokenGroup.innerHTML = `<label class="form-label">Password</label><input class="form-input" type="password" placeholder="Enter the password to add lunches" />`
 
-      const dropdownWrap = document.createElement('div')
-      dropdownWrap.className = 'search-dropdown-wrap'
+      const submitBtn = document.createElement('button')
+      submitBtn.className = 'btn btn-primary btn-full'
+      submitBtn.textContent = 'Add Lunch'
 
-      const searchInput = document.createElement('input')
-      searchInput.className = 'form-input'
-      searchInput.placeholder = 'Search lunches…'
-      searchInput.type = 'text'
-      searchInput.autocomplete = 'off'
-
-      const dropdownList = document.createElement('div')
-      dropdownList.className = 'search-dropdown-list'
-      dropdownList.style.display = 'none'
-
-      dropdownWrap.appendChild(searchInput)
-      dropdownWrap.appendChild(dropdownList)
-      selectGroup.appendChild(dropdownWrap)
-
-      let imagelessLunches: Lunch[] = []
-
-      getLunchesWithoutImages()
-        .then((lunches: Lunch[]) => {
-          imagelessLunches = lunches
-          renderDropdown('')
-        })
-        .catch(() => {
-          dropdownList.innerHTML = '<div class="search-dropdown-empty">Failed to load lunches</div>'
-        })
-
-      function renderDropdown(query: string): void {
-        const filtered = fuzzyFilter(query, imagelessLunches)
-        dropdownList.innerHTML = ''
-        if (filtered.length === 0) {
-          const empty = document.createElement('div')
-          empty.className = 'search-dropdown-empty'
-          empty.textContent = 'No matches found'
-          dropdownList.appendChild(empty)
-        } else {
-          filtered.forEach((l) => {
-            const item = document.createElement('div')
-            item.className = 'search-dropdown-item'
-            item.dataset.id = String(l.id)
-            item.textContent = l.name
-            item.addEventListener('click', () => {
-              selectedExistingId = Number(item.dataset.id)
-              searchInput.value = item.textContent ?? ''
-              dropdownList.style.display = 'none'
-            })
-            dropdownList.appendChild(item)
-          })
-        }
-      }
-
-      searchInput.addEventListener('focus', () => {
-        dropdownList.style.display = 'block'
-        renderDropdown(searchInput.value)
-      })
-      searchInput.addEventListener('input', () => {
-        selectedExistingId = null
-        renderDropdown(searchInput.value)
-        dropdownList.style.display = 'block'
-      })
-      document.addEventListener('click', (e) => {
-        if (!dropdownWrap.contains(e.target as Node)) {
-          dropdownList.style.display = 'none'
-        }
-      }, { once: false })
-    }
-
-    const submitBtn = document.createElement('button')
-    submitBtn.className = 'btn btn-primary btn-full'
-    submitBtn.textContent = currentMode === 'add-image' ? 'Upload Image' : 'Add Lunch'
-
-    if (currentMode === 'add-image') {
-      if (selectGroup) formContainer.appendChild(selectGroup)
-    } else {
       formContainer.appendChild(nameGroup)
       formContainer.appendChild(descriptionGroup)
       formContainer.appendChild(veganGroup)
-    }
+      formContainer.appendChild(uploadGroup)
+      formContainer.appendChild(tokenGroup)
+      formContainer.appendChild(submitBtn)
 
-    if (uploadGroup) formContainer.appendChild(uploadGroup)
-    formContainer.appendChild(tokenGroup)
-    formContainer.appendChild(submitBtn)
+      submitBtn.addEventListener('click', async () => {
+        const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
+        if (!token) { showAlert('Password is required.', 'error'); return }
 
-    submitBtn.addEventListener('click', async () => {
-      const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
-      if (!token) { showAlert('Password is required.', 'error'); return }
-
-      const nameInput = nameGroup.querySelector('input') as HTMLInputElement | null
-      const descriptionInput = descriptionGroup.querySelector('textarea') as HTMLTextAreaElement | null
-      const veganInput = veganGroup.querySelector('input') as HTMLInputElement | null
-      const description = descriptionInput?.value.trim() ?? ''
-      const isVegan = veganInput?.checked ?? false
-
-      if (currentMode === 'text') {
-        const name = nameInput?.value.trim() ?? ''
+        const name = nameInput.value.trim()
         if (!name) { showAlert('Lunch name is required.', 'error'); return }
-        submitBtn.disabled = true
-        submitBtn.textContent = 'Submitting…'
+
+        if (selectedFile) {
+          const validation = await validateImageFile(selectedFile)
+          if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
+        }
+
         const highMatch = warnDuplicates.find((d) => d.score >= 0.75)
         if (highMatch) {
-          const proceed = window.confirm(
-            `A similar dish already exists: "${highMatch.name}". Add anyway?`
-          )
-          if (!proceed) {
-            submitBtn.disabled = false
-            submitBtn.textContent = 'Add Lunch'
-            return
-          }
+          const proceed = window.confirm(`A similar dish already exists: "${highMatch.name}". Add anyway?`)
+          if (!proceed) return
         }
+
+        submitBtn.disabled = true
+        submitBtn.textContent = 'Submitting…'
+
+        const description = (descriptionGroup.querySelector('textarea') as HTMLTextAreaElement).value.trim()
+        const isVegan = (veganGroup.querySelector('input') as HTMLInputElement).checked
+
         try {
-          await createLunch(name, token, description || null, isVegan)
-          nameInput!.value = ''
-          if (descriptionInput) descriptionInput.value = ''
-          if (veganInput) veganInput.checked = false
-          showAlert('Lunch added!', 'success')
+          const lunch = await createLunch(name, token, description || null, isVegan)
+          const hadImage = !!selectedFile
+          if (selectedFile) {
+            await uploadImage(lunch.id, selectedFile, token)
+          }
+          nameInput.value = '';
+          (descriptionGroup.querySelector('textarea') as HTMLTextAreaElement).value = '';
+          (veganGroup.querySelector('input') as HTMLInputElement).checked = false
+          selectedFile = null
+          imagePreview.style.display = 'none'
+          uploadArea.querySelector('p')!.textContent = 'Drop image here or click to select'
+          showAlert(hadImage ? 'Lunch added with image!' : 'Lunch added!', 'success')
         } catch (e: unknown) {
           showAlert((e as Error).message ?? 'Failed to add lunch.', 'error')
         } finally {
           submitBtn.disabled = false
           submitBtn.textContent = 'Add Lunch'
         }
-      } else if (currentMode === 'text-image') {
-        const name = nameInput?.value.trim() ?? ''
-        if (!name) { showAlert('Lunch name is required.', 'error'); return }
-        if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
-        const validation = await validateImageFile(selectedFile)
-        if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-        submitBtn.disabled = true
-        submitBtn.textContent = 'Submitting…'
-        const highMatch = warnDuplicates.find((d) => d.score >= 0.75)
-        if (highMatch) {
-          const proceed = window.confirm(
-            `A similar dish already exists: "${highMatch.name}". Add anyway?`
-          )
-          if (!proceed) {
-            submitBtn.disabled = false
-            submitBtn.textContent = 'Add Lunch'
-            return
-          }
-        }
-        try {
-          const lunch = await createLunch(name, token, description || null, isVegan)
-          await uploadImage(lunch.id, selectedFile, token)
-          nameInput!.value = ''
-          if (descriptionInput) descriptionInput.value = ''
-          if (veganInput) veganInput.checked = false
-          selectedFile = null
-          if (imagePreview) imagePreview.style.display = 'none'
-          showAlert('Lunch added with image!', 'success')
-        } catch (e: unknown) {
-          showAlert((e as Error).message ?? 'Failed.', 'error')
-        } finally {
-          submitBtn.disabled = false
-          submitBtn.textContent = 'Add Lunch'
-        }
-      } else if (currentMode === 'add-image') {
-        const lunchId = selectedExistingId
-        if (!lunchId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
-        if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
-        const validation = await validateImageFile(selectedFile)
-        if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-        submitBtn.disabled = true
-        submitBtn.textContent = 'Uploading…'
-        try {
-          await uploadImage(lunchId, selectedFile, token)
-          selectedFile = null
-          if (imagePreview) imagePreview.style.display = 'none'
-          showAlert('Image uploaded!', 'success')
-          await renderForm()
-        } catch (e: unknown) {
-          showAlert((e as Error).message ?? 'Upload failed.', 'error')
-        } finally {
-          submitBtn.disabled = false
-          submitBtn.textContent = 'Upload Image'
-        }
+      })
+
+      return
+    }
+
+    // --- Add Image to Existing mode ---
+    const selectGroup = document.createElement('div')
+    selectGroup.className = 'form-group'
+    selectGroup.innerHTML = `<label class="form-label">Select Lunch</label>`
+
+    const dropdownWrap = document.createElement('div')
+    dropdownWrap.className = 'search-dropdown-wrap'
+
+    const searchInput = document.createElement('input')
+    searchInput.className = 'form-input'
+    searchInput.placeholder = 'Search lunches…'
+    searchInput.type = 'text'
+    searchInput.autocomplete = 'off'
+
+    const dropdownList = document.createElement('div')
+    dropdownList.className = 'search-dropdown-list'
+    dropdownList.style.display = 'none'
+
+    dropdownWrap.appendChild(searchInput)
+    dropdownWrap.appendChild(dropdownList)
+    selectGroup.appendChild(dropdownWrap)
+
+    let selectedExistingId: number | null = null
+    let imagelessLunches: Lunch[] = []
+
+    getLunchesWithoutImages()
+      .then((lunches: Lunch[]) => {
+        imagelessLunches = lunches
+        renderDropdown('')
+      })
+      .catch(() => {
+        dropdownList.innerHTML = '<div class="search-dropdown-empty">Failed to load lunches</div>'
+      })
+
+    function renderDropdown(query: string): void {
+      const filtered = fuzzyFilter(query, imagelessLunches)
+      dropdownList.innerHTML = ''
+      if (filtered.length === 0) {
+        const empty = document.createElement('div')
+        empty.className = 'search-dropdown-empty'
+        empty.textContent = 'No matches found'
+        dropdownList.appendChild(empty)
+      } else {
+        filtered.forEach((l) => {
+          const item = document.createElement('div')
+          item.className = 'search-dropdown-item'
+          item.dataset.id = String(l.id)
+          item.textContent = l.name
+          item.addEventListener('click', () => {
+            selectedExistingId = Number(item.dataset.id)
+            searchInput.value = item.textContent ?? ''
+            dropdownList.style.display = 'none'
+          })
+          dropdownList.appendChild(item)
+        })
+      }
+    }
+
+    searchInput.addEventListener('focus', () => {
+      dropdownList.style.display = 'block'
+      renderDropdown(searchInput.value)
+    })
+    searchInput.addEventListener('input', () => {
+      selectedExistingId = null
+      renderDropdown(searchInput.value)
+      dropdownList.style.display = 'block'
+    })
+    document.addEventListener('click', (e) => {
+      if (!dropdownWrap.contains(e.target as Node)) {
+        dropdownList.style.display = 'none'
+      }
+    }, { once: false })
+
+    const uploadGroup = document.createElement('div')
+    uploadGroup.className = 'form-group'
+
+    const uploadArea = document.createElement('div')
+    uploadArea.className = 'upload-area'
+    uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP · max 5MB</p>`
+
+    const fileInput = document.createElement('input')
+    fileInput.type = 'file'
+    fileInput.accept = 'image/jpeg,image/png,image/webp'
+    fileInput.style.display = 'none'
+    uploadArea.appendChild(fileInput)
+
+    const imagePreview = document.createElement('img')
+    imagePreview.className = 'upload-preview'
+    imagePreview.style.display = 'none'
+    uploadArea.appendChild(imagePreview)
+
+    uploadArea.addEventListener('click', () => fileInput.click())
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0]
+      if (!file) return
+      selectedFile = file
+      imagePreview.src = URL.createObjectURL(file)
+      imagePreview.style.display = 'block'
+      uploadArea.querySelector('p')!.textContent = file.name
+    })
+    uploadGroup.appendChild(uploadArea)
+
+    const tokenGroup = document.createElement('div')
+    tokenGroup.className = 'form-group'
+    tokenGroup.innerHTML = `<label class="form-label">Password</label><input class="form-input" type="password" placeholder="Enter the password to add lunches" />`
+
+    const submitBtn = document.createElement('button')
+    submitBtn.className = 'btn btn-primary btn-full'
+    submitBtn.textContent = 'Upload Image'
+
+    formContainer.appendChild(selectGroup)
+    formContainer.appendChild(uploadGroup)
+    formContainer.appendChild(tokenGroup)
+    formContainer.appendChild(submitBtn)
+
+    submitBtn.addEventListener('click', async () => {
+      const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
+      if (!token) { showAlert('Password is required.', 'error'); return }
+      if (!selectedExistingId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
+      if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
+      const validation = await validateImageFile(selectedFile)
+      if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
+      submitBtn.disabled = true
+      submitBtn.textContent = 'Uploading…'
+      try {
+        await uploadImage(selectedExistingId, selectedFile, token)
+        selectedFile = null
+        imagePreview.style.display = 'none'
+        showAlert('Image uploaded!', 'success')
+        await renderForm()
+      } catch (e: unknown) {
+        showAlert((e as Error).message ?? 'Upload failed.', 'error')
+      } finally {
+        submitBtn.disabled = false
+        submitBtn.textContent = 'Upload Image'
       }
     })
   }

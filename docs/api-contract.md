@@ -230,7 +230,7 @@ type Lunch = {
   glicko_rd: number          // RD, starts at 350
   glicko_volatility: number  // starts at 0.06
   conservative_rating: number // rating - (2 * glicko_rd), starts at 800
-  confidence: number         // 0-100 value derived from RD (higher is more certain)
+  confidence?: number         // 0-100 value derived from RD (higher is more certain), currently returned on leaderboard responses
   wins: number
   losses: number
   ties: number

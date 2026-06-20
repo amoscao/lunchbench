@@ -272,3 +272,19 @@ Returns full stats for one lunch.
 **Errors:**
 - `400 BAD_REQUEST` — invalid id
 - `404 NOT_FOUND` — lunch not found
+
+---
+
+## POST /api/admin/reset-scores
+
+Requires admin session token.
+
+Resets all dishes to baseline Glicko-2 values. Keeps name, description, and image unchanged. Deletes all votes and vote rate limits.
+
+**Response 200:**
+```json
+{ "reset": true }
+```
+
+**Errors:**
+- `401 UNAUTHORIZED` — missing or expired session token

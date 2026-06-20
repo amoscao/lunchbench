@@ -9,13 +9,6 @@ function rankBadgeClass(rank: number): string {
   return 'plain'
 }
 
-function renderThumb(lunch: LeaderboardLunch): string {
-  if (lunch.image_url) {
-    return `<img class="lunch-thumb" src="${lunch.image_url}" alt="${lunch.name}" loading="lazy" />`
-  }
-  return `<div class="lunch-thumb-placeholder">?</div>`
-}
-
 function renderSkeletonRows(): string {
   return Array.from({ length: 5 }, () => `
     <tr><td colspan="6"><div class="skeleton skeleton-row"></div></td></tr>
@@ -84,7 +77,6 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
         nameTd.className = 'col-name'
         nameTd.innerHTML = `
           <div class="name-cell">
-            ${renderThumb(lunch)}
             <div>
               <div class="lunch-name-row"><span>${lunch.name}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}</div>
               ${lunch.description ? `<div class="leaderboard-subtitle">${lunch.description}</div>` : ''}

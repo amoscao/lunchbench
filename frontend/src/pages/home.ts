@@ -137,7 +137,24 @@ export function renderHome(
     const bar = document.querySelector<HTMLDivElement>('.vote-gradient-bar')
     if (bar) bar.classList.add('loading')
 
-    const delay = new Promise<void>((r) => setTimeout(r, 1000))
+    // Fade buttons visually
+    const voteRow = document.querySelector<HTMLElement>('.vote-buttons')
+    if (voteRow) voteRow.classList.add('voted-state')
+
+    // Neon pulse on the voted card(s)
+    const cards = document.querySelectorAll<HTMLElement>('.vote-arena .lunch-card')
+    // cards[0] = left card, cards[1] = VS div (skip), cards[2] = right card
+    if (result === 'left_win') {
+      cards[0]?.classList.add('voted')
+    } else if (result === 'right_win') {
+      cards[2]?.classList.add('voted')
+    } else {
+      // tie
+      cards[0]?.classList.add('voted')
+      cards[2]?.classList.add('voted')
+    }
+
+    const delay = new Promise<void>((r) => setTimeout(r, 1500))
 
     try {
       const [res] = await Promise.all([

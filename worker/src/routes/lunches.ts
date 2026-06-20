@@ -47,8 +47,8 @@ lunches.get('/:id{[0-9]+}', async (c) => {
 lunches.get('/leaderboard', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC'
-    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC'
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC, name ASC'
+    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC, name ASC'
   const result = await c.env.DB.prepare(query).all<LunchRow>()
   const baseUrl = new URL(c.req.url).origin
   const ranked = result.results.map((r, i) => ({

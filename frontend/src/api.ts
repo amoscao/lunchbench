@@ -22,6 +22,14 @@ export type LeaderboardLunch = Lunch & {
   conservative_rating: number
 }
 
+export type LeaderboardPage = {
+  lunches: LeaderboardLunch[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
 export type LunchDetail = Lunch & {
   glicko_rd: number
   glicko_volatility: number
@@ -60,11 +68,12 @@ export async function submitVote(
   return res.json()
 }
 
-export async function getLeaderboard(veganOnly = false): Promise<LeaderboardLunch[]> {
-  const res = await fetch(`${BASE}/lunches/leaderboard${veganOnly ? '?vegan=true' : ''}`)
+export async function getLeaderboard(veganOnly = false, page = 1, perPage = 10): Promise<LeaderboardPage> {
+  const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+  if (veganOnly) params.set('vegan', 'true')
+  const res = await fetch(`${BASE}/lunches/leaderboard?${params}`)
   if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`)
-  const data = await res.json()
-  return data.lunches
+  return res.json()
 }
 
 export async function getLunches(): Promise<Lunch[]> {

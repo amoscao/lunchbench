@@ -1,5 +1,6 @@
 import { getMatchup, submitVote, type Lunch } from '../api'
 import { isVeganMode } from '../vegan-mode'
+import { hasSeen, markSeen } from '../utils/seen-pairs'
 
 function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
@@ -239,8 +240,20 @@ export function renderHome(
       return
     }
 
-    leftLunch = matchup.left
-    rightLunch = matchup.right
+    let currentMatchup: { left: Lunch; right: Lunch } | null = matchup
+    let retries = 0
+    while (currentMatchup && hasSeen(currentMatchup.left.id, currentMatchup.right.id) && retries < 10) {
+      currentMatchup = await getMatchup(isVeganMode())
+      retries++
+    }
+    if (!currentMatchup) {
+      content.appendChild(renderEmpty(navigate, isVeganMode()))
+      return
+    }
+    markSeen(currentMatchup.left.id, currentMatchup.right.id)
+
+    leftLunch = currentMatchup.left
+    rightLunch = currentMatchup.right
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'

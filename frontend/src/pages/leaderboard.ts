@@ -44,125 +44,163 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
         </thead>
         <tbody id="lb-body">${renderSkeletonRows()}</tbody>
       </table>
+      <div class="lb-pagination" style="display:none">
+        <button class="btn btn-secondary lb-prev">← Prev</button>
+        <span class="lb-page-info"></span>
+        <button class="btn btn-secondary lb-next">Next →</button>
+      </div>
   `
 
   const tbody = content.querySelector<HTMLElement>('#lb-body')!
+  const pagination = content.querySelector<HTMLElement>('.lb-pagination')!
+  const prevBtn = content.querySelector<HTMLButtonElement>('.lb-prev')!
+  const nextBtn = content.querySelector<HTMLButtonElement>('.lb-next')!
+  const pageInfo = content.querySelector<HTMLElement>('.lb-page-info')!
 
-  getLeaderboard(veganOnly)
-    .then((lunches) => {
-      if (lunches.length === 0) {
+  let currentPage = 1
+
+  function loadPage(page: number): void {
+    tbody.innerHTML = renderSkeletonRows()
+
+    getLeaderboard(veganOnly, page)
+      .then(({ lunches, total_pages, page: returnedPage }) => {
+        currentPage = returnedPage
+
+        if (lunches.length === 0 && page === 1) {
+          tbody.innerHTML = `
+            <tr><td colspan="6">
+              <div class="state-center">
+                <div class="state-icon">🏆</div>
+                <div class="state-title">No lunches ranked yet</div>
+                <div class="state-desc">Add some lunches and start voting!</div>
+              </div>
+            </td></tr>
+          `
+          const btn = document.createElement('button')
+          btn.className = 'btn btn-primary'
+          btn.textContent = 'Add a Lunch'
+          btn.style.margin = '0 auto'
+          btn.addEventListener('click', () => navigate('/add'))
+          tbody.querySelector('.state-center')?.appendChild(btn)
+          pagination.style.display = 'none'
+          return
+        }
+
+        tbody.innerHTML = ''
+        for (const lunch of lunches) {
+          const row = document.createElement('tr')
+          row.style.cursor = 'pointer'
+          row.addEventListener('click', () => navigate(`/lunch/${lunch.id}`))
+
+          const rankTd = document.createElement('td')
+          rankTd.className = 'col-rank'
+          rankTd.innerHTML = `<span class="rank-badge ${rankBadgeClass(lunch.rank)}">${lunch.rank}</span>`
+          row.appendChild(rankTd)
+
+          const nameTd = document.createElement('td')
+          nameTd.className = 'col-name'
+          nameTd.innerHTML = `
+            <div class="name-cell">
+              ${renderThumb(lunch)}
+              <div>
+                <div class="lunch-name-row"><span>${lunch.name}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}</div>
+                ${lunch.description ? `<div class="leaderboard-subtitle">${lunch.description}</div>` : ''}
+              </div>
+            </div>
+          `
+          row.appendChild(nameTd)
+
+          const ratingTd = document.createElement('td')
+          ratingTd.className = 'col-rating'
+          const rating = Math.round(lunch.conservative_rating)
+          ratingTd.innerHTML = `<span class="rating-value" data-raw="${rating}">${rating}</span>`
+          row.appendChild(ratingTd)
+
+          const recordTd = document.createElement('td')
+          recordTd.className = 'col-record'
+          recordTd.innerHTML = `
+            <span class="wins-text">${lunch.wins}W</span>
+            <span class="losses-text"> ${lunch.losses}L</span>
+            <span> ${lunch.ties}T</span>
+          `
+          row.appendChild(recordTd)
+
+          const confTd = document.createElement('td')
+          confTd.className = 'leaderboard-cell col-confidence'
+          const confClass = lunch.confidence >= 75 ? 'conf-high' : lunch.confidence >= 50 ? 'conf-mid' : 'conf-low'
+          confTd.innerHTML = `
+            <div class="confidence-pct ${confClass}">${lunch.confidence}%</div>
+            <div class="confidence-rd">RD ${Math.round(lunch.glicko_rd)}</div>
+          `
+          row.appendChild(confTd)
+
+          const band = lunch.consistency_band
+          const consistencyTd = document.createElement('td')
+          consistencyTd.className = 'leaderboard-cell col-consistency'
+
+          if (lunch.consistency === null) {
+            consistencyTd.innerHTML = `<span class="consistency-empty">—</span>`
+          } else {
+            const pct = Math.max(0, Math.min(100, lunch.consistency)).toFixed(1)
+            consistencyTd.innerHTML = `
+              <div class="consistency-row">
+                <span class="consistency-num consistency-${band}">${Math.round(lunch.consistency)}</span>
+                <div class="consistency-bar-track">
+                  <div class="consistency-bar-fill consistency-fill-${band}" style="width:${pct}%"></div>
+                </div>
+              </div>
+            `
+          }
+          row.appendChild(consistencyTd)
+
+          tbody.appendChild(row)
+        }
+
+        const table = content.querySelector<HTMLElement>('.leaderboard-table')
+        table?.querySelectorAll<HTMLElement>('.col-rating .rating-value').forEach((el) => {
+          const raw = Number(el.dataset.raw)
+          if (!isNaN(raw)) animateCountUp(el, raw, (v) => String(v))
+        })
+
+        if (total_pages <= 1) {
+          pagination.style.display = 'none'
+        } else {
+          pagination.style.display = 'flex'
+          pageInfo.textContent = `Page ${currentPage} of ${total_pages}`
+          prevBtn.disabled = currentPage <= 1
+          nextBtn.disabled = currentPage >= total_pages
+        }
+      })
+      .catch(() => {
         tbody.innerHTML = `
           <tr><td colspan="6">
             <div class="state-center">
-              <div class="state-icon">🏆</div>
-              <div class="state-title">No lunches ranked yet</div>
-              <div class="state-desc">Add some lunches and start voting!</div>
+              <div class="error-icon-wrap">⚠</div>
+              <div class="state-title">Something went wrong</div>
+              <div class="state-desc">Could not load the leaderboard.</div>
             </div>
           </td></tr>
         `
         const btn = document.createElement('button')
-        btn.className = 'btn btn-primary'
-        btn.textContent = 'Add a Lunch'
-        btn.style.margin = '0 auto'
-        btn.addEventListener('click', () => navigate('/add'))
+        btn.className = 'btn btn-secondary'
+        btn.textContent = 'Retry'
+        btn.style.margin = '16px auto 0'
+        btn.addEventListener('click', () => {
+          container.innerHTML = ''
+          renderLeaderboard(container, navigate)
+        })
         tbody.querySelector('.state-center')?.appendChild(btn)
-        return
-      }
-
-      tbody.innerHTML = ''
-      for (const lunch of lunches) {
-        const row = document.createElement('tr')
-        row.style.cursor = 'pointer'
-        row.addEventListener('click', () => navigate(`/lunch/${lunch.id}`))
-
-        const rankTd = document.createElement('td')
-        rankTd.className = 'col-rank'
-        rankTd.innerHTML = `<span class="rank-badge ${rankBadgeClass(lunch.rank)}">${lunch.rank}</span>`
-        row.appendChild(rankTd)
-
-        const nameTd = document.createElement('td')
-        nameTd.className = 'col-name'
-        nameTd.innerHTML = `
-          <div class="name-cell">
-            ${renderThumb(lunch)}
-            <div>
-              <div class="lunch-name-row"><span>${lunch.name}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}</div>
-              ${lunch.description ? `<div class="leaderboard-subtitle">${lunch.description}</div>` : ''}
-            </div>
-          </div>
-        `
-        row.appendChild(nameTd)
-
-        const ratingTd = document.createElement('td')
-        ratingTd.className = 'col-rating'
-        const rating = Math.round(lunch.conservative_rating)
-        ratingTd.innerHTML = `<span class="rating-value" data-raw="${rating}">${rating}</span>`
-        row.appendChild(ratingTd)
-
-        const recordTd = document.createElement('td')
-        recordTd.className = 'col-record'
-        recordTd.innerHTML = `
-          <span class="wins-text">${lunch.wins}W</span>
-          <span class="losses-text"> ${lunch.losses}L</span>
-          <span> ${lunch.ties}T</span>
-        `
-        row.appendChild(recordTd)
-
-        const confTd = document.createElement('td')
-        confTd.className = 'leaderboard-cell col-confidence'
-        const confClass = lunch.confidence >= 75 ? 'conf-high' : lunch.confidence >= 50 ? 'conf-mid' : 'conf-low'
-        confTd.innerHTML = `
-          <div class="confidence-pct ${confClass}">${lunch.confidence}%</div>
-          <div class="confidence-rd">RD ${Math.round(lunch.glicko_rd)}</div>
-        `
-        row.appendChild(confTd)
-
-        const band = lunch.consistency_band
-        const consistencyTd = document.createElement('td')
-        consistencyTd.className = 'leaderboard-cell col-consistency'
-
-        if (lunch.consistency === null) {
-          consistencyTd.innerHTML = `<span class="consistency-empty">—</span>`
-        } else {
-          const pct = Math.max(0, Math.min(100, lunch.consistency)).toFixed(1)
-          consistencyTd.innerHTML = `
-            <div class="consistency-row">
-              <span class="consistency-num consistency-${band}">${Math.round(lunch.consistency)}</span>
-              <div class="consistency-bar-track">
-                <div class="consistency-bar-fill consistency-fill-${band}" style="width:${pct}%"></div>
-              </div>
-            </div>
-          `
-        }
-        row.appendChild(consistencyTd)
-
-        tbody.appendChild(row)
-      }
-
-      const table = content.querySelector<HTMLElement>('.leaderboard-table')
-      table?.querySelectorAll<HTMLElement>('.col-rating .rating-value').forEach((el) => {
-        const raw = Number(el.dataset.raw)
-        if (!isNaN(raw)) animateCountUp(el, raw, (v) => String(v))
+        pagination.style.display = 'none'
       })
-    })
-    .catch(() => {
-      tbody.innerHTML = `
-        <tr><td colspan="6">
-          <div class="state-center">
-            <div class="error-icon-wrap">⚠</div>
-            <div class="state-title">Something went wrong</div>
-            <div class="state-desc">Could not load the leaderboard.</div>
-          </div>
-        </td></tr>
-      `
-      const btn = document.createElement('button')
-      btn.className = 'btn btn-secondary'
-      btn.textContent = 'Retry'
-      btn.style.margin = '16px auto 0'
-      btn.addEventListener('click', () => {
-        container.innerHTML = ''
-        renderLeaderboard(container, navigate)
-      })
-      tbody.querySelector('.state-center')?.appendChild(btn)
-    })
+  }
+
+  prevBtn.addEventListener('click', () => {
+    if (currentPage > 1) loadPage(currentPage - 1)
+  })
+
+  nextBtn.addEventListener('click', () => {
+    loadPage(currentPage + 1)
+  })
+
+  loadPage(1)
 }

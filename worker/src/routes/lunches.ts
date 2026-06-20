@@ -46,20 +46,36 @@ lunches.get('/:id{[0-9]+}', async (c) => {
 
 lunches.get('/leaderboard', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
-  const query = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC, name ASC'
-    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC, name ASC'
-  const result = await c.env.DB.prepare(query).all<LunchRow>()
+
+  const pageParam = parseInt(c.req.query('page') ?? '1', 10)
+  const perPageParam = parseInt(c.req.query('per_page') ?? '10', 10)
+  const page = Number.isFinite(pageParam) && pageParam >= 1 ? pageParam : 1
+  const perPage = Number.isFinite(perPageParam) && perPageParam >= 1 ? Math.min(perPageParam, 50) : 10
+
+  const countQuery = veganOnly
+    ? 'SELECT COUNT(*) as count FROM lunches WHERE is_vegan = 1'
+    : 'SELECT COUNT(*) as count FROM lunches'
+  const countResult = await c.env.DB.prepare(countQuery).first<{ count: number }>()
+  const total = countResult?.count ?? 0
+  const total_pages = Math.max(1, Math.ceil(total / perPage))
+  const safePage = Math.min(page, total_pages)
+  const offset = (safePage - 1) * perPage
+
+  const dataQuery = veganOnly
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC, name ASC LIMIT ? OFFSET ?'
+    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC, name ASC LIMIT ? OFFSET ?'
+  const result = await c.env.DB.prepare(dataQuery).bind(perPage, offset).all<LunchRow>()
+
   const baseUrl = new URL(c.req.url).origin
   const ranked = result.results.map((r, i) => ({
-    rank: i + 1,
+    rank: offset + i + 1,
     ...lunchFromRow(r, baseUrl),
     confidence: confidenceFromRd(r.glicko_rd),
     consistency: computeConsistency(r.wins, r.losses, r.ties),
     consistency_band: consistencyBand(computeConsistency(r.wins, r.losses, r.ties)),
     glicko_rd: r.glicko_rd,
   }))
-  return c.json({ lunches: ranked })
+  return c.json({ lunches: ranked, total, page: safePage, per_page: perPage, total_pages })
 })
 
 lunches.post('/', async (c) => {

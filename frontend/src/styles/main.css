@@ -38,20 +38,36 @@
 }
 
 [data-theme="dark"] {
-  --bg-primary: #111110;
-  --bg-surface: #1c1c1a;
-  --bg-hover: #242422;
-  --text-primary: #f0efed;
-  --text-secondary: #9e9e9a;
-  --text-muted: #666663;
-  --border: #2a2a28;
-  --border-accent: #3a3a38;
-  --accent: #f59e0b;
-  --accent-hover: #fbbf24;
-  --accent-text: #111110;
-  --accent-subtle: #292310;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --bg-primary: #0c0c0c;
+  --bg-surface: #141414;
+  --bg-hover: #1e1e1e;
+  --text-primary: #ededed;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666;
+  --border: #252525;
+  --border-accent: #333;
+  --accent: #f5a623;
+  --accent-hover: #e09415;
+  --accent-text: #0c0c0c;
+  --accent-subtle: #2a1f08;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.8);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.9);
+}
+
+.upload-area,
+.drop-zone,
+.image-drop {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 2px dashed var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-10) var(--space-5);
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* =====================

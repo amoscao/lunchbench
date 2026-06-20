@@ -38,13 +38,13 @@ function renderHowItWorks(): HTMLElement {
     </div>
     <div class="hiw-step">
       <span class="hiw-num">02</span>
-      <h3 class="hiw-title">Elo Rating</h3>
-      <p class="hiw-desc">Every vote updates each dish's Elo score. Beat a higher-rated dish and you gain more points. Lose to a lower-rated one and you drop more.</p>
+      <h3 class="hiw-title">Lunch Score</h3>
+      <p class="hiw-desc">Every vote updates each dish's desirability score.</p>
     </div>
     <div class="hiw-step">
       <span class="hiw-num">03</span>
       <h3 class="hiw-title">Leaderboard</h3>
-      <p class="hiw-desc">Dishes are ranked by Elo. The more votes, the more accurate the ranking. The best lunch rises to the top.</p>
+      <p class="hiw-desc">Dish rankings are sent to Paula as feedback.</p>
     </div>
   `
   return section

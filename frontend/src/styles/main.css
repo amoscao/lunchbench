@@ -55,6 +55,13 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,0.7);
 }
 
+/* =====================
+   Confidence color classes
+   ===================== */
+.conf-high { color: hsl(152 70% 44%); }
+.conf-mid  { color: hsl(168 88% 52%); }
+.conf-low  { color: hsl(40 95% 52%);  }
+
 .upload-area,
 .drop-zone,
 .image-drop {

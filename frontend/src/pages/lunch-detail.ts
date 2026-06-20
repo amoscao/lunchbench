@@ -20,6 +20,12 @@ function metricTile(
   return tile
 }
 
+function confidenceClass(pct: number): string {
+  if (pct >= 75) return 'conf-high'
+  if (pct >= 50) return 'conf-mid'
+  return 'conf-low'
+}
+
 function bandLabel(band: string | null): string {
   switch (band) {
     case 'very-steady': return 'Very Steady'
@@ -154,6 +160,7 @@ function renderDetail(content: HTMLElement, lunch: LunchDetail, navigate: (p: st
     `RD ${Math.round(lunch.glicko_rd)}`,
     lunch.confidence,
     'pct',
+    confidenceClass(lunch.confidence),
   ))
   grid.appendChild(metricTile(
     'Win Rate',

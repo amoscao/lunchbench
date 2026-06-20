@@ -38,20 +38,21 @@
 }
 
 [data-theme="dark"] {
-  --bg-primary: #0c0c0c;
-  --bg-surface: #141414;
-  --bg-hover: #1e1e1e;
-  --text-primary: #ededed;
-  --text-secondary: #a0a0a0;
-  --text-muted: #666;
-  --border: #252525;
-  --border-accent: #333;
-  --accent: #f5a623;
-  --accent-hover: #e09415;
-  --accent-text: #0c0c0c;
-  --accent-subtle: #2a1f08;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.8);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.9);
+  --bg-primary:   hsl(222, 35%, 6%);
+  --bg-surface:   hsl(223, 28%, 10%);
+  --bg-hover:     hsl(223, 22%, 14%);
+  --text-primary: hsl(220, 25%, 96%);
+  --text-secondary: hsl(220, 10%, 72%);
+  --text-muted:   hsl(220, 8%, 50%);
+  --border:       hsl(223, 18%, 14%);
+  --border-accent: hsl(223, 18%, 22%);
+  --accent:       hsl(168, 88%, 52%);
+  --accent-hover: hsl(168, 88%, 44%);
+  --accent-text:  hsl(222, 35%, 6%);
+  --accent-subtle: hsl(168, 60%, 12%);
+  --accent2:      hsl(282, 82%, 68%);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.6);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.7);
 }
 
 .upload-area,

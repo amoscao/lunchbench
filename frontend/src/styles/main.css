@@ -643,6 +643,12 @@ img {
   margin-bottom: 4px;
 }
 
+@media (hover: none) and (pointer: coarse) {
+  .vote-key-hint {
+    display: none;
+  }
+}
+
 .vote-buttons .btn {
   min-width: 140px;
 }
@@ -1187,6 +1193,17 @@ img {
   .leaderboard-table thead th.col-consistency,
   .leaderboard-table tbody td.col-consistency {
     display: none;
+  }
+}
+
+@media (max-width: 480px) and (pointer: coarse) {
+  .vote-arena .vote-card-label {
+    min-height: 48px;
+    padding: 0 var(--space-4);
+  }
+
+  .vote-arena .vote-card-label::before {
+    font-size: 15px;
   }
 }
 

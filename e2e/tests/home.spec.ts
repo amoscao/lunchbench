@@ -39,14 +39,11 @@ test.describe('Home / Voting', () => {
     await expect(buttons).toHaveCount(3)
   })
 
-  test('left vote button label contains left arrow', async ({ page }) => {
+  test('left vote button label is A wins', async ({ page }) => {
     await waitForMatchup(page)
 
     const leftBtn = page.locator('.vote-buttons .btn').nth(0)
-    const btnText = await leftBtn.textContent()
-
-    expect(btnText).toBeTruthy()
-    expect(btnText!.includes('←')).toBe(true)
+    await expect(leftBtn).toHaveText('A wins')
   })
 
   test('tie button is labeled Tie', async ({ page }) => {
@@ -55,11 +52,10 @@ test.describe('Home / Voting', () => {
     await expect(tieBtn).toHaveText('Tie')
   })
 
-  test('right vote button label contains right arrow', async ({ page }) => {
+  test('right vote button label is B wins', async ({ page }) => {
     await waitForMatchup(page)
     const rightBtn = page.locator('.vote-buttons .btn').nth(2)
-    const btnText = await rightBtn.textContent()
-    expect(btnText!.includes('→')).toBe(true)
+    await expect(rightBtn).toHaveText('B wins')
   })
 
   test('casting a left vote loads a new matchup', async ({ page }) => {

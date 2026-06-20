@@ -199,7 +199,7 @@ export function renderHome(
       cards[1]?.classList.add('voted')
     }
 
-    const delay = new Promise<void>((r) => setTimeout(r, 1500))
+    const delay = new Promise<void>((r) => setTimeout(r, 2000))
 
     try {
       const [res] = await Promise.all([

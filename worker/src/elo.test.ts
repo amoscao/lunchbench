@@ -1,51 +1,68 @@
 import { describe, it, expect } from 'vitest'
-import { calculateElo } from './elo'
+import { updateRatingPair, conservativeScore, confidenceFromRd, GLICKO_DEFAULTS } from './elo'
 
-describe('calculateElo', () => {
+const player = () => ({ rating: GLICKO_DEFAULTS.rating, rd: GLICKO_DEFAULTS.rd, volatility: GLICKO_DEFAULTS.volatility })
+
+describe('updateRatingPair', () => {
   it('A wins: A rating increases, B decreases', () => {
-    const { newA, newB } = calculateElo(1000, 1000, 'a_wins')
-    expect(newA).toBeGreaterThan(1000)
-    expect(newB).toBeLessThan(1000)
+    const { a, b } = updateRatingPair({ a: player(), b: player(), outcome: 'A_WIN' })
+    expect(a.rating).toBeGreaterThan(1500)
+    expect(b.rating).toBeLessThan(1500)
   })
 
   it('B wins: B rating increases, A decreases', () => {
-    const { newA, newB } = calculateElo(1000, 1000, 'b_wins')
-    expect(newA).toBeLessThan(1000)
-    expect(newB).toBeGreaterThan(1000)
+    const { a, b } = updateRatingPair({ a: player(), b: player(), outcome: 'B_WIN' })
+    expect(a.rating).toBeLessThan(1500)
+    expect(b.rating).toBeGreaterThan(1500)
   })
 
-  it('Tie: both ratings move toward each other from equal start — no change', () => {
-    const { newA, newB } = calculateElo(1000, 1000, 'tie')
-    expect(newA).toBeCloseTo(1000, 5)
-    expect(newB).toBeCloseTo(1000, 5)
+  it('Draw at equal ratings: ratings do not change', () => {
+    const { a, b } = updateRatingPair({ a: player(), b: player(), outcome: 'DRAW' })
+    expect(a.rating).toBeCloseTo(1500, 3)
+    expect(b.rating).toBeCloseTo(1500, 3)
   })
 
-  it('Equal ratings + A wins: A gains exactly 16 points', () => {
-    const { newA, newB } = calculateElo(1000, 1000, 'a_wins')
-    expect(newA).toBeCloseTo(1016, 5)
-    expect(newB).toBeCloseTo(984, 5)
+  it('Draw at unequal ratings: higher-rated player loses, lower gains', () => {
+    const high = { rating: 1700, rd: 100, volatility: 0.06 }
+    const low = { rating: 1300, rd: 100, volatility: 0.06 }
+    const { a, b } = updateRatingPair({ a: high, b: low, outcome: 'DRAW' })
+    expect(a.rating).toBeLessThan(1700)
+    expect(b.rating).toBeGreaterThan(1300)
   })
 
-  it('Higher-rated player losing: larger rating drop than equal-rated loss', () => {
-    // A is much higher rated than B, A loses — A should lose more than 16 points
-    const { newA } = calculateElo(1400, 1000, 'b_wins')
-    const { newA: equalLoss } = calculateElo(1000, 1000, 'b_wins')
-    expect(Math.abs(1400 - newA)).toBeGreaterThan(Math.abs(1000 - equalLoss))
+  it('RD decreases after a game (more certain after playing)', () => {
+    const { a } = updateRatingPair({ a: player(), b: player(), outcome: 'A_WIN' })
+    expect(a.rd).toBeLessThan(GLICKO_DEFAULTS.rd)
   })
 
-  it('Sum of ratings is conserved', () => {
-    const total = 2000
-    const { newA: wA, newB: wB } = calculateElo(1000, 1000, 'a_wins')
-    expect(wA + wB).toBeCloseTo(total, 5)
-    const { newA: tA, newB: tB } = calculateElo(1000, 1000, 'tie')
-    expect(tA + tB).toBeCloseTo(total, 5)
-    const { newA: lA, newB: lB } = calculateElo(1000, 1000, 'b_wins')
-    expect(lA + lB).toBeCloseTo(total, 5)
+  it('Higher-rated player upset loss moves rating more than expected win', () => {
+    const strong = { rating: 1700, rd: 100, volatility: 0.06 }
+    const weak = { rating: 1300, rd: 100, volatility: 0.06 }
+    const { a: upset } = updateRatingPair({ a: strong, b: weak, outcome: 'B_WIN' })
+    const { a: expected } = updateRatingPair({ a: strong, b: weak, outcome: 'A_WIN' })
+    expect(upset.rating).toBeLessThan(expected.rating)
+  })
+})
+
+describe('conservativeScore', () => {
+  it('returns rating - 2*rd', () => {
+    expect(conservativeScore(1500, 350)).toBe(800)
+    expect(conservativeScore(1600, 100)).toBe(1400)
+  })
+})
+
+describe('confidenceFromRd', () => {
+  it('returns 100 at floor RD (30)', () => {
+    expect(confidenceFromRd(30)).toBe(100)
   })
 
-  it('Tie at unequal ratings: higher-rated player loses a small amount', () => {
-    const { newA, newB } = calculateElo(1200, 1000, 'tie')
-    expect(newA).toBeLessThan(1200) // favored player loses a bit
-    expect(newB).toBeGreaterThan(1000) // underdog gains a bit
+  it('returns 0 at ceiling RD (350)', () => {
+    expect(confidenceFromRd(350)).toBe(0)
+  })
+
+  it('returns intermediate value for mid-range RD', () => {
+    const mid = confidenceFromRd(190)
+    expect(mid).toBeGreaterThan(0)
+    expect(mid).toBeLessThan(100)
   })
 })

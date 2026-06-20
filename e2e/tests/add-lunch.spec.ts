@@ -100,13 +100,11 @@ test.describe('Add Lunch', () => {
     try {
       const fileInput = page.locator('input[type="file"]')
       await fileInput.setInputFiles(tmpFile)
-
-      await page.fill('input[type="text"]', 'Test Lunch Image')
-      await page.fill('input[type="password"]', ADMIN_TOKEN)
-      await page.locator('button.btn-primary').click()
-
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(300)
+      // Validation fires before the crop modal — error shown immediately
       await expect(page.locator('.alert-error')).toBeVisible()
+      // Crop modal should NOT appear
+      await expect(page.locator('.crop-backdrop')).toHaveCount(0)
     } finally {
       fs.unlinkSync(tmpFile)
     }
@@ -130,6 +128,11 @@ test.describe('Add Lunch', () => {
     try {
       const fileInput = page.locator('input[type="file"]')
       await fileInput.setInputFiles(tmpFile)
+
+      // Crop modal should open
+      await expect(page.locator('.crop-backdrop')).toBeVisible()
+      // Confirm the crop
+      await page.locator('.crop-actions .btn-primary').click()
 
       await page.waitForTimeout(500)
       const preview = page.locator('.upload-preview')

@@ -60,7 +60,7 @@ Returns all lunches.
 ---
 
 ### GET /api/lunches/leaderboard
-Returns all lunches sorted by rating descending, with rank.
+Returns all lunches sorted by `conservative_rating` descending, with rank.
 
 **Response 200:**
 ```json
@@ -73,6 +73,10 @@ Returns all lunches sorted by rating descending, with rank.
       "image_key": "images/abc123.jpg",
       "image_url": "/api/images/images/abc123.jpg",
       "rating": 1024.5,
+      "glicko_rd": 340.2,
+      "glicko_volatility": 0.06,
+      "conservative_rating": 1344.1,
+      "confidence": 84,
       "wins": 10,
       "losses": 3,
       "ties": 1,
@@ -222,7 +226,11 @@ type Lunch = {
   name: string
   image_key: string | null
   image_url: string | null   // derived: "/api/images/<image_key>" or null
-  rating: number             // Elo rating, starts at 1000
+  rating: number             // Glicko-2 rating, starts at 1500
+  glicko_rd: number          // RD, starts at 350
+  glicko_volatility: number  // starts at 0.06
+  conservative_rating: number // rating - (2 * glicko_rd), starts at 800
+  confidence: number         // 0-100 value derived from RD (higher is more certain)
   wins: number
   losses: number
   ties: number

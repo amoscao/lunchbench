@@ -9,17 +9,16 @@ test.describe('Add Lunch', () => {
     await page.goto('/add')
   })
 
-  test('page loads with heading and three mode tabs', async ({ page }) => {
+  test('page loads with heading and two mode tabs', async ({ page }) => {
     await expect(page.locator('.page-heading')).toHaveText('Add Lunch')
     const modeBtns = page.locator('.mode-btn')
-    await expect(modeBtns).toHaveCount(3)
+    await expect(modeBtns).toHaveCount(2)
   })
 
   test('mode tabs have correct labels', async ({ page }) => {
     const modeBtns = page.locator('.mode-btn')
     await expect(modeBtns.nth(0)).toContainText('New Lunch')
-    await expect(modeBtns.nth(1)).toContainText('New Lunch + Image')
-    await expect(modeBtns.nth(2)).toContainText('Add Image to Existing')
+    await expect(modeBtns.nth(1)).toContainText('Add Image to Existing')
   })
 
   test('first mode is active by default', async ({ page }) => {
@@ -84,20 +83,17 @@ test.describe('Add Lunch', () => {
   })
 
   test('image upload mode shows upload area', async ({ page }) => {
-    await page.locator('.mode-btn').nth(1).click()
     await expect(page.locator('.upload-area')).toBeVisible()
   })
 
   test('add image to existing mode shows searchable lunch input', async ({ page }) => {
-    await page.locator('.mode-btn').nth(2).click()
+    await page.locator('.mode-btn').nth(1).click()
     await page.waitForTimeout(1500)
     await expect(page.locator('label.form-label', { hasText: 'Select Lunch' })).toBeVisible()
     await expect(page.locator('.search-dropdown-wrap input[placeholder="Search lunches…"]')).toBeVisible()
   })
 
   test('client-side validation rejects wrong file type', async ({ page }) => {
-    await page.locator('.mode-btn').nth(1).click()
-
     const tmpFile = path.join(os.tmpdir(), `lunchbench-e2e-${Date.now()}.txt`)
     fs.writeFileSync(tmpFile, 'not an image')
 
@@ -117,8 +113,6 @@ test.describe('Add Lunch', () => {
   })
 
   test('client-side validation shows image preview for valid file', async ({ page }) => {
-    await page.locator('.mode-btn').nth(1).click()
-
     const tmpFile = path.join(os.tmpdir(), `lunchbench-e2e-${Date.now()}.jpg`)
     const jpegHeader = Buffer.from([
       0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,

@@ -158,7 +158,8 @@ function showVoteOverlay(
     ratingValue,
     Math.round(voteResult.conservative_rating),
     (v) => String(v),
-    800
+    800,
+    Math.round(lunch.rating)
   )
 }
 

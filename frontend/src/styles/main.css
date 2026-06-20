@@ -449,6 +449,10 @@ img {
   min-height: 420px;
 }
 
+.vote-vs {
+  display: none;
+}
+
 .vote-card-label {
   font-size: 11px;
   font-weight: 600;
@@ -905,33 +909,122 @@ img {
    Responsive
    ===================== */
 @media (max-width: 640px) {
-  .vote-arena {
-    flex-direction: column;
+  /* ---- Page padding ---- */
+  .page-content {
+    padding: var(--space-4) var(--space-3);
   }
 
-  .vote-buttons {
+  /* ---- Nav ---- */
+  .nav-links {
+    gap: var(--space-4);
+  }
+
+  /* ---- Arena: compact horizontal strips instead of tall columns ---- */
+  .vote-arena {
     flex-direction: column;
-    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  /* Each card becomes a short horizontal row: thumbnail left, name right */
+  .vote-arena .lunch-card {
+    min-height: unset;
+    flex-direction: row;
+    align-items: center;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+  }
+
+  /* Label sits above the card name, not in a separate element */
+  .vote-arena .vote-card-label {
+    font-size: 10px;
+    margin-bottom: 2px;
+    padding: 0;
+  }
+
+  /* Square thumbnail — fixed width */
+  .vote-arena .lunch-card-image {
+    flex: 0 0 96px;
+    min-height: 96px;
+    height: 96px;
+  }
+
+  .vote-arena .lunch-card-image img {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+  }
+
+  .vote-arena .lunch-card-placeholder {
+    flex: 0 0 96px;
+    min-height: 96px;
+    height: 96px;
+    border-radius: 0;
+  }
+
+  .vote-arena .lunch-card-info {
+    padding: var(--space-3) var(--space-4);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .vote-arena .lunch-card-name {
+    font-size: var(--text-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vote-arena .lunch-card-description {
+    display: none;
+  }
+
+  /* ---- VS divider between the two strips ---- */
+  .vote-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    height: 18px;
+    margin: 0;
+  }
+
+  /* ---- Vote buttons: row on mobile ---- */
+  .vote-buttons {
+    flex-direction: row;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+
+  .vote-button-wrap {
+    flex: 1;
   }
 
   .vote-buttons .btn {
     min-width: unset;
+    width: 100%;
+    padding: 10px var(--space-2);
+    font-size: var(--text-sm);
   }
 
-  .how-it-works {
-    grid-template-columns: 1fr;
-  }
-
-  .col-record {
+  .vote-key-hint {
     display: none;
   }
 
+  /* ---- How it works: single column ---- */
+  .how-it-works {
+    grid-template-columns: 1fr;
+    padding: var(--space-4);
+    gap: var(--space-4);
+    margin-top: var(--space-5);
+  }
+
+  /* ---- Leaderboard: hide record column ---- */
+  .col-record,
   .leaderboard-table thead th.col-record,
   .leaderboard-table tbody td.col-record {
     display: none;
-  }
-
-  .nav-links {
-    gap: var(--space-4);
   }
 }

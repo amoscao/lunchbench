@@ -216,6 +216,10 @@ export function renderHome(
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
     arena.appendChild(renderCard(leftLunch, 'DISH A'))
+    const vs = document.createElement('div')
+    vs.className = 'vote-vs'
+    vs.textContent = 'VS'
+    arena.appendChild(vs)
     arena.appendChild(renderCard(rightLunch, 'DISH B'))
     content.appendChild(arena)
 

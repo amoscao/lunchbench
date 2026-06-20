@@ -16,8 +16,9 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
     ? `<div class="lunch-card-description">${lunch.description}</div>`
     : ''
 
+  const shortLabel = label === 'DISH A' ? 'A' : 'B'
   card.innerHTML = `
-    <div class="vote-card-label">${label}</div>
+    <div class="vote-card-label" data-short="${shortLabel}">${label}</div>
     ${mediaArea}
     <div class="lunch-card-info">
       <div class="lunch-card-name">${lunch.name}${veganBadge}</div>

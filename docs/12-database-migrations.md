@@ -24,7 +24,11 @@ Current files include:
 - `0002_add_description.sql`
 - `0003_add_vegan.sql`
 - `0004_admin_sessions.sql`
+- `0005_glicko.sql`
+- `0006_glicko_defaults.sql`
 - `seed.sql`
+
+`0006_glicko_defaults.sql` repairs the schema defaults for new lunches, resets invalid-only self-match histories to the unrated Glicko baseline, drops copied self-match votes, and shifts obvious valid old-default `1000` starts onto the `1500` scale. It does not replay mixed historical Glicko games. Exact historical replay requires an explicitly approved repair command because the Glicko update is application logic, not SQL.
 
 Migration files should be append-only once merged. If a migration has shipped, create a new migration instead of editing history.
 

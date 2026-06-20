@@ -13,7 +13,8 @@ matchup.get('/', async (c) => {
     : 'SELECT * FROM lunches'
   const allLunches = await c.env.DB.prepare(query).all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
-    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC LIMIT 10'
+    // id DESC makes same-second D1 timestamps deterministic.
+    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
   ).all<{ left_lunch_id: number; right_lunch_id: number }>()
 
   const recentPairs: [number, number][] = recentVotes.results.map(

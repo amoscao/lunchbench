@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow, validateAdminToken } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
-import { computeConsistency, confidenceFromRd, consistencyBand } from '../elo'
+import { computeConsistency, confidenceFromRd, consistencyBand, GLICKO_DEFAULTS } from '../elo'
 import type { LunchRow } from '../types'
 
 const lunches = new Hono<{ Bindings: Bindings }>()
@@ -66,8 +66,8 @@ lunches.get('/leaderboard', async (c) => {
   const offset = (safePage - 1) * perPage
 
   const dataQuery = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC, name ASC LIMIT ? OFFSET ?'
-    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC, name ASC LIMIT ? OFFSET ?'
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC, name ASC, id ASC LIMIT ? OFFSET ?'
+    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC, name ASC, id ASC LIMIT ? OFFSET ?'
   const result = await c.env.DB.prepare(dataQuery).bind(perPage, offset).all<LunchRow>()
 
   const baseUrl = new URL(c.req.url).origin
@@ -124,8 +124,24 @@ lunches.post('/', async (c) => {
   const name = body.name.trim()
   const isVegan = body.is_vegan === true ? 1 : 0
   const result = await c.env.DB.prepare(
-    'INSERT INTO lunches (name, description, is_vegan) VALUES (?, ?, ?) RETURNING *'
-  ).bind(name, description, isVegan).first<LunchRow>()
+    `INSERT INTO lunches (
+      name,
+      description,
+      is_vegan,
+      rating,
+      glicko_rd,
+      glicko_volatility,
+      conservative_rating
+    ) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
+  ).bind(
+    name,
+    description,
+    isVegan,
+    GLICKO_DEFAULTS.rating,
+    GLICKO_DEFAULTS.rd,
+    GLICKO_DEFAULTS.volatility,
+    GLICKO_DEFAULTS.conservative_rating
+  ).first<LunchRow>()
 
   if (!result) {
     return c.json({ error: 'Failed to create lunch', code: 'INTERNAL_ERROR' }, 500)

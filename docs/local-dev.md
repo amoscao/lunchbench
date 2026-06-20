@@ -25,6 +25,11 @@ cp worker/.dev.vars.example worker/.dev.vars
 ```bash
 cd worker
 npx wrangler d1 execute lunchbench --local --file=../migrations/0001_initial.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0002_add_description.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0003_add_vegan.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0004_admin_sessions.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0005_glicko.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0006_glicko_defaults.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/seed.sql
 ```
 

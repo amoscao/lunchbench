@@ -1,5 +1,6 @@
 import { getLeaderboard, type LeaderboardLunch } from '../api'
 import { isVeganMode } from '../vegan-mode'
+import { animateCountUp } from '../utils/count-up'
 
 function rankBadgeClass(rank: number): string {
   if (rank === 1) return 'gold'
@@ -94,7 +95,8 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
 
         const ratingTd = document.createElement('td')
         ratingTd.className = 'col-rating'
-        ratingTd.textContent = `${Math.round(lunch.rating)}`
+        const rating = Math.round(lunch.conservative_rating)
+        ratingTd.innerHTML = `<span class="rating-value" data-raw="${rating}">${rating}</span>`
         row.appendChild(ratingTd)
 
         const recordTd = document.createElement('td')
@@ -135,6 +137,12 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
 
         tbody.appendChild(row)
       }
+
+      const table = content.querySelector<HTMLElement>('.leaderboard-table')
+      table?.querySelectorAll<HTMLElement>('.col-rating .rating-value').forEach((el) => {
+        const raw = Number(el.dataset.raw)
+        if (!isNaN(raw)) animateCountUp(el, raw, (v) => String(v))
+      })
     })
     .catch(() => {
       tbody.innerHTML = `

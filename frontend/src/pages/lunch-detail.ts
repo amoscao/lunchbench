@@ -1,11 +1,19 @@
 import { getLunch, type LunchDetail } from '../api'
+import { animateCountUp } from '../utils/count-up'
 
-function statCard(label: string, value: string, sub?: string): HTMLElement {
+function statCard(
+  label: string,
+  value: string,
+  sub?: string,
+  raw?: number,
+  format: 'int' | 'pct' | 'pct1' = 'int',
+): HTMLElement {
   const card = document.createElement('div')
   card.className = 'stat-card'
+  const dataAttrs = raw === undefined ? '' : ` data-animate="${raw}" data-format="${format}"`
   card.innerHTML = `
     <div class="stat-label">${label}</div>
-    <div class="stat-value">${value}</div>
+    <div class="stat-value"${dataAttrs}>${value}</div>
     ${sub ? `<div class="stat-sub">${sub}</div>` : ''}
   `
   return card
@@ -85,17 +93,52 @@ function renderDetail(content: HTMLElement, lunch: LunchDetail, navigate: (p: st
     : '—'
   const momentumStr = lunch.momentum >= 0 ? `+${lunch.momentum}` : `${lunch.momentum}`
 
-  grid.appendChild(statCard('Rating', String(Math.round(lunch.conservative_rating)), `raw ${Math.round(lunch.rating)}`))
-  grid.appendChild(statCard('Confidence', `${lunch.confidence}%`, `RD ${Math.round(lunch.glicko_rd)}`))
+  grid.appendChild(
+    statCard(
+      'Rating',
+      String(Math.round(lunch.conservative_rating)),
+      `raw ${Math.round(lunch.rating)}`,
+      Math.round(lunch.conservative_rating),
+      'int',
+    ),
+  )
+  grid.appendChild(
+    statCard(
+      'Confidence',
+      `${lunch.confidence}%`,
+      `RD ${Math.round(lunch.glicko_rd)}`,
+      lunch.confidence,
+      'pct',
+    ),
+  )
   grid.appendChild(statCard('Consistency', consStr))
-  grid.appendChild(statCard('Win Rate', `${winRatePct}%`))
-  grid.appendChild(statCard('Total Votes', String(totalVotes)))
-  grid.appendChild(statCard('Wins', String(lunch.wins)))
-  grid.appendChild(statCard('Losses', String(lunch.losses)))
-  grid.appendChild(statCard('Ties', String(lunch.ties)))
+  grid.appendChild(
+    statCard(
+      'Win Rate',
+      `${winRatePct}%`,
+      undefined,
+      Math.round(lunch.win_rate * 1000),
+      'pct1',
+    ),
+  )
+  grid.appendChild(statCard('Total Votes', String(totalVotes), undefined, totalVotes, 'int'))
+  grid.appendChild(statCard('Wins', String(lunch.wins), undefined, lunch.wins, 'int'))
+  grid.appendChild(statCard('Losses', String(lunch.losses), undefined, lunch.losses, 'int'))
+  grid.appendChild(statCard('Ties', String(lunch.ties), undefined, lunch.ties, 'int'))
   grid.appendChild(statCard('Momentum', momentumStr))
 
   content.appendChild(grid)
+
+  grid.querySelectorAll<HTMLElement>('[data-animate]').forEach((el) => {
+    const raw = Number(el.dataset.animate)
+    if (Number.isNaN(raw)) return
+    const fmt = el.dataset.format ?? 'int'
+    animateCountUp(el, raw, (v) => {
+      if (fmt === 'pct') return `${v}%`
+      if (fmt === 'pct1') return `${(v / 10).toFixed(1)}%`
+      return String(v)
+    })
+  })
 
   // W/L/T bar
   content.appendChild(wltBar(lunch.wins, lunch.losses, lunch.ties))

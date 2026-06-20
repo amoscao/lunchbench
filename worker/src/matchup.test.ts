@@ -38,6 +38,22 @@ describe('selectMatchup', () => {
     }
   })
 
+  it('prefers any non-recent pair when one exists', () => {
+    const lunches = [
+      { id: 1, name: 'Recent-only anchor', rating: 1500, glicko_rd: 1000 },
+      { id: 2, name: 'Allowed anchor', rating: 1510, glicko_rd: 10 },
+      { id: 3, name: 'Closest allowed opponent', rating: 1520, glicko_rd: 10 },
+      { id: 4, name: 'Distant allowed opponent', rating: 1900, glicko_rd: 10 },
+    ]
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
+
+    const result = selectMatchup(lunches, [[1, 2], [1, 3], [1, 4]])!
+
+    expect(result.map((lunch) => lunch.id)).toEqual([2, 3])
+  })
+
   it('weights anchor selection by higher glicko_rd', () => {
     const lunches = [
       { id: 1, name: 'Low uncertainty', rating: 1200, glicko_rd: 10 },

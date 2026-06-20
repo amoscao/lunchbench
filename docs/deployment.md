@@ -19,6 +19,11 @@ npx wrangler pages deploy dist --project-name=lunchbench --branch=main
 ```bash
 cd worker
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0001_initial.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0002_add_description.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0003_add_vegan.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0004_admin_sessions.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0005_glicko.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0006_glicko_defaults.sql
 ```
 
 ## Automated Deployment (GitHub Actions)

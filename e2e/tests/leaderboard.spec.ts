@@ -53,7 +53,7 @@ test.describe('Leaderboard', () => {
     })
   })
 
-  test('Elo ratings update after voting', async ({ page }) => {
+  test('Glicko scores update after voting', async ({ page }) => {
     const initialRatings = await page.locator('td.col-rating').allTextContents()
 
     await page.goto('/')

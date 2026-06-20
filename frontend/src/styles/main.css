@@ -1141,10 +1141,16 @@ img {
     margin-top: var(--space-5);
   }
 
-  /* ---- Leaderboard: hide record column ---- */
+  /* ---- Leaderboard: hide record, confidence, consistency columns ---- */
   .col-record,
   .leaderboard-table thead th.col-record,
-  .leaderboard-table tbody td.col-record {
+  .leaderboard-table tbody td.col-record,
+  .col-confidence,
+  .leaderboard-table thead th.col-confidence,
+  .leaderboard-table tbody td.col-confidence,
+  .col-consistency,
+  .leaderboard-table thead th.col-consistency,
+  .leaderboard-table tbody td.col-consistency {
     display: none;
   }
 }

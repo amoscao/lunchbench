@@ -31,17 +31,21 @@ lunches.get('/:id{[0-9]+}', async (c) => {
   const lunch = lunchFromRow(row, baseUrl)
   const consistency = computeConsistency(row.wins, row.losses, row.ties)
 
-  return c.json({
-    ...lunch,
-    glicko_rd: row.glicko_rd,
-    glicko_volatility: row.glicko_volatility,
-    conservative_rating: row.conservative_rating,
-    confidence: confidenceFromRd(row.glicko_rd),
-    consistency,
-    consistency_band: consistencyBand(consistency),
-    win_rate: (row.wins + row.losses + row.ties) > 0 ? row.wins / (row.wins + row.losses + row.ties) : 0,
-    momentum,
-  })
+  return c.json(
+    {
+      ...lunch,
+      glicko_rd: row.glicko_rd,
+      glicko_volatility: row.glicko_volatility,
+      conservative_rating: row.conservative_rating,
+      confidence: confidenceFromRd(row.glicko_rd),
+      consistency,
+      consistency_band: consistencyBand(consistency),
+      win_rate: (row.wins + row.losses + row.ties) > 0 ? row.wins / (row.wins + row.losses + row.ties) : 0,
+      momentum,
+    },
+    200,
+    { 'Cache-Control': 'public, max-age=60, s-maxage=300' }
+  )
 })
 
 lunches.get('/leaderboard', async (c) => {
@@ -75,7 +79,11 @@ lunches.get('/leaderboard', async (c) => {
     consistency_band: consistencyBand(computeConsistency(r.wins, r.losses, r.ties)),
     glicko_rd: r.glicko_rd,
   }))
-  return c.json({ lunches: ranked, total, page: safePage, per_page: perPage, total_pages })
+  return c.json(
+    { lunches: ranked, total, page: safePage, per_page: perPage, total_pages },
+    200,
+    { 'Cache-Control': 'no-cache, s-maxage=60' }
+  )
 })
 
 lunches.post('/', async (c) => {

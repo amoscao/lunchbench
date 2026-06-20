@@ -376,6 +376,7 @@ img {
   display: flex;
   flex-direction: column;
   cursor: default;
+  position: relative;
 }
 
 /* Vote feedback: neon pulse on voted card */
@@ -1486,4 +1487,73 @@ img {
   white-space: nowrap;
   flex: 1;
   text-align: center;
+}
+
+/* Vote result overlay */
+.vote-result-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: inherit;
+  z-index: 10;
+  animation: overlay-fade-in 0.2s ease-out forwards;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.overlay-rank-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+}
+
+.overlay-rank-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  overflow: hidden;
+  height: 1.2em;
+  position: relative;
+}
+
+.overlay-rank-number {
+  display: block;
+  animation: rank-slide-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes rank-slide-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.overlay-rank-up    .overlay-rank-number { color: #4ade80; }
+.overlay-rank-down  .overlay-rank-number { color: #f87171; }
+.overlay-rank-neutral .overlay-rank-number { color: #d1d5db; }
+
+.overlay-rating-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+  margin-top: 8px;
+}
+
+.overlay-rating-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }

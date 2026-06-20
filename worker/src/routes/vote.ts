@@ -154,6 +154,15 @@ export async function recordVoteWithRetry(
   return voteId === null ? { status: 'conflict' } : { status: 'ok', voteId }
 }
 
+type VoteResultRow = {
+  rating: number
+  conservative_rating: number
+}
+
+type RankRow = {
+  rank: number
+}
+
 vote.post('/', async (c) => {
   const ip = getClientIp(c.req.raw)
   const rl = await checkRateLimit(c.env.DB, ip, 'vote', 300, 3600)
@@ -201,6 +210,28 @@ vote.post('/', async (c) => {
     return c.json({ error: 'Vote conflict, please retry', code: 'CONFLICT' }, 409)
   }
 
+  const [leftResultRow, rightResultRow] = await Promise.all([
+    c.env.DB.prepare('SELECT rating, conservative_rating FROM lunches WHERE id = ?')
+      .bind(left_lunch_id)
+      .first<VoteResultRow>(),
+    c.env.DB.prepare('SELECT rating, conservative_rating FROM lunches WHERE id = ?')
+      .bind(right_lunch_id)
+      .first<VoteResultRow>(),
+  ])
+
+  if (!leftResultRow || !rightResultRow) {
+    return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
+  }
+
+  const [leftRankRow, rightRankRow] = await Promise.all([
+    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
+      .bind(leftResultRow.conservative_rating)
+      .first<RankRow>(),
+    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
+      .bind(rightResultRow.conservative_rating)
+      .first<RankRow>(),
+  ])
+
   // Get next matchup
   const allLunches = await c.env.DB.prepare('SELECT * FROM lunches').all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
@@ -217,6 +248,16 @@ vote.post('/', async (c) => {
 
   return c.json({
     vote_id: writeResult.voteId,
+    left_result: {
+      rating: leftResultRow.rating,
+      conservative_rating: leftResultRow.conservative_rating,
+      rank: leftRankRow?.rank ?? 1,
+    },
+    right_result: {
+      rating: rightResultRow.rating,
+      conservative_rating: rightResultRow.conservative_rating,
+      rank: rightRankRow?.rank ?? 1,
+    },
     next: nextPair
       ? { left: lunchFromRow(nextPair[0], baseUrl), right: lunchFromRow(nextPair[1], baseUrl) }
       : null,

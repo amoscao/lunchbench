@@ -1,6 +1,7 @@
-import { getMatchup, submitVote, type Lunch } from '../api'
+import { getMatchup, submitVote, type Lunch, type VoteResult } from '../api'
 import { isVeganMode } from '../vegan-mode'
 import { hasSeen, markSeen } from '../utils/seen-pairs'
+import { animateCountUp } from '../utils/count-up'
 
 function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
@@ -118,6 +119,49 @@ function renderError(retry: () => void): HTMLElement {
   return div
 }
 
+function showVoteOverlay(
+  card: HTMLElement,
+  lunch: Lunch,
+  voteResult: VoteResult,
+  colorClass: 'overlay-rank-up' | 'overlay-rank-down' | 'overlay-rank-neutral'
+): void {
+  const overlay = document.createElement('div')
+  overlay.className = `vote-result-overlay ${colorClass}`
+
+  const rankLabel = document.createElement('div')
+  rankLabel.className = 'overlay-rank-label'
+  rankLabel.textContent = 'Rank'
+
+  const rankValue = document.createElement('div')
+  rankValue.className = 'overlay-rank-value'
+
+  const rankNumber = document.createElement('span')
+  rankNumber.className = 'overlay-rank-number'
+  rankNumber.textContent = `#${voteResult.rank}`
+  rankValue.appendChild(rankNumber)
+
+  const ratingLabel = document.createElement('div')
+  ratingLabel.className = 'overlay-rating-label'
+  ratingLabel.textContent = 'Rating'
+
+  const ratingValue = document.createElement('div')
+  ratingValue.className = 'overlay-rating-value'
+  ratingValue.textContent = String(Math.round(lunch.rating))
+
+  overlay.appendChild(rankLabel)
+  overlay.appendChild(rankValue)
+  overlay.appendChild(ratingLabel)
+  overlay.appendChild(ratingValue)
+  card.appendChild(overlay)
+
+  animateCountUp(
+    ratingValue,
+    Math.round(voteResult.conservative_rating),
+    (v) => String(v),
+    800
+  )
+}
+
 export function renderHome(
   container: HTMLElement,
   navigate: (p: string) => void
@@ -159,7 +203,21 @@ export function renderHome(
 
     try {
       const [res] = await Promise.all([
-        submitVote(leftLunch.id, rightLunch.id, result),
+        submitVote(leftLunch.id, rightLunch.id, result).then((r) => {
+          const leftCard = cards[0]
+          const rightCard = cards[1]
+          const leftColor =
+            result === 'left_win' ? 'overlay-rank-up' :
+            result === 'right_win' ? 'overlay-rank-down' :
+            'overlay-rank-neutral'
+          const rightColor =
+            result === 'right_win' ? 'overlay-rank-up' :
+            result === 'left_win' ? 'overlay-rank-down' :
+            'overlay-rank-neutral'
+          if (leftCard && leftLunch) showVoteOverlay(leftCard, leftLunch, r.left_result, leftColor)
+          if (rightCard && rightLunch) showVoteOverlay(rightCard, rightLunch, r.right_result, rightColor)
+          return r
+        }),
         delay,
       ])
 

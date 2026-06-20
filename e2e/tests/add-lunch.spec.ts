@@ -100,36 +100,55 @@ test.describe('Add Lunch', () => {
     try {
       const fileInput = page.locator('input[type="file"]')
       await fileInput.setInputFiles(tmpFile)
-
-      await page.fill('input[type="text"]', 'Test Lunch Image')
-      await page.fill('input[type="password"]', ADMIN_TOKEN)
-      await page.locator('button.btn-primary').click()
-
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(300)
+      // Validation fires before the crop modal — error shown immediately
       await expect(page.locator('.alert-error')).toBeVisible()
+      // Crop modal should NOT appear
+      await expect(page.locator('.crop-backdrop')).toHaveCount(0)
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  test('crop modal appears after selecting valid image', async ({ page }) => {
+    const tmpFile = path.join(os.tmpdir(), `lunchbench-e2e-${Date.now()}.png`)
+    const png1x1 = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64'
+    )
+    fs.writeFileSync(tmpFile, png1x1)
+
+    try {
+      await page.locator('input[type="file"]').setInputFiles(tmpFile)
+      await expect(page.locator('.crop-backdrop')).toBeVisible()
+      await expect(page.locator('.crop-title')).toContainText('Crop')
+      await expect(page.locator('.crop-actions .btn-primary')).toBeEnabled()
+      // Cancel dismisses the modal
+      await page.locator('.crop-actions .btn-secondary').click()
+      await expect(page.locator('.crop-backdrop')).toHaveCount(0)
     } finally {
       fs.unlinkSync(tmpFile)
     }
   })
 
   test('client-side validation shows image preview for valid file', async ({ page }) => {
-    const tmpFile = path.join(os.tmpdir(), `lunchbench-e2e-${Date.now()}.jpg`)
-    const jpegHeader = Buffer.from([
-      0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-      0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
-      0xFF, 0xDB, 0x00, 0x43, 0x00,
-      ...Array(64).fill(0x10),
-      0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00,
-      0xFF, 0xC4, 0x00, 0x1F, 0x00,
-      ...Array(29).fill(0x00),
-      0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00,
-      0x7F, 0xFF, 0xD9,
-    ])
-    fs.writeFileSync(tmpFile, jpegHeader)
+    const tmpFile = path.join(os.tmpdir(), `lunchbench-e2e-${Date.now()}.png`)
+    // Minimal valid 1×1 grayscale PNG
+    const png1x1 = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==',
+      'base64'
+    )
+    fs.writeFileSync(tmpFile, png1x1)
 
     try {
       const fileInput = page.locator('input[type="file"]')
       await fileInput.setInputFiles(tmpFile)
+
+      // Crop modal should open
+      await expect(page.locator('.crop-backdrop')).toBeVisible()
+      // Wait for image to load and confirm button to enable
+      await expect(page.locator('.crop-actions .btn-primary')).toBeEnabled()
+      await page.locator('.crop-actions .btn-primary').click()
 
       await page.waitForTimeout(500)
       const preview = page.locator('.upload-preview')

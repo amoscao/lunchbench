@@ -1,6 +1,7 @@
 import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch } from '../api'
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
+import { openCropModal } from '../utils/crop-modal'
 
 type Mode = 'new' | 'add-image'
 
@@ -133,13 +134,18 @@ export function renderAdd(container: HTMLElement): void {
       uploadArea.appendChild(imagePreview)
 
       uploadArea.addEventListener('click', () => fileInput.click())
-      fileInput.addEventListener('change', () => {
+      fileInput.addEventListener('change', async () => {
         const file = fileInput.files?.[0]
         if (!file) return
-        selectedFile = file
-        imagePreview.src = URL.createObjectURL(file)
+        fileInput.value = ''
+        const validation = await validateImageFile(file)
+        if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
+        const cropped = await openCropModal(file)
+        if (!cropped) return
+        selectedFile = cropped
+        imagePreview.src = URL.createObjectURL(cropped)
         imagePreview.style.display = 'block'
-        uploadArea.querySelector('p')!.textContent = file.name
+        uploadArea.querySelector('p')!.textContent = cropped.name
       })
       uploadGroup.appendChild(uploadArea)
 
@@ -165,11 +171,6 @@ export function renderAdd(container: HTMLElement): void {
 
         const name = nameInput.value.trim()
         if (!name) { showAlert('Lunch name is required.', 'error'); return }
-
-        if (selectedFile) {
-          const validation = await validateImageFile(selectedFile)
-          if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-        }
 
         const highMatch = warnDuplicates.find((d) => d.score >= 0.75)
         if (highMatch) {
@@ -299,13 +300,18 @@ export function renderAdd(container: HTMLElement): void {
     uploadArea.appendChild(imagePreview)
 
     uploadArea.addEventListener('click', () => fileInput.click())
-    fileInput.addEventListener('change', () => {
+    fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0]
       if (!file) return
-      selectedFile = file
-      imagePreview.src = URL.createObjectURL(file)
+      fileInput.value = ''
+      const validation = await validateImageFile(file)
+      if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
+      const cropped = await openCropModal(file)
+      if (!cropped) return
+      selectedFile = cropped
+      imagePreview.src = URL.createObjectURL(cropped)
       imagePreview.style.display = 'block'
-      uploadArea.querySelector('p')!.textContent = file.name
+      uploadArea.querySelector('p')!.textContent = cropped.name
     })
     uploadGroup.appendChild(uploadArea)
 
@@ -327,8 +333,6 @@ export function renderAdd(container: HTMLElement): void {
       if (!token) { showAlert('Password is required.', 'error'); return }
       if (!selectedExistingId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
       if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
-      const validation = await validateImageFile(selectedFile)
-      if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
       submitBtn.disabled = true
       submitBtn.textContent = 'Uploading…'
       try {

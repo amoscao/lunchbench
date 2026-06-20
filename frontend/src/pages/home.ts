@@ -1,11 +1,7 @@
 import { getMatchup, submitVote, type Lunch } from '../api'
 import { isVeganMode } from '../vegan-mode'
 
-function truncate(s: string, n = 20): string {
-  return s.length > n ? s.slice(0, n - 1) + '…' : s
-}
-
-function renderCard(lunch: Lunch): HTMLElement {
+function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
   card.className = 'lunch-card'
 
@@ -21,14 +17,61 @@ function renderCard(lunch: Lunch): HTMLElement {
     : ''
 
   card.innerHTML = `
+    <div class="vote-card-label">${label}</div>
     ${mediaArea}
     <div class="lunch-card-info">
       <div class="lunch-card-name">${lunch.name}${veganBadge}</div>
       ${description}
-      <div class="lunch-card-stats">Elo ${Math.round(lunch.rating)} · ${lunch.wins}W ${lunch.losses}L ${lunch.ties}T</div>
     </div>
   `
   return card
+}
+
+function renderHowItWorks(): HTMLElement {
+  const section = document.createElement('section')
+  section.className = 'how-it-works'
+  section.innerHTML = `
+    <div class="hiw-step">
+      <span class="hiw-num">01</span>
+      <h3 class="hiw-title">Vote</h3>
+      <p class="hiw-desc">Two lunch dishes go head to head. Pick the one you'd rather eat — or call it a tie.</p>
+    </div>
+    <div class="hiw-step">
+      <span class="hiw-num">02</span>
+      <h3 class="hiw-title">Elo Rating</h3>
+      <p class="hiw-desc">Every vote updates each dish's Elo score. Beat a higher-rated dish and you gain more points. Lose to a lower-rated one and you drop more.</p>
+    </div>
+    <div class="hiw-step">
+      <span class="hiw-num">03</span>
+      <h3 class="hiw-title">Leaderboard</h3>
+      <p class="hiw-desc">Dishes are ranked by Elo. The more votes, the more accurate the ranking. The best lunch rises to the top.</p>
+    </div>
+  `
+  return section
+}
+
+function createVoteButton(
+  label: string,
+  hint: string,
+  onClick: () => void,
+  buttonClass: string
+): { wrapper: HTMLElement; button: HTMLButtonElement } {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'vote-button-wrap'
+
+  const hintEl = document.createElement('span')
+  hintEl.className = 'vote-key-hint'
+  hintEl.textContent = hint
+
+  const button = document.createElement('button')
+  button.className = `btn ${buttonClass}`
+  button.textContent = label
+  button.addEventListener('click', onClick)
+
+  wrapper.appendChild(hintEl)
+  wrapper.appendChild(button)
+
+  return { wrapper, button }
 }
 
 function renderSkeleton(): HTMLElement {
@@ -73,9 +116,75 @@ function renderError(retry: () => void): HTMLElement {
   return div
 }
 
-export function renderHome(container: HTMLElement, navigate: (p: string) => void): void {
+export function renderHome(
+  container: HTMLElement,
+  navigate: (p: string) => void
+): (() => void) | void {
   let leftLunch: Lunch | null = null
   let rightLunch: Lunch | null = null
+  let cleanupKeyboard: (() => void) | null = null
+  let isSubmitting = false
+
+  const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
+    if (isSubmitting || !leftLunch || !rightLunch) return
+
+    isSubmitting = true
+
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.vote-buttons .btn')
+    buttons.forEach((b) => (b.disabled = true))
+
+    const arena = document.querySelector<HTMLDivElement>('.vote-arena')
+    if (arena) {
+      arena.style.transition = 'opacity 0.2s'
+      arena.style.opacity = '0'
+    }
+
+    try {
+      const res = await submitVote(leftLunch.id, rightLunch.id, result)
+      await new Promise((r) => setTimeout(r, 200))
+      await load(res.next)
+    } catch {
+      if (arena) {
+        arena.style.opacity = '1'
+      }
+      buttons.forEach((b) => (b.disabled = false))
+      const err = document.createElement('p')
+      err.style.cssText = 'text-align:center;color:#dc2626;margin-top:12px;font-size:13px;'
+      err.textContent = 'Vote failed. Try again.'
+      const content = container.firstElementChild as HTMLElement
+      content?.appendChild(err)
+    } finally {
+      isSubmitting = false
+    }
+  }
+
+  const addKeyboardShortcuts = (): void => {
+    const handler = (event: KeyboardEvent): void => {
+      const active = document.activeElement
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) {
+        return
+      }
+
+      if (event.key === '1') {
+        void castVote('left_win')
+      } else if (event.key === '2') {
+        void castVote('tie')
+      } else if (event.key === '3') {
+        void castVote('right_win')
+      }
+    }
+
+    cleanupKeyboard?.()
+    document.addEventListener('keydown', handler)
+    cleanupKeyboard = () => {
+      document.removeEventListener('keydown', handler)
+      cleanupKeyboard = null
+    }
+  }
 
   async function load(matchup?: { left: Lunch; right: Lunch } | null): Promise<void> {
     container.innerHTML = ''
@@ -106,56 +215,30 @@ export function renderHome(container: HTMLElement, navigate: (p: string) => void
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
-    arena.appendChild(renderCard(leftLunch))
-    arena.appendChild(renderCard(rightLunch))
+    arena.appendChild(renderCard(leftLunch, 'DISH A'))
+    arena.appendChild(renderCard(rightLunch, 'DISH B'))
     content.appendChild(arena)
 
     const voteRow = document.createElement('div')
     voteRow.className = 'vote-buttons'
 
-    const leftBtn = document.createElement('button')
-    leftBtn.className = 'btn btn-primary'
-    leftBtn.textContent = `← ${truncate(leftLunch.name)}`
+    const left = createVoteButton('A wins', '[1]', () => void castVote('left_win'), 'btn-primary')
+    const tie = createVoteButton('Tie', '[2]', () => void castVote('tie'), 'btn-secondary')
+    const right = createVoteButton('B wins', '[3]', () => void castVote('right_win'), 'btn-primary')
 
-    const tieBtn = document.createElement('button')
-    tieBtn.className = 'btn btn-secondary'
-    tieBtn.textContent = 'Tie'
-
-    const rightBtn = document.createElement('button')
-    rightBtn.className = 'btn btn-primary'
-    rightBtn.textContent = `${truncate(rightLunch.name)} →`
-
-    voteRow.appendChild(leftBtn)
-    voteRow.appendChild(tieBtn)
-    voteRow.appendChild(rightBtn)
+    voteRow.appendChild(left.wrapper)
+    voteRow.appendChild(tie.wrapper)
+    voteRow.appendChild(right.wrapper)
     content.appendChild(voteRow)
+    content.appendChild(renderHowItWorks())
 
-    async function castVote(result: 'left_win' | 'right_win' | 'tie'): Promise<void> {
-      if (!leftLunch || !rightLunch) return
-      ;[leftBtn, tieBtn, rightBtn].forEach((b) => { b.disabled = true })
-
-      // Fade out before replacing the matchup.
-      arena.style.transition = 'opacity 0.2s'
-      arena.style.opacity = '0'
-
-      try {
-        const res = await submitVote(leftLunch.id, rightLunch.id, result)
-        await new Promise((r) => setTimeout(r, 200))
-        await load(res.next)
-      } catch {
-        arena.style.opacity = '1'
-        ;[leftBtn, tieBtn, rightBtn].forEach((b) => { b.disabled = false })
-        const err = document.createElement('p')
-        err.style.cssText = 'text-align:center;color:#dc2626;margin-top:12px;font-size:13px;'
-        err.textContent = 'Vote failed. Try again.'
-        content.appendChild(err)
-      }
-    }
-
-    leftBtn.addEventListener('click', () => castVote('left_win'))
-    tieBtn.addEventListener('click', () => castVote('tie'))
-    rightBtn.addEventListener('click', () => castVote('right_win'))
+    addKeyboardShortcuts()
   }
 
   load(undefined)
+  addKeyboardShortcuts()
+
+  return () => {
+    cleanupKeyboard?.()
+  }
 }

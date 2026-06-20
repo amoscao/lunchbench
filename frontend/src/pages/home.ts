@@ -1,5 +1,6 @@
 import { getMatchup, submitVote, type Lunch } from '../api'
 import { isVeganMode } from '../vegan-mode'
+import { hasSeen, markSeen } from '../utils/seen-pairs'
 
 function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
@@ -143,15 +144,15 @@ export function renderHome(
 
     // Neon pulse on the voted card(s)
     const cards = document.querySelectorAll<HTMLElement>('.vote-arena .lunch-card')
-    // cards[0] = left card, cards[1] = VS div (skip), cards[2] = right card
+    // cards[0] = left card, cards[1] = right card (.vote-vs is not a .lunch-card)
     if (result === 'left_win') {
       cards[0]?.classList.add('voted')
     } else if (result === 'right_win') {
-      cards[2]?.classList.add('voted')
+      cards[1]?.classList.add('voted')
     } else {
       // tie
       cards[0]?.classList.add('voted')
-      cards[2]?.classList.add('voted')
+      cards[1]?.classList.add('voted')
     }
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
@@ -161,6 +162,15 @@ export function renderHome(
         submitVote(leftLunch.id, rightLunch.id, result),
         delay,
       ])
+
+      // Fade out the arena, then load next matchup
+      const arena = document.querySelector<HTMLElement>('.vote-arena')
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (arena && !reducedMotion) {
+        arena.classList.add('fading-out')
+        await new Promise<void>((r) => setTimeout(r, 260))
+      }
+
       await load(res.next)
     } catch (e) {
       if (bar) bar.classList.remove('loading')
@@ -230,8 +240,20 @@ export function renderHome(
       return
     }
 
-    leftLunch = matchup.left
-    rightLunch = matchup.right
+    let currentMatchup: { left: Lunch; right: Lunch } | null = matchup
+    let retries = 0
+    while (currentMatchup && hasSeen(currentMatchup.left.id, currentMatchup.right.id) && retries < 10) {
+      currentMatchup = await getMatchup(isVeganMode())
+      retries++
+    }
+    if (!currentMatchup) {
+      content.appendChild(renderEmpty(navigate, isVeganMode()))
+      return
+    }
+    markSeen(currentMatchup.left.id, currentMatchup.right.id)
+
+    leftLunch = currentMatchup.left
+    rightLunch = currentMatchup.right
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
@@ -241,6 +263,8 @@ export function renderHome(
     vs.textContent = 'VS'
     arena.appendChild(vs)
     arena.appendChild(renderCard(rightLunch, 'DISH B'))
+    const reducedMotionFadeIn = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!reducedMotionFadeIn) arena.classList.add('fading-in')
     content.appendChild(arena)
 
     const gradientBar = document.createElement('div')

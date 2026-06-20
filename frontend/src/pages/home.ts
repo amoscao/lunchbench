@@ -143,15 +143,15 @@ export function renderHome(
 
     // Neon pulse on the voted card(s)
     const cards = document.querySelectorAll<HTMLElement>('.vote-arena .lunch-card')
-    // cards[0] = left card, cards[1] = VS div (skip), cards[2] = right card
+    // cards[0] = left card, cards[1] = right card (.vote-vs is not a .lunch-card)
     if (result === 'left_win') {
       cards[0]?.classList.add('voted')
     } else if (result === 'right_win') {
-      cards[2]?.classList.add('voted')
+      cards[1]?.classList.add('voted')
     } else {
       // tie
       cards[0]?.classList.add('voted')
-      cards[2]?.classList.add('voted')
+      cards[1]?.classList.add('voted')
     }
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))

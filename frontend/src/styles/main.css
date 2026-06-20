@@ -936,7 +936,6 @@ img {
 
   /* Label: show short version ("A"/"B") in white, hide "DISH A"/"DISH B" text */
   .vote-arena .vote-card-label {
-    font-size: 10px;
     margin-bottom: 2px;
     padding: 0;
     color: var(--text-primary);

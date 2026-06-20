@@ -6,7 +6,6 @@ export function createNav(navigate: (path: string) => void): HTMLElement {
     <div class="nav-links">
       <span class="nav-link" data-path="/">Arena</span>
       <span class="nav-link" data-path="/leaderboard">Leaderboard</span>
-      <span class="nav-link" data-path="/add">Add Lunch</span>
     </div>
     <div class="nav-actions">
       <button class="nav-vegan-toggle" aria-label="Enable vegan mode">🌿</button>

@@ -46,10 +46,13 @@ Returns all lunches.
       "name": "Margherita Pizza",
       "image_key": null,
       "image_url": null,
-      "rating": 1024.5,
-      "wins": 10,
-      "losses": 3,
-      "ties": 1,
+      "rating": 1500,
+      "glicko_rd": 350,
+      "glicko_volatility": 0.06,
+      "conservative_rating": 800,
+      "wins": 0,
+      "losses": 0,
+      "ties": 0,
       "created_at": "2024-09-23T12:00:00Z",
       "updated_at": "2024-09-23T14:00:00Z"
     }
@@ -60,7 +63,12 @@ Returns all lunches.
 ---
 
 ### GET /api/lunches/leaderboard
-Returns all lunches sorted by `conservative_rating` descending, with rank.
+Returns lunches sorted by `conservative_rating` descending, then `name` ascending, then `id` ascending, with rank.
+
+**Query params:**
+- `?page=1` — 1-based page number
+- `?per_page=10` — page size, capped at 50
+- `?vegan=true` — only include vegan lunches
 
 **Response 200:**
 ```json
@@ -72,27 +80,32 @@ Returns all lunches sorted by `conservative_rating` descending, with rank.
       "name": "Margherita Pizza",
       "image_key": "images/abc123.jpg",
       "image_url": "/api/images/images/abc123.jpg",
-      "rating": 1024.5,
-      "glicko_rd": 340.2,
+      "rating": 1600,
+      "glicko_rd": 100,
       "glicko_volatility": 0.06,
-      "conservative_rating": 1344.1,
-      "confidence": 84,
-      "consistency": 88.9,
+      "conservative_rating": 1400,
+      "confidence": 78,
+      "consistency": 100,
       "consistency_band": "very-steady",
-      "wins": 10,
-      "losses": 3,
-      "ties": 1,
+      "wins": 6,
+      "losses": 0,
+      "ties": 0,
       "created_at": "2024-09-23T12:00:00Z",
       "updated_at": "2024-09-23T14:00:00Z"
     }
-  ]
+  ],
+  "total": 1,
+  "page": 1,
+  "per_page": 10,
+  "total_pages": 1
 }
 ```
 
 ---
 
 ### GET /api/matchup
-Returns two randomly selected lunches for voting.
+Returns two selected lunches for voting.
+Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
 
 **Response 200:**
 ```json
@@ -119,6 +132,7 @@ Submit a vote for a matchup.
 ```
 
 `result` must be one of: `"left_win"`, `"right_win"`, `"tie"`
+`left_lunch_id` and `right_lunch_id` must be different.
 
 **Response 200:**
 ```json
@@ -134,9 +148,12 @@ Submit a vote for a matchup.
 `next` is `null` if fewer than 2 lunches are available for the next matchup.
 
 **Errors:**
-- `400 BAD_REQUEST` — invalid or missing fields
+- `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides
 - `404 NOT_FOUND` — lunch id(s) not found
-- `429 RATE_LIMITED` — exceeded 30 votes/hour/IP
+- `409 CONFLICT` — concurrent vote conflict after retries
+- `429 RATE_LIMITED` — exceeded 300 votes/hour/IP
+
+Vote writes retry from a fresh rating snapshot when another vote updates either lunch first. Counters are incremented in SQL so concurrent vote requests do not overwrite W/L/T totals.
 
 **Rate limit response:**
 ```json
@@ -212,7 +229,7 @@ Cache-Control: public, max-age=31536000, immutable
 
 | Route | Limit | Window | Key |
 |-------|-------|--------|-----|
-| POST /api/vote | 30 | 1 hour | IP |
+| POST /api/vote | 300 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |
 | POST /api/lunches | 10 | 24 hours | IP |
 
@@ -233,6 +250,8 @@ type Lunch = {
   glicko_volatility: number  // starts at 0.06
   conservative_rating: number // rating - (2 * glicko_rd), starts at 800
   confidence?: number         // 0-100 value derived from RD (higher is more certain), currently returned on leaderboard responses
+  consistency?: number | null // 0-100 dominant outcome share after at least 5 votes
+  consistency_band?: "very-steady" | "steady" | "mixed" | "high-swing" | null
   wins: number
   losses: number
   ties: number
@@ -251,14 +270,14 @@ Returns full stats for one lunch.
   "name": "Margherita Pizza",
   "image_key": "images/abc123.jpg",
   "image_url": "/api/images/images/abc123.jpg",
-  "rating": 1024.5,
-  "glicko_rd": 340.2,
+  "rating": 1600,
+  "glicko_rd": 100,
   "glicko_volatility": 0.06,
-  "conservative_rating": 1344.1,
-  "confidence": 84,
-  "consistency": 88.9,
-  "consistency_band": "very-steady",
-  "win_rate": 0.75,
+  "conservative_rating": 1400,
+  "confidence": 78,
+  "consistency": 80,
+  "consistency_band": "steady",
+  "win_rate": 0.8,
   "wins": 12,
   "losses": 2,
   "ties": 1,
@@ -272,3 +291,19 @@ Returns full stats for one lunch.
 **Errors:**
 - `400 BAD_REQUEST` — invalid id
 - `404 NOT_FOUND` — lunch not found
+
+---
+
+## POST /api/admin/reset-scores
+
+Requires admin session token.
+
+Resets all dishes to baseline Glicko-2 values. Keeps name, description, and image unchanged. Deletes all votes and vote rate limits.
+
+**Response 200:**
+```json
+{ "reset": true }
+```
+
+**Errors:**
+- `401 UNAUTHORIZED` — missing or expired session token

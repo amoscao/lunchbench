@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow, validateAdminToken } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
-import { computeConsistency, confidenceFromRd, consistencyBand } from '../elo'
+import { computeConsistency, confidenceFromRd, consistencyBand, GLICKO_DEFAULTS } from '../elo'
 import type { LunchRow } from '../types'
 
 const lunches = new Hono<{ Bindings: Bindings }>()
@@ -31,35 +31,59 @@ lunches.get('/:id{[0-9]+}', async (c) => {
   const lunch = lunchFromRow(row, baseUrl)
   const consistency = computeConsistency(row.wins, row.losses, row.ties)
 
-  return c.json({
-    ...lunch,
-    glicko_rd: row.glicko_rd,
-    glicko_volatility: row.glicko_volatility,
-    conservative_rating: row.conservative_rating,
-    confidence: confidenceFromRd(row.glicko_rd),
-    consistency,
-    consistency_band: consistencyBand(consistency),
-    win_rate: (row.wins + row.losses + row.ties) > 0 ? row.wins / (row.wins + row.losses + row.ties) : 0,
-    momentum,
-  })
+  return c.json(
+    {
+      ...lunch,
+      glicko_rd: row.glicko_rd,
+      glicko_volatility: row.glicko_volatility,
+      conservative_rating: row.conservative_rating,
+      confidence: confidenceFromRd(row.glicko_rd),
+      consistency,
+      consistency_band: consistencyBand(consistency),
+      win_rate: (row.wins + row.losses + row.ties) > 0 ? row.wins / (row.wins + row.losses + row.ties) : 0,
+      momentum,
+    },
+    200,
+    { 'Cache-Control': 'public, max-age=60, s-maxage=300' }
+  )
 })
 
 lunches.get('/leaderboard', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
-  const query = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC'
-    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC'
-  const result = await c.env.DB.prepare(query).all<LunchRow>()
+
+  const pageParam = parseInt(c.req.query('page') ?? '1', 10)
+  const perPageParam = parseInt(c.req.query('per_page') ?? '10', 10)
+  const page = Number.isFinite(pageParam) && pageParam >= 1 ? pageParam : 1
+  const perPage = Number.isFinite(perPageParam) && perPageParam >= 1 ? Math.min(perPageParam, 50) : 10
+
+  const countQuery = veganOnly
+    ? 'SELECT COUNT(*) as count FROM lunches WHERE is_vegan = 1'
+    : 'SELECT COUNT(*) as count FROM lunches'
+  const countResult = await c.env.DB.prepare(countQuery).first<{ count: number }>()
+  const total = countResult?.count ?? 0
+  const total_pages = Math.max(1, Math.ceil(total / perPage))
+  const safePage = Math.min(page, total_pages)
+  const offset = (safePage - 1) * perPage
+
+  const dataQuery = veganOnly
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC, name ASC, id ASC LIMIT ? OFFSET ?'
+    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC, name ASC, id ASC LIMIT ? OFFSET ?'
+  const result = await c.env.DB.prepare(dataQuery).bind(perPage, offset).all<LunchRow>()
+
   const baseUrl = new URL(c.req.url).origin
   const ranked = result.results.map((r, i) => ({
-    rank: i + 1,
+    rank: offset + i + 1,
     ...lunchFromRow(r, baseUrl),
     confidence: confidenceFromRd(r.glicko_rd),
     consistency: computeConsistency(r.wins, r.losses, r.ties),
     consistency_band: consistencyBand(computeConsistency(r.wins, r.losses, r.ties)),
     glicko_rd: r.glicko_rd,
   }))
-  return c.json({ lunches: ranked })
+  return c.json(
+    { lunches: ranked, total, page: safePage, per_page: perPage, total_pages },
+    200,
+    { 'Cache-Control': 'no-cache, s-maxage=60' }
+  )
 })
 
 lunches.post('/', async (c) => {
@@ -100,8 +124,24 @@ lunches.post('/', async (c) => {
   const name = body.name.trim()
   const isVegan = body.is_vegan === true ? 1 : 0
   const result = await c.env.DB.prepare(
-    'INSERT INTO lunches (name, description, is_vegan) VALUES (?, ?, ?) RETURNING *'
-  ).bind(name, description, isVegan).first<LunchRow>()
+    `INSERT INTO lunches (
+      name,
+      description,
+      is_vegan,
+      rating,
+      glicko_rd,
+      glicko_volatility,
+      conservative_rating
+    ) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
+  ).bind(
+    name,
+    description,
+    isVegan,
+    GLICKO_DEFAULTS.rating,
+    GLICKO_DEFAULTS.rd,
+    GLICKO_DEFAULTS.volatility,
+    GLICKO_DEFAULTS.conservative_rating
+  ).first<LunchRow>()
 
   if (!result) {
     return c.json({ error: 'Failed to create lunch', code: 'INTERNAL_ERROR' }, 500)

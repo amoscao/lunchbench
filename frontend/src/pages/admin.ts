@@ -1,4 +1,4 @@
-import { type Lunch } from '../api'
+import { type LeaderboardLunch, type LeaderboardPage, type Lunch } from '../api'
 
 const API_URL = '/api'
 
@@ -114,6 +114,238 @@ async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number;
   if (!res.ok) throw new Error('Failed to load stats')
   return res.json()
 }
+async function exportLeaderboardPDF(token: string | null): Promise<void> {
+  void token
+
+  async function fetchLeaderboardPage(page: number): Promise<LeaderboardPage> {
+    const res = await fetch(`/api/lunches/leaderboard?page=${page}`)
+    if (!res.ok) throw new Error('Failed to load leaderboard')
+    return res.json()
+  }
+
+  const firstPage = await fetchLeaderboardPage(1)
+  const lunches: LeaderboardLunch[] = [...firstPage.lunches]
+
+  for (let page = 2; page <= firstPage.total_pages; page += 1) {
+    const data = await fetchLeaderboardPage(page)
+    lunches.push(...data.lunches)
+  }
+
+  const dateString = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+  const count = lunches.length
+  const tableRows = lunches.map((lunch) => {
+    const rankClass = lunch.rank <= 3 ? ` rank-${lunch.rank}` : ''
+    const veganDot = lunch.is_vegan === 1 ? '<span class="vegan-dot"></span>' : ''
+    const description = lunch.description
+      ? `<div class="dish-desc">${escapeHtml(lunch.description)}</div>`
+      : ''
+    const confidenceClass = lunch.confidence >= 75
+      ? 'conf-high'
+      : lunch.confidence >= 50
+        ? 'conf-mid'
+        : 'conf-low'
+
+    return `
+      <tr>
+        <td class="col-rank"><span class="rank-num${rankClass}">${lunch.rank}</span></td>
+        <td>
+          <div class="dish-name">${escapeHtml(lunch.name)}${veganDot}</div>
+          ${description}
+        </td>
+        <td>
+          <div class="rating-val">${Math.round(lunch.conservative_rating)}</div>
+          <div class="rating-raw">Raw ${Math.round(lunch.rating)}</div>
+        </td>
+        <td class="record">
+          <span class="w">${lunch.wins}W</span>
+          <span class="l">${lunch.losses}L</span>
+          <span class="t">${lunch.ties}T</span>
+        </td>
+        <td>
+          <div class="conf-val ${confidenceClass}">${Math.round(lunch.confidence)}%</div>
+          <div class="conf-rd">RD ${Math.round(lunch.glicko_rd)}</div>
+        </td>
+      </tr>
+    `
+  }).join('')
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LunchBench Leaderboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+      color: #111;
+      background: #fff;
+      padding: 40px 48px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 2.5px solid #e5e7eb;
+    }
+    .logo-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .logo-text {
+      background: linear-gradient(90deg, #10d4a4 0%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 8px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .export-meta {
+      text-align: right;
+      font-size: 12px;
+      color: #9ca3af;
+      line-height: 1.6;
+      padding-top: 6px;
+    }
+    .export-meta strong { color: #6b7280; font-weight: 600; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      background: #f3f4f6;
+      border-bottom: 2px solid #e5e7eb;
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #6b7280;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr { border-bottom: 1px solid #f0f0ee; }
+    tbody td { padding: 10px 14px; vertical-align: middle; }
+    .col-rank { width: 52px; }
+    .rank-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-weight: 800;
+      font-size: 13px;
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .rank-1 { background: #fef3c7; color: #92400e; }
+    .rank-2 { background: #f1f5f9; color: #475569; }
+    .rank-3 { background: #fdf4e7; color: #78350f; }
+    .dish-name { font-weight: 700; color: #111827; font-size: 13.5px; }
+    .dish-desc { font-size: 11px; color: #9ca3af; margin-top: 3px; max-width: 260px; }
+    .vegan-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #16a34a;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .rating-val {
+      font-weight: 800;
+      font-size: 15px;
+      color: #0f9e7c;
+    }
+    .rating-raw { font-size: 10.5px; color: #9ca3af; margin-top: 2px; }
+    .record { font-size: 12.5px; }
+    .w { color: #059669; font-weight: 700; }
+    .l { color: #dc2626; font-weight: 700; }
+    .t { color: #6b7280; }
+    .conf-val { font-weight: 700; font-size: 13px; }
+    .conf-high { color: #059669; }
+    .conf-mid  { color: #d97706; }
+    .conf-low  { color: #dc2626; }
+    .conf-rd { font-size: 10.5px; color: #9ca3af; margin-top: 2px; }
+    .footer {
+      margin-top: 28px;
+      padding-top: 14px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 11px;
+      color: #9ca3af;
+      display: flex;
+      justify-content: space-between;
+    }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 0.5in; size: A4 landscape; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo-line">
+        <span>🥪</span>
+        <span class="logo-text">LunchBench</span>
+      </div>
+      <div class="subtitle">Hyperfine Lunch Benchmark</div>
+    </div>
+    <div class="export-meta">
+      <strong>Leaderboard Export</strong><br>
+      DATE_STRING<br>
+      COUNT dishes ranked
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-rank">#</th>
+        <th>Dish</th>
+        <th>Rating</th>
+        <th>Record</th>
+        <th>Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      TABLE_ROWS
+    </tbody>
+  </table>
+  <div class="footer">
+    <span>LunchBench · Hyperfine Lunch Benchmark</span>
+    <span>COUNT lunches · Glicko-2 rating system</span>
+  </div>
+  <script>window.onload = () => { window.print(); }</script>
+</body>
+</html>`
+    .replace('DATE_STRING', dateString)
+    .replaceAll('COUNT', String(count))
+    .replace('TABLE_ROWS', tableRows)
+
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) throw new Error('Could not open print window')
+
+  printWindow.document.open()
+  printWindow.document.write(html)
+  printWindow.document.close()
+}
 
 function renderDashboard(container: HTMLElement): void {
   let activeTab: 'lunches' | 'stats' = 'lunches'
@@ -121,7 +353,10 @@ function renderDashboard(container: HTMLElement): void {
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <h1 class="page-heading" style="margin:0">Admin Dashboard</h1>
-      <button class="btn btn-secondary" id="logout-btn">Logout</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-secondary" id="export-pdf-btn">Export PDF</button>
+        <button class="btn btn-secondary" id="logout-btn">Logout</button>
+      </div>
     </div>
     <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
       <button class="admin-tab admin-tab-active" id="tab-lunches" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px">Lunches</button>
@@ -155,6 +390,20 @@ function renderDashboard(container: HTMLElement): void {
 
   tabLunches.addEventListener('click', () => setTab('lunches'))
   tabStats.addEventListener('click',   () => setTab('stats'))
+
+  const exportPdfBtn = container.querySelector<HTMLButtonElement>('#export-pdf-btn')!
+  exportPdfBtn.addEventListener('click', async () => {
+    exportPdfBtn.disabled = true
+    exportPdfBtn.textContent = 'Exporting…'
+    try {
+      await exportLeaderboardPDF(state.token)
+    } catch {
+      showAlert('Export failed', 'error')
+    } finally {
+      exportPdfBtn.disabled = false
+      exportPdfBtn.textContent = 'Export PDF'
+    }
+  })
 
   container.querySelector('#logout-btn')!.addEventListener('click', () => {
     state.token = null

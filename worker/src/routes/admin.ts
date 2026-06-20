@@ -153,4 +153,23 @@ admin.get('/stats', requireAdminSession, async (c) => {
   })
 })
 
+admin.post('/reset-scores', requireAdminSession, async (c) => {
+  await c.env.DB.batch([
+    c.env.DB.prepare(`
+      UPDATE lunches SET
+        rating              = 1500.0,
+        glicko_rd           = 350.0,
+        glicko_volatility   = 0.06,
+        conservative_rating = 800.0,
+        wins                = 0,
+        losses              = 0,
+        ties                = 0,
+        updated_at          = ?
+    `).bind(new Date().toISOString()),
+    c.env.DB.prepare('DELETE FROM votes'),
+    c.env.DB.prepare("DELETE FROM rate_limits WHERE action = 'vote'"),
+  ])
+  return c.json({ reset: true })
+})
+
 export { admin as adminRouter }

@@ -110,8 +110,9 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
 
         const confTd = document.createElement('td')
         confTd.className = 'leaderboard-cell col-confidence'
+        const confClass = lunch.confidence >= 75 ? 'conf-high' : lunch.confidence >= 50 ? 'conf-mid' : 'conf-low'
         confTd.innerHTML = `
-          <div class="confidence-pct">${lunch.confidence}%</div>
+          <div class="confidence-pct ${confClass}">${lunch.confidence}%</div>
           <div class="confidence-rd">RD ${Math.round(lunch.glicko_rd)}</div>
         `
         row.appendChild(confTd)

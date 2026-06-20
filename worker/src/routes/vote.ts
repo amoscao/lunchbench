@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
-import { calculateElo } from '../elo'
+import { conservativeScore, updateRatingPair } from '../elo'
 import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 
@@ -52,8 +52,16 @@ vote.post('/', async (c) => {
     return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
   }
 
-  const eloResult = result === 'left_win' ? 'a_wins' : result === 'right_win' ? 'b_wins' : 'tie'
-  const { newA: newLeft, newB: newRight } = calculateElo(leftRow.rating, rightRow.rating, eloResult)
+  const outcome = result === 'left_win' ? 'A_WIN' : result === 'right_win' ? 'B_WIN' : 'DRAW'
+  const updated = updateRatingPair({
+    a: { rating: leftRow.rating, rd: leftRow.glicko_rd, volatility: leftRow.glicko_volatility },
+    b: { rating: rightRow.rating, rd: rightRow.glicko_rd, volatility: rightRow.glicko_volatility },
+    outcome,
+  })
+  const newLeft = updated.a
+  const newRight = updated.b
+  const newLeftConservative = conservativeScore(newLeft.rating, newLeft.rd)
+  const newRightConservative = conservativeScore(newRight.rating, newRight.rd)
 
   const leftWins = result === 'left_win' ? leftRow.wins + 1 : leftRow.wins
   const leftLosses = result === 'right_win' ? leftRow.losses + 1 : leftRow.losses
@@ -67,18 +75,38 @@ vote.post('/', async (c) => {
 
   await c.env.DB.batch([
     c.env.DB.prepare(
-      'UPDATE lunches SET rating = ?, wins = ?, losses = ?, ties = ?, updated_at = ? WHERE id = ?'
-    ).bind(newLeft, leftWins, leftLosses, leftTies, now, left_lunch_id),
+      'UPDATE lunches SET rating = ?, glicko_rd = ?, glicko_volatility = ?, conservative_rating = ?, wins = ?, losses = ?, ties = ?, updated_at = ? WHERE id = ?'
+    ).bind(
+      newLeft.rating,
+      newLeft.rd,
+      newLeft.volatility,
+      newLeftConservative,
+      leftWins,
+      leftLosses,
+      leftTies,
+      now,
+      left_lunch_id
+    ),
     c.env.DB.prepare(
-      'UPDATE lunches SET rating = ?, wins = ?, losses = ?, ties = ?, updated_at = ? WHERE id = ?'
-    ).bind(newRight, rightWins, rightLosses, rightTies, now, right_lunch_id),
+      'UPDATE lunches SET rating = ?, glicko_rd = ?, glicko_volatility = ?, conservative_rating = ?, wins = ?, losses = ?, ties = ?, updated_at = ? WHERE id = ?'
+    ).bind(
+      newRight.rating,
+      newRight.rd,
+      newRight.volatility,
+      newRightConservative,
+      rightWins,
+      rightLosses,
+      rightTies,
+      now,
+      right_lunch_id
+    ),
     c.env.DB.prepare(
       `INSERT INTO votes (left_lunch_id, right_lunch_id, result, left_rating_before, right_rating_before, left_rating_after, right_rating_after, voter_key)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       left_lunch_id, right_lunch_id, result,
       leftRow.rating, rightRow.rating,
-      newLeft, newRight,
+      newLeft.rating, newRight.rating,
       ip
     ),
   ])

@@ -4,6 +4,9 @@ export function lunchFromRow(row: LunchRow, baseUrl: string): Lunch {
   return {
     ...row,
     image_url: row.image_key ? `${baseUrl}/api/images/${row.image_key}` : null,
+    glicko_rd: row.glicko_rd,
+    glicko_volatility: row.glicko_volatility,
+    conservative_rating: row.conservative_rating,
   }
 }
 

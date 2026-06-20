@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow, validateAdminToken } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
+import { confidenceFromRd } from '../elo'
 import type { LunchRow } from '../types'
 
 const lunches = new Hono<{ Bindings: Bindings }>()
@@ -19,13 +20,14 @@ lunches.get('/', async (c) => {
 lunches.get('/leaderboard', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY rating DESC'
-    : 'SELECT * FROM lunches ORDER BY rating DESC'
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1 ORDER BY conservative_rating DESC'
+    : 'SELECT * FROM lunches ORDER BY conservative_rating DESC'
   const result = await c.env.DB.prepare(query).all<LunchRow>()
   const baseUrl = new URL(c.req.url).origin
   const ranked = result.results.map((r, i) => ({
     rank: i + 1,
     ...lunchFromRow(r, baseUrl),
+    confidence: confidenceFromRd(r.glicko_rd),
   }))
   return c.json({ lunches: ranked })
 })

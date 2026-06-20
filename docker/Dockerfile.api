@@ -28,6 +28,7 @@ RUN printf '%s\n' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0001_initial.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0002_add_description.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0003_add_vegan.sql' \
+  'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0005_glicko.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/seed.sql' \
   'cd /app/worker' \
   'exec pnpm exec wrangler dev --local --ip 0.0.0.0 --port 8787 --persist-to /data' \

@@ -407,9 +407,11 @@ img {
   animation: btn-hint-pulse 0.45s ease-out forwards;
 }
 
-.lunch-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md), 0 8px 24px rgba(0,0,0,0.12);
+@media (hover: hover) {
+  .lunch-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md), 0 8px 24px rgba(0,0,0,0.12);
+  }
 }
 
 /* Dark mode card gradient overlay — teal top-left, purple top-right */

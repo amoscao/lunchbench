@@ -41,6 +41,12 @@ export type LunchDetail = Lunch & {
   momentum: number
 }
 
+export type VoteResult = {
+  rating: number
+  conservative_rating: number
+  rank: number
+}
+
 const BASE = '/api'
 
 export async function getMatchup(veganOnly = false): Promise<{ left: Lunch; right: Lunch } | null> {
@@ -54,7 +60,12 @@ export async function submitVote(
   leftId: number,
   rightId: number,
   result: 'left_win' | 'right_win' | 'tie'
-): Promise<{ vote_id: number; next: { left: Lunch; right: Lunch } | null }> {
+): Promise<{
+  vote_id: number
+  next: { left: Lunch; right: Lunch } | null
+  left_result: VoteResult
+  right_result: VoteResult
+}> {
   const res = await fetch(`${BASE}/vote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

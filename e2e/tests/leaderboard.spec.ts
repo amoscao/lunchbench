@@ -72,11 +72,9 @@ test.describe('Leaderboard', () => {
     expect(changed).toBe(true)
   })
 
-  test('placeholder thumbnails shown when no image', async ({ page }) => {
-    const placeholders = page.locator('.lunch-thumb-placeholder')
-    const thumbs = page.locator('.lunch-thumb')
-    expect(await placeholders.count()).toBeGreaterThanOrEqual(5)
-    await expect(thumbs).toHaveCount(0)
+  test('no thumbnails shown in leaderboard rows', async ({ page }) => {
+    await expect(page.locator('.lunch-thumb-placeholder')).toHaveCount(0)
+    await expect(page.locator('.lunch-thumb')).toHaveCount(0)
   })
 
   test('win/loss/tie record shown in record column', async ({ page }) => {

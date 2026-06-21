@@ -17,25 +17,24 @@ function fakeDb(): D1Database {
           bound = args
           return this
         },
+        applyCooldownInsert() {
+          const [key, action, nowStr, cooldownSeconds] = bound as [string, string, string, number]
+          const rowKey = `${key}:${action}`
+          const existing = rows.get(rowKey)
+          const isActive = existing
+            ? new Date(existing.window_start).getTime() + cooldownSeconds * 1000 > new Date(nowStr).getTime()
+            : false
+
+          if (isActive) return null
+
+          const row = { count: 1, window_start: nowStr }
+          rows.set(rowKey, row)
+          return { window_start: row.window_start }
+        },
         async run() {
           if (sql.includes('DELETE FROM rate_limits')) {
             const [key, action] = bound as [string, string]
             rows.delete(`${key}:${action}`)
-            return
-          }
-
-          if (sql.includes('unixepoch(window_start)')) {
-            const [key, action, nowStr, cooldownSeconds] = bound as [string, string, string, number]
-            const rowKey = `${key}:${action}`
-            const existing = rows.get(rowKey)
-            const isActive = existing
-              ? new Date(existing.window_start).getTime() + cooldownSeconds * 1000 > new Date(nowStr).getTime()
-              : false
-
-            rows.set(rowKey, {
-              count: isActive && existing ? existing.count + 1 : 1,
-              window_start: isActive && existing ? existing.window_start : nowStr,
-            })
             return
           }
 
@@ -49,6 +48,10 @@ function fakeDb(): D1Database {
           })
         },
         async first() {
+          if (sql.includes('RETURNING window_start')) {
+            return this.applyCooldownInsert()
+          }
+
           const [key, action] = bound as [string, string]
           return rows.get(`${key}:${action}`) ?? null
         },

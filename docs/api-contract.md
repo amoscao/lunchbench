@@ -253,7 +253,7 @@ Cache-Control: public, max-age=31536000, immutable
 
 | Route | Limit | Window | Key |
 |-------|-------|--------|-----|
-| POST /api/vote | 300 | 1 hour | IP |
+| POST /api/vote | 30 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |
 | POST /api/lunches | 10 | 24 hours | IP |
 

@@ -57,25 +57,23 @@ export async function checkCooldown(
   const now = new Date()
   const nowStr = now.toISOString()
 
-  await db.prepare(`
+  const acquired = await db.prepare(`
     INSERT INTO rate_limits (key, action, count, window_start)
     VALUES (?, ?, 1, ?)
     ON CONFLICT(key, action) DO UPDATE SET
-      count = CASE
-        WHEN unixepoch(window_start) + ? > unixepoch(?) THEN count + 1
-        ELSE 1
-      END,
-      window_start = CASE
-        WHEN unixepoch(window_start) + ? > unixepoch(?) THEN window_start
-        ELSE excluded.window_start
-      END
-  `).bind(key, action, nowStr, cooldownSeconds, nowStr, cooldownSeconds, nowStr).run()
+      count = 1,
+      window_start = excluded.window_start
+      WHERE unixepoch(rate_limits.window_start) + ? <= unixepoch(excluded.window_start)
+    RETURNING window_start
+  `).bind(key, action, nowStr, cooldownSeconds).first<{ window_start: string }>()
+
+  if (acquired) return { allowed: true }
 
   const row = await db.prepare(
-    'SELECT count, window_start FROM rate_limits WHERE key = ? AND action = ?'
-  ).bind(key, action).first<{ count: number; window_start: string }>()
+    'SELECT window_start FROM rate_limits WHERE key = ? AND action = ?'
+  ).bind(key, action).first<{ window_start: string }>()
 
-  if (!row || row.count <= 1) return { allowed: true }
+  if (!row) return { allowed: false, retryAfter: cooldownSeconds }
 
   const windowEnd = new Date(new Date(row.window_start).getTime() + cooldownSeconds * 1000)
   const retryAfter = Math.ceil((windowEnd.getTime() - now.getTime()) / 1000)

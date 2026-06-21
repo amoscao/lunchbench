@@ -339,3 +339,17 @@ Resets all dishes to baseline Glicko-2 values. Keeps name, description, and imag
 
 **Errors:**
 - `401 UNAUTHORIZED` — missing or expired session token
+
+### DELETE /api/admin/session
+
+Invalidates the current admin session token.
+
+Send current session token in `Authorization: Bearer <token>` to revoke it from `admin_sessions`.
+
+**Response 200:**
+```json
+{ "revoked": true }
+```
+
+**Errors:**
+- `401 UNAUTHORIZED` — missing or invalid session token

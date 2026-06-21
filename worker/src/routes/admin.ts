@@ -46,6 +46,21 @@ admin.post('/verify', async (c) => {
   return c.json({ token })
 })
 
+admin.delete('/session', async (c) => {
+  const auth = c.req.header('Authorization')
+  if (!auth?.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
+  }
+
+  const token = auth.slice(7)
+  const result = await c.env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run()
+  if ((result.meta?.changes ?? 0) === 0) {
+    return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
+  }
+
+  return c.json({ revoked: true })
+})
+
 async function requireAdminSession(c: Context<AdminEnv>, next: Next): Promise<Response | void> {
   const hasSession = await validateAdminSession(c.req.raw, c.env.DB)
   if (!hasSession) {

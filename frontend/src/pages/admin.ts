@@ -106,6 +106,15 @@ async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number;
   if (!res.ok) throw new Error('Failed to load stats')
   return res.json()
 }
+
+async function revokeAdminSession(token: string | null): Promise<void> {
+  if (!token) return
+  await fetch(`${API_URL}/admin/session`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
 async function exportLeaderboardPDF(token: string | null): Promise<void> {
   void token
 
@@ -387,11 +396,15 @@ function renderDashboard(container: HTMLElement): void {
     }
   })
 
-  container.querySelector('#logout-btn')!.addEventListener('click', () => {
-    state.token = null
-    sessionStorage.removeItem('admin-token')
-    container.innerHTML = ''
-    renderLogin(container)
+  container.querySelector('#logout-btn')!.addEventListener('click', async () => {
+    try {
+      await revokeAdminSession(state.token)
+    } finally {
+      state.token = null
+      sessionStorage.removeItem('admin-token')
+      container.innerHTML = ''
+      renderLogin(container)
+    }
   })
 
   const alertEl = container.querySelector<HTMLElement>('#admin-alert')!

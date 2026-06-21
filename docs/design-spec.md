@@ -7,7 +7,7 @@ Lunchbench is its lunch-themed cousin: same spirit, original implementation.
 
 ## 1. Typography
 
-**Font family:** Inter (load from Google Fonts or bundled via Fontsource)
+**Font family:** Inter when bundled, otherwise system UI fallback. Do not load fonts from third-party origins.
 ```
 font-family: 'Inter', system-ui, -apple-system, sans-serif;
 ```
@@ -356,6 +356,6 @@ Max content width: 960px, centered.
 - All components use CSS custom properties — never hardcode colors
 - No CSS framework (no Tailwind, Bootstrap, etc.) — plain CSS only
 - No external icon libraries — use Unicode symbols or inline SVG only
-- Font loading: `<link rel="preconnect" href="https://fonts.googleapis.com">` + Inter 400/500/600/700
-- Anti-flash script must be the FIRST script in `<head>`, before any stylesheet
+- Font loading: same-origin bundled fonts only. The SPA CSP uses `font-src 'self'`.
+- Theme boot script must be the FIRST script in `<head>`, before any stylesheet
 - Component files export a function that returns an HTMLElement or renders into a container

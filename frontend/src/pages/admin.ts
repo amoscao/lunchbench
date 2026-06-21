@@ -323,7 +323,6 @@ async function exportLeaderboardPDF(token: string | null): Promise<void> {
     <span>LunchBench · Hyperfine Lunch Benchmark</span>
     <span>COUNT lunches · Glicko-2 rating system</span>
   </div>
-  <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`
     .replace('DATE_STRING', dateString)
@@ -335,6 +334,7 @@ async function exportLeaderboardPDF(token: string | null): Promise<void> {
 
   printWindow.document.open()
   printWindow.document.write(html)
+  printWindow.addEventListener('load', () => printWindow.print(), { once: true })
   printWindow.document.close()
 }
 

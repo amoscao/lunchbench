@@ -91,7 +91,7 @@ test.describe('API', () => {
     expect(res.status()).toBe(400)
   })
 
-  test('POST /api/vote counts accepted concurrent votes and rejects stale conflicts', async ({ request }) => {
+  test('POST /api/vote rate limits concurrent votes for the same pair', async ({ request }) => {
     const matchupRes = await request.get(`${API_URL}/api/matchup`)
     const { left, right } = await matchupRes.json()
 
@@ -101,9 +101,9 @@ test.describe('API', () => {
       })
     ))
     const accepted = votes.filter((res) => res.ok()).length
-    const conflicts = votes.filter((res) => res.status() === 409).length
-    expect(accepted).toBeGreaterThan(0)
-    expect(accepted + conflicts).toBe(5)
+    const rateLimited = votes.filter((res) => res.status() === 429).length
+    expect(accepted).toBe(1)
+    expect(rateLimited).toBe(4)
 
     const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard`)
     const body = await lbRes.json()

@@ -38,6 +38,50 @@ export async function checkRateLimit(
   return { allowed: true }
 }
 
+export async function clearRateLimit(
+  db: D1Database,
+  key: string,
+  action: string
+): Promise<void> {
+  await db.prepare('DELETE FROM rate_limits WHERE key = ? AND action = ?')
+    .bind(key, action)
+    .run()
+}
+
+export async function checkCooldown(
+  db: D1Database,
+  key: string,
+  action: string,
+  cooldownSeconds: number
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const now = new Date()
+  const nowStr = now.toISOString()
+
+  await db.prepare(`
+    INSERT INTO rate_limits (key, action, count, window_start)
+    VALUES (?, ?, 1, ?)
+    ON CONFLICT(key, action) DO UPDATE SET
+      count = CASE
+        WHEN unixepoch(window_start) + ? > unixepoch(?) THEN count + 1
+        ELSE 1
+      END,
+      window_start = CASE
+        WHEN unixepoch(window_start) + ? > unixepoch(?) THEN window_start
+        ELSE excluded.window_start
+      END
+  `).bind(key, action, nowStr, cooldownSeconds, nowStr, cooldownSeconds, nowStr).run()
+
+  const row = await db.prepare(
+    'SELECT count, window_start FROM rate_limits WHERE key = ? AND action = ?'
+  ).bind(key, action).first<{ count: number; window_start: string }>()
+
+  if (!row || row.count <= 1) return { allowed: true }
+
+  const windowEnd = new Date(new Date(row.window_start).getTime() + cooldownSeconds * 1000)
+  const retryAfter = Math.ceil((windowEnd.getTime() - now.getTime()) / 1000)
+  return { allowed: false, retryAfter }
+}
+
 export function getClientIp(request: Request): string {
   return (
     request.headers.get('CF-Connecting-IP') ||

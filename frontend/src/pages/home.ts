@@ -1,4 +1,4 @@
-import { getMatchup, submitVote, type Lunch, type VoteResult } from '../api'
+import { getMatchup, submitVote, type Lunch, type Matchup, type VoteResult } from '../api'
 import { isVeganMode } from '../vegan-mode'
 import { hasSeen, markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
@@ -236,19 +236,24 @@ export function renderHome(
 ): (() => void) | void {
   let leftLunch: Lunch | null = null
   let rightLunch: Lunch | null = null
+  let currentMatchup: Matchup | null = null
+  let nextMatchupPromise: Promise<Matchup | null> | null = null
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
 
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
-    if (isSubmitting || !leftLunch || !rightLunch) return
+    if (isSubmitting || !leftLunch || !rightLunch || !currentMatchup) return
 
     isSubmitting = true
+    const votedLeft = leftLunch
+    const votedRight = rightLunch
+    const projected = currentMatchup.projected[result]
 
     const buttons = document.querySelectorAll<HTMLButtonElement>('.vote-buttons .btn')
     buttons.forEach((b) => (b.disabled = true))
 
     const bar = document.querySelector<HTMLDivElement>('.vote-gradient-bar')
-    if (bar) bar.classList.add('waiting')
+    if (bar) bar.classList.add('loading')
 
     // Fade buttons visually
     const voteRow = document.querySelector<HTMLElement>('.vote-buttons')
@@ -267,20 +272,22 @@ export function renderHome(
       cards[1]?.classList.add('voted')
     }
 
-    const delay = new Promise<void>((r) => setTimeout(r, 2000))
+    const leftCard = cards[0]
+    const rightCard = cards[1]
+    if (leftCard) showVoteOverlay(leftCard, votedLeft, projected.left)
+    if (rightCard) showVoteOverlay(rightCard, votedRight, projected.right)
+
+    const delay = new Promise<void>((r) => setTimeout(r, 1500))
+    const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async () => {
+      try {
+        await submitVote(votedLeft.id, votedRight.id, result)
+      } catch {
+        // Swallow until production error reporting is added.
+      }
+    })
 
     try {
-      const [res] = await Promise.all([
-        submitVote(leftLunch.id, rightLunch.id, result).then((r) => {
-          if (bar) { bar.classList.remove('waiting'); bar.classList.add('loading') }
-          const leftCard = cards[0]
-          const rightCard = cards[1]
-          if (leftCard && leftLunch) showVoteOverlay(leftCard, leftLunch, r.left_result)
-          if (rightCard && rightLunch) showVoteOverlay(rightCard, rightLunch, r.right_result)
-          return r
-        }),
-        delay,
-      ])
+      await Promise.all([delay, votePromise])
 
       // Fade out the arena, then load next matchup
       const arena = document.querySelector<HTMLElement>('.vote-arena')
@@ -290,18 +297,16 @@ export function renderHome(
         await new Promise<void>((r) => setTimeout(r, 260))
       }
 
-      await load(res.next)
-    } catch (e) {
-      if (bar) { bar.classList.remove('waiting'); bar.classList.remove('loading') }
-      buttons.forEach((b) => (b.disabled = false))
-      const err = document.createElement('p')
-      err.style.cssText = 'text-align:center;color:#dc2626;margin-top:12px;font-size:13px;'
-      err.textContent =
-        e instanceof Error && e.message === 'rate_limited'
-          ? 'Slow down! You\'ve voted a lot. Try again in a bit.'
-          : 'Vote failed. Try again.'
-      const content = container.firstElementChild as HTMLElement
-      content?.appendChild(err)
+      let next: Matchup | null
+      try {
+        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+      } catch {
+        next = await getMatchup(isVeganMode())
+      }
+      await load(next)
+    } catch {
+      if (bar) bar.classList.remove('loading')
+      await load(undefined)
     } finally {
       isSubmitting = false
     }
@@ -335,7 +340,7 @@ export function renderHome(
     }
   }
 
-  async function load(matchup?: { left: Lunch; right: Lunch } | null): Promise<void> {
+  async function load(matchup?: Matchup | null): Promise<void> {
     container.innerHTML = ''
     const content = document.createElement('div')
     content.className = 'page-content'
@@ -355,24 +360,29 @@ export function renderHome(
     }
 
     if (!matchup) {
+      currentMatchup = null
+      nextMatchupPromise = null
       content.appendChild(renderEmpty(navigate, isVeganMode()))
       return
     }
 
-    let currentMatchup: { left: Lunch; right: Lunch } | null = matchup
+    let displayMatchup: Matchup | null = matchup
     let retries = 0
-    while (currentMatchup && hasSeen(currentMatchup.left.id, currentMatchup.right.id) && retries < 10) {
-      currentMatchup = await getMatchup(isVeganMode())
+    while (displayMatchup && hasSeen(displayMatchup.left.id, displayMatchup.right.id) && retries < 10) {
+      displayMatchup = await getMatchup(isVeganMode())
       retries++
     }
-    if (!currentMatchup) {
+    if (!displayMatchup) {
+      currentMatchup = null
+      nextMatchupPromise = null
       content.appendChild(renderEmpty(navigate, isVeganMode()))
       return
     }
-    markSeen(currentMatchup.left.id, currentMatchup.right.id)
+    markSeen(displayMatchup.left.id, displayMatchup.right.id)
 
-    leftLunch = currentMatchup.left
-    rightLunch = currentMatchup.right
+    currentMatchup = displayMatchup
+    leftLunch = displayMatchup.left
+    rightLunch = displayMatchup.right
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
@@ -416,6 +426,7 @@ export function renderHome(
     content.appendChild(renderHowItWorks())
 
     addKeyboardShortcuts()
+    nextMatchupPromise = getMatchup(isVeganMode())
   }
 
   load(undefined)

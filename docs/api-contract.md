@@ -112,9 +112,25 @@ Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_r
 ```json
 {
   "left": { "rank": 1, /* full Lunch object, including conservative_rating */ },
-  "right": { "rank": 2, /* full Lunch object, including conservative_rating */ }
+  "right": { "rank": 2, /* full Lunch object, including conservative_rating */ },
+  "projected": {
+    "left_win": {
+      "left": { "rating": 1520, "conservative_rating": 1320, "rank": 1 },
+      "right": { "rating": 1480, "conservative_rating": 1280, "rank": 3 }
+    },
+    "right_win": {
+      "left": { "rating": 1480, "conservative_rating": 1280, "rank": 3 },
+      "right": { "rating": 1520, "conservative_rating": 1320, "rank": 1 }
+    },
+    "tie": {
+      "left": { "rating": 1500, "conservative_rating": 1300, "rank": 2 },
+      "right": { "rating": 1500, "conservative_rating": 1300, "rank": 2 }
+    }
+  }
 }
 ```
+
+`projected` contains read-only projected rating, conservative rating, and rank outcomes for each possible vote result.
 
 **Response 204:** (fewer than 2 lunches exist — no body)
 

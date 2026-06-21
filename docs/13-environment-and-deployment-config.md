@@ -119,6 +119,27 @@ Production uses Cloudflare Pages and the Pages Function proxy in:
 frontend/functions/api/[[path]].ts
 ```
 
+## API CORS
+
+The Worker only emits browser CORS allow headers for known frontend origins.
+Browser requests with any other `Origin` are rejected before route handling.
+HTTP clients with no `Origin` header are still allowed.
+
+- `https://lunchbench.xyz`
+- `https://www.lunchbench.xyz`
+- `https://lunchbench.pages.dev`
+- `https://*.lunchbench.pages.dev`
+- `http://localhost:5173`
+- `http://localhost:4173`
+- `http://127.0.0.1:5173`
+- `http://127.0.0.1:4173`
+- `http://frontend:5173`
+- `http://[::1]:5173`
+- `http://[::1]:4173`
+
+Pages preview deployment URLs use the `*.lunchbench.pages.dev` pattern.
+Local origins cover Vite dev and Vite preview.
+
 ## Deployment
 
 Production deployment is handled by GitHub Actions on push to `main`.

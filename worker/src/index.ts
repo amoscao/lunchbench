@@ -8,16 +8,23 @@ import { voteRouter } from './routes/vote'
 import { imagesRouter } from './routes/images'
 import { handleImageUpload } from './routes/images'
 import { adminRouter } from './routes/admin'
-import { securityHeaders } from './middleware'
+import { allowedCorsOrigin, restrictBrowserOrigins, securityHeaders } from './middleware'
 
 const app = new Hono<{ Bindings: Bindings }>()
+const corsOptions = {
+  origin: allowedCorsOrigin,
+  allowMethods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Authorization', 'Content-Type'],
+  maxAge: 600,
+}
 
 app.use(sentry(app, (env) => ({
   dsn: env.SENTRY_DSN,
   tracesSampleRate: 0,
 })))
-app.use('*', cors())
+app.use('/api/*', cors(corsOptions))
 app.use('*', securityHeaders)
+app.use('/api/*', restrictBrowserOrigins)
 
 app.get('/api/health', (c) => c.json({ ok: true }))
 

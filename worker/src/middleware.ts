@@ -21,7 +21,6 @@ const ALLOWED_ORIGINS = [
   'http://[::1]:4173',
 ] as const
 
-const PUBLIC_ORIGINS = ALLOWED_ORIGINS
 const PAGES_PREVIEW_HOST_SUFFIX = '.lunchbench.pages.dev'
 
 function isAllowedPagesPreviewOrigin(origin: string): boolean {
@@ -45,11 +44,6 @@ function requiresRestrictedCorsOrigin(c: Context): boolean {
   return false
 }
 
-function isAllowedTrustedOrigin(origin: string | null): boolean {
-  if (!origin) return true
-  return PUBLIC_ORIGINS.includes(origin as (typeof PUBLIC_ORIGINS)[number])
-}
-
 export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return true
   return ALLOWED_ORIGINS.includes(origin as (typeof ALLOWED_ORIGINS)[number])
@@ -59,7 +53,7 @@ export function isAllowedOrigin(origin: string | null): boolean {
 export function isAllowedCorsOriginForRequest(origin: string | null, c: Context): boolean {
   if (!origin) return true
   if (requiresRestrictedCorsOrigin(c)) {
-    return isAllowedTrustedOrigin(origin)
+    return isAllowedOrigin(origin)
   }
   return isAllowedOrigin(origin)
 }

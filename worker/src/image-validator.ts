@@ -3,7 +3,7 @@ export type ImageValidationResult =
   | { valid: false; error: string; status: 413 | 415 }
 
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
-const MIN_IMAGE_SIZE_BYTES = 100
+const MIN_IMAGE_SIZE_BYTES = 100 // app-level policy floor; not a strict PNG/JPEG/WebP validity requirement
 
 export function validateImageBuffer(
   buf: ArrayBuffer,
@@ -50,15 +50,13 @@ export function validateImageBuffer(
     bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a &&
     bytes[6] === 0x1a && bytes[7] === 0x0a
   ) {
-    const tail = fileBytes.slice(fileBytes.length - 12)
-    let hasIend = false
-    for (let i = 0; i <= tail.length - 4; i++) {
-      if (tail[i] === 0x49 && tail[i + 1] === 0x45 && tail[i + 2] === 0x4e && tail[i + 3] === 0x44) {
-        hasIend = true
-        break
-      }
-    }
-    if (!hasIend) {
+    const iendOffset = fileBytes.length - 8
+    if (
+      fileBytes[iendOffset] !== 0x49 ||
+      fileBytes[iendOffset + 1] !== 0x45 ||
+      fileBytes[iendOffset + 2] !== 0x4e ||
+      fileBytes[iendOffset + 3] !== 0x44
+    ) {
       return { valid: false, error: 'Invalid PNG image', status: 415 }
     }
     return validImage('png', 'image/png')

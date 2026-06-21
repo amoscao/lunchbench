@@ -125,6 +125,37 @@ function showVoteOverlay(
   voteResult: VoteResult,
   colorClass: 'overlay-rank-up' | 'overlay-rank-down' | 'overlay-rank-neutral'
 ): void {
+  const isMobile = window.matchMedia('(max-width: 600px)').matches
+
+  if (isMobile) {
+    const info = card.querySelector<HTMLElement>('.lunch-card-info')
+    if (!info) return
+
+    const statLine = document.createElement('div')
+    statLine.className = `vote-stat-line ${colorClass}`
+
+    const rankEl = document.createElement('span')
+    rankEl.className = 'vote-stat-rank'
+    rankEl.textContent = `#${voteResult.rank}`
+
+    const sep = document.createElement('span')
+    sep.className = 'vote-stat-sep'
+    sep.textContent = '·'
+
+    const ratingEl = document.createElement('span')
+    ratingEl.className = 'vote-stat-rating'
+    ratingEl.textContent = String(Math.round(lunch.rating))
+
+    statLine.appendChild(rankEl)
+    statLine.appendChild(sep)
+    statLine.appendChild(ratingEl)
+    info.appendChild(statLine)
+
+    animateCountUp(ratingEl, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.rating))
+    return
+  }
+
+  // Desktop: full card overlay
   const overlay = document.createElement('div')
   overlay.className = `vote-result-overlay ${colorClass}`
 
@@ -154,13 +185,7 @@ function showVoteOverlay(
   overlay.appendChild(ratingValue)
   card.appendChild(overlay)
 
-  animateCountUp(
-    ratingValue,
-    Math.round(voteResult.conservative_rating),
-    (v) => String(v),
-    800,
-    Math.round(lunch.rating)
-  )
+  animateCountUp(ratingValue, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.rating))
 }
 
 export function renderHome(

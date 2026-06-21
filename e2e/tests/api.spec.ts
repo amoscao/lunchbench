@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_TOKEN, API_URL } from './helpers'
+import { getAdminSessionToken, API_URL } from './helpers'
 
 test.describe('API', () => {
   test('GET /api/health returns ok', async ({ request }) => {
@@ -125,10 +125,11 @@ test.describe('API', () => {
   })
 
   test('POST /api/lunches creates lunch with valid token', async ({ request }) => {
+    const token = await getAdminSessionToken()
     const uniqueName = `API Test Lunch ${Date.now()}`
     const res = await request.post(`${API_URL}/api/lunches`, {
       data: { name: uniqueName },
-      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     expect(res.ok()).toBe(true)
     const body = await res.json()
@@ -140,14 +141,15 @@ test.describe('API', () => {
   })
 
   test('leaderboard uses deterministic same-name ordering', async ({ request }) => {
+    const token = await getAdminSessionToken()
     const sameName = `Same Name ${Date.now()}`
     const firstRes = await request.post(`${API_URL}/api/lunches`, {
       data: { name: sameName },
-      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     const secondRes = await request.post(`${API_URL}/api/lunches`, {
       data: { name: sameName },
-      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     const { lunch: first } = await firstRes.json()
     const { lunch: second } = await secondRes.json()
@@ -163,23 +165,25 @@ test.describe('API', () => {
   })
 
   test('POST /api/lunches rejects empty name', async ({ request }) => {
+    const token = await getAdminSessionToken()
     const res = await request.post(`${API_URL}/api/lunches`, {
       data: { name: '' },
-      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     expect(res.status()).toBe(400)
   })
 
   test('POST /api/lunches/:id/image rejects non-image file', async ({ request }) => {
+    const token = await getAdminSessionToken()
     const createRes = await request.post(`${API_URL}/api/lunches`, {
       data: { name: `Image Test Lunch ${Date.now()}` },
-      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     const { lunch } = await createRes.json()
 
     const fakeFile = Buffer.from('this is not an image')
     const res = await request.post(`${API_URL}/api/lunches/${lunch.id}/image`, {
-      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      headers: { Authorization: `Bearer ${token}` },
       multipart: {
         image: {
           name: 'test.jpg',

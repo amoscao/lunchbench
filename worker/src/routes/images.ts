@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
-import { validateAdminToken } from '../helpers'
+import { validateAdminSession } from '../helpers'
 import { checkRateLimit } from '../rate-limit'
 import { validateImageBuffer } from '../image-validator'
 import { resizeImage } from '../image-resize'
@@ -33,10 +33,9 @@ export async function handleImageUpload(
   request: Request,
   lunchId: number,
   db: D1Database,
-  bucket: R2Bucket | undefined,
-  adminToken: string
+  bucket: R2Bucket | undefined
 ): Promise<Response> {
-  if (!validateAdminToken(request, adminToken)) {
+  if (!(await validateAdminSession(request, db))) {
     return Response.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 

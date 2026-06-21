@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
-import { lunchFromRow, validateAdminToken } from '../helpers'
+import { lunchFromRow, validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { computeConsistency, confidenceFromRd, consistencyBand, GLICKO_DEFAULTS } from '../elo'
 import type { LunchRow } from '../types'
@@ -93,7 +93,7 @@ lunches.get('/leaderboard', async (c) => {
 })
 
 lunches.post('/', async (c) => {
-  if (!validateAdminToken(c.req.raw, c.env.VOTE_PASSWORD)) {
+  if (!(await validateAdminSession(c.req.raw, c.env.DB))) {
     return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
   }
 

@@ -219,8 +219,9 @@ Use a current admin session token from `POST /api/admin/verify` in the `Authoriz
 
 **Constraints:**
 - Max size: 5MB
+- Min size: 100 bytes
 - Allowed types: `image/jpeg`, `image/png`, `image/webp`
-- Validated by magic bytes server-side
+- Validated server-side by file signature and basic format structure
 
 **Response 200:**
 ```json
@@ -234,7 +235,7 @@ Use a current admin session token from `POST /api/admin/verify` in the `Authoriz
 - `401 UNAUTHORIZED`
 - `404 NOT_FOUND` — lunch not found
 - `413 PAYLOAD_TOO_LARGE` — file exceeds 5MB
-- `415 UNSUPPORTED_MEDIA_TYPE` — invalid file type or magic bytes mismatch
+- `415 UNSUPPORTED_MEDIA_TYPE` — invalid file type, invalid signature, or invalid image structure
 - `429 RATE_LIMITED` — exceeded 5 uploads/day/IP
 
 ---

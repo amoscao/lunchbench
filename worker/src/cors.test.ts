@@ -33,8 +33,8 @@ describe('CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://lunchbench.pages.dev')
   })
 
-  test('allows Cloudflare Pages preview origins', async () => {
-    const res = await preflight('/api/vote', 'https://abc123.lunchbench.pages.dev')
+  test('allows Cloudflare Pages preview origins on public routes', async () => {
+    const res = await preflight('/api/lunches', 'https://abc123.lunchbench.pages.dev', 'GET')
 
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://abc123.lunchbench.pages.dev')
@@ -52,6 +52,19 @@ describe('CORS', () => {
 
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://frontend:5173')
+  })
+
+  test('does not allow preview origins on protected routes', async () => {
+    const vote = await preflight('/api/vote', 'https://abc123.lunchbench.pages.dev', 'POST')
+    const admin = await preflight('/api/admin/verify', 'https://abc123.lunchbench.pages.dev', 'POST')
+    const lunches = await preflight('/api/lunches', 'https://abc123.lunchbench.pages.dev', 'POST')
+
+    expect(vote.status).toBe(204)
+    expect(vote.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    expect(admin.status).toBe(204)
+    expect(admin.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    expect(lunches.status).toBe(204)
+    expect(lunches.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 
   test('does not allow arbitrary origins on vote routes', async () => {

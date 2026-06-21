@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
 import { checkRateLimit } from '../rate-limit'
-import { validateImageBuffer } from '../image-validator'
+import { MAX_IMAGE_SIZE_BYTES, validateImageBuffer } from '../image-validator'
 import { resizeImage } from '../image-resize'
 import { isAllowedOrigin } from '../middleware'
 
@@ -39,8 +39,9 @@ export async function handleImageUpload(
     return Response.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
-  const contentLength = Number(request.headers.get('Content-Length') ?? '0')
-  if (contentLength > 5 * 1024 * 1024) {
+  const contentLengthHeader = request.headers.get('Content-Length')
+  const contentLength = contentLengthHeader ? Number.parseInt(contentLengthHeader, 10) : Number.NaN
+  if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_SIZE_BYTES) {
     return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
   }
 
@@ -80,6 +81,10 @@ export async function handleImageUpload(
   }
 
   const imageFile = file as File
+  if (imageFile.size > MAX_IMAGE_SIZE_BYTES) {
+    return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+  }
+
   const buf = await imageFile.arrayBuffer()
   const validation = validateImageBuffer(buf, imageFile.size)
   if (!validation.valid) {

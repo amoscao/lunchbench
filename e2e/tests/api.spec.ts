@@ -105,8 +105,12 @@ test.describe('API', () => {
     expect(accepted).toBeGreaterThan(0)
     expect(accepted + conflicts).toBe(5)
 
-    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard?per_page=50`)
-    const { lunches } = await lbRes.json()
+    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard`)
+    const body = await lbRes.json()
+    expect(body).not.toHaveProperty('page')
+    expect(body).not.toHaveProperty('per_page')
+    expect(body).not.toHaveProperty('total_pages')
+    const { lunches } = body
     const updatedLeft = lunches.find((l: any) => l.id === left.id)
     const updatedRight = lunches.find((l: any) => l.id === right.id)
     expect(updatedLeft.wins).toBe(left.wins + accepted)
@@ -148,8 +152,12 @@ test.describe('API', () => {
     const { lunch: first } = await firstRes.json()
     const { lunch: second } = await secondRes.json()
 
-    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard?per_page=50`)
-    const { lunches } = await lbRes.json()
+    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard`)
+    const body = await lbRes.json()
+    expect(body).not.toHaveProperty('page')
+    expect(body).not.toHaveProperty('per_page')
+    expect(body).not.toHaveProperty('total_pages')
+    const { lunches } = body
     const matches = lunches.filter((l: any) => l.name === sameName)
     expect(matches.map((l: any) => l.id)).toEqual([first.id, second.id].sort((a, b) => a - b))
   })

@@ -66,8 +66,6 @@ Returns all lunches.
 Returns lunches sorted by `conservative_rating` descending, then `name` ascending, then `id` ascending, with rank.
 
 **Query params:**
-- `?page=1` — 1-based page number
-- `?per_page=10` — page size, capped at 50
 - `?vegan=true` — only include vegan lunches
 
 **Response 200:**
@@ -93,11 +91,7 @@ Returns lunches sorted by `conservative_rating` descending, then `name` ascendin
       "created_at": "2024-09-23T12:00:00Z",
       "updated_at": "2024-09-23T14:00:00Z"
     }
-  ],
-  "total": 1,
-  "page": 1,
-  "per_page": 10,
-  "total_pages": 1
+  ]
 }
 ```
 

@@ -7,6 +7,7 @@ export type Lunch = {
   is_vegan: number
   rank: number
   rating: number
+  conservative_rating: number
   wins: number
   losses: number
   ties: number

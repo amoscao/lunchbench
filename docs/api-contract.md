@@ -111,8 +111,8 @@ Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_r
 **Response 200:**
 ```json
 {
-  "left": { "rank": 1, /* Lunch object */ },
-  "right": { "rank": 2, /* Lunch object */ }
+  "left": { "rank": 1, /* full Lunch object, including conservative_rating */ },
+  "right": { "rank": 2, /* full Lunch object, including conservative_rating */ }
 }
 ```
 
@@ -139,6 +139,16 @@ Submit a vote for a matchup.
 ```json
 {
   "vote_id": 42,
+  "left_result": {
+    "rating": 1520,
+    "conservative_rating": 1320,
+    "rank": 2
+  },
+  "right_result": {
+    "rating": 1480,
+    "conservative_rating": 1280,
+    "rank": 3
+  },
   "next": {
     "left": { /* Lunch object */ },
     "right": { /* Lunch object */ }
@@ -146,6 +156,7 @@ Submit a vote for a matchup.
 }
 ```
 
+`left_result` and `right_result` contain the post-vote ratings and current rank for each lunch.
 `next` is `null` if fewer than 2 lunches are available for the next matchup.
 When present, each `next` lunch includes `rank`, its pre-vote leaderboard position for that next vote.
 

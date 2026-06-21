@@ -3,6 +3,7 @@ export type Bindings = {
   IMAGES: R2Bucket | undefined
   VOTE_PASSWORD: string
   ADMIN_MANAGER_PASSWORD: string
+  SENTRY_DSN: string
 }
 
 export type Lunch = {

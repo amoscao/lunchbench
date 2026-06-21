@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { sentry } from '@sentry/hono/cloudflare'
 import type { Bindings } from './types'
 import { lunchesRouter } from './routes/lunches'
 import { matchupRouter } from './routes/matchup'
@@ -11,6 +12,10 @@ import { securityHeaders } from './middleware'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
+app.use(sentry(app, (env) => ({
+  dsn: env.SENTRY_DSN,
+  tracesSampleRate: 0,
+})))
 app.use('*', cors())
 app.use('*', securityHeaders)
 

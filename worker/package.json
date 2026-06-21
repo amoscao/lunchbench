@@ -6,6 +6,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sentry/cloudflare": "^10.59.0",
+    "@sentry/hono": "^10.59.0",
     "hono": "^4"
   },
   "devDependencies": {

@@ -4,26 +4,40 @@ import { escapeHtml } from '../utils/escape-html'
 const API_URL = '/api'
 
 type AdminState = {
-  token: string | null
   lunches: Lunch[]
 }
 
+let adminToken: string | null = null
+
 const state: AdminState = {
-  token: sessionStorage.getItem('admin-token'),
   lunches: [],
 }
 
-export function renderAdmin(container: HTMLElement): void {
+function setAdminToken(token: string): void {
+  adminToken = token
+}
+
+function clearAdminToken(): void {
+  adminToken = null
+  state.lunches = []
+}
+
+window.addEventListener('pagehide', clearAdminToken)
+window.addEventListener('beforeunload', clearAdminToken)
+
+export function renderAdmin(container: HTMLElement): () => void {
   container.innerHTML = ''
   const content = document.createElement('div')
   content.className = 'page-content'
   container.appendChild(content)
 
-  if (!state.token) {
+  if (!adminToken) {
     renderLogin(content)
   } else {
     renderDashboard(content)
   }
+
+  return clearAdminToken
 }
 
 function renderLogin(container: HTMLElement): void {
@@ -61,8 +75,7 @@ function renderLogin(container: HTMLElement): void {
         throw new Error((err as any).error ?? 'Login failed')
       }
       const { token } = await res.json()
-      state.token = token
-      sessionStorage.setItem('admin-token', token)
+      setAdminToken(token)
       container.innerHTML = ''
       renderDashboard(container)
     } catch (e: unknown) {
@@ -82,11 +95,10 @@ function renderLogin(container: HTMLElement): void {
 
 async function fetchAdminLunches(): Promise<Lunch[]> {
   const res = await fetch(`${API_URL}/admin/lunches`, {
-    headers: { Authorization: `Bearer ${state.token}` },
+    headers: { Authorization: `Bearer ${adminToken}` },
   })
   if (res.status === 401) {
-    state.token = null
-    sessionStorage.removeItem('admin-token')
+    clearAdminToken()
     throw new Error('Session expired')
   }
   if (!res.ok) throw new Error('Failed to load lunches')
@@ -96,11 +108,10 @@ async function fetchAdminLunches(): Promise<Lunch[]> {
 
 async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number; votes_30d: number }> {
   const res = await fetch(`${API_URL}/admin/stats`, {
-    headers: { Authorization: `Bearer ${state.token}` },
+    headers: { Authorization: `Bearer ${adminToken}` },
   })
   if (res.status === 401) {
-    state.token = null
-    sessionStorage.removeItem('admin-token')
+    clearAdminToken()
     throw new Error('Session expired')
   }
   if (!res.ok) throw new Error('Failed to load stats')
@@ -387,7 +398,7 @@ function renderDashboard(container: HTMLElement): void {
     exportPdfBtn.disabled = true
     exportPdfBtn.textContent = 'Exporting…'
     try {
-      await exportLeaderboardPDF(state.token)
+      await exportLeaderboardPDF(adminToken)
     } catch {
       showAlert('Export failed', 'error')
     } finally {
@@ -396,15 +407,12 @@ function renderDashboard(container: HTMLElement): void {
     }
   })
 
-  container.querySelector('#logout-btn')!.addEventListener('click', async () => {
-    try {
-      await revokeAdminSession(state.token)
-    } finally {
-      state.token = null
-      sessionStorage.removeItem('admin-token')
-      container.innerHTML = ''
-      renderLogin(container)
-    }
+  container.querySelector('#logout-btn')!.addEventListener('click', () => {
+    const token = adminToken
+    clearAdminToken()
+    container.innerHTML = ''
+    renderLogin(container)
+    void revokeAdminSession(token).catch(() => undefined)
   })
 
   const alertEl = container.querySelector<HTMLElement>('#admin-alert')!
@@ -480,10 +488,16 @@ function renderDashboard(container: HTMLElement): void {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${state.token}`,
+                Authorization: `Bearer ${adminToken}`,
               },
               body: JSON.stringify(updates),
             })
+            if (res.status === 401) {
+              clearAdminToken()
+              container.innerHTML = ''
+              renderLogin(container)
+              return
+            }
             if (!res.ok) throw new Error('Update failed')
             showAlert('Updated!', 'success')
             await loadTable()
@@ -503,8 +517,14 @@ function renderDashboard(container: HTMLElement): void {
         try {
           const res = await fetch(`${API_URL}/admin/lunches/${id}`, {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${state.token}` },
+            headers: { Authorization: `Bearer ${adminToken}` },
           })
+          if (res.status === 401) {
+            clearAdminToken()
+            container.innerHTML = ''
+            renderLogin(container)
+            return
+          }
           if (!res.ok) throw new Error('Delete failed')
           showAlert('Deleted!', 'success')
           await loadTable()

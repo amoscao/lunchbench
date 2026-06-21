@@ -3,7 +3,7 @@ const CONTENT_SECURITY_POLICY = [
   "script-src 'self' https://gc.zgo.at",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
-  "connect-src 'self' https://lunchbench.goatcounter.com",
+  "connect-src 'self' https://lunchbench.goatcounter.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
   "font-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",

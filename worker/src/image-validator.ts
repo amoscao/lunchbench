@@ -3,6 +3,7 @@ export type ImageValidationResult =
   | { valid: false; error: string; status: 413 | 415 }
 
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
+const MIN_IMAGE_SIZE_BYTES = 100
 
 export function validateImageBuffer(
   buf: ArrayBuffer,
@@ -16,7 +17,12 @@ export function validateImageBuffer(
     return { valid: false, error: 'File exceeds 5MB limit', status: 413 }
   }
 
-  const bytes = new Uint8Array(buf.slice(0, 12))
+  if (declaredSize < MIN_IMAGE_SIZE_BYTES || buf.byteLength < MIN_IMAGE_SIZE_BYTES) {
+    return { valid: false, error: 'File is too small to be a valid image', status: 415 }
+  }
+
+  const fileBytes = new Uint8Array(buf)
+  const bytes = fileBytes.slice(0, 12)
 
   const validImage = (ext: string, contentType: string): ImageValidationResult => {
     const textView = new TextDecoder('utf-8', { fatal: false, ignoreBOM: false }).decode(buf.slice(0, 100))
@@ -32,6 +38,9 @@ export function validateImageBuffer(
 
   // JPEG: FF D8 FF
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    if (fileBytes[fileBytes.length - 2] !== 0xff || fileBytes[fileBytes.length - 1] !== 0xd9) {
+      return { valid: false, error: 'Invalid JPEG image', status: 415 }
+    }
     return validImage('jpg', 'image/jpeg')
   }
 
@@ -41,6 +50,17 @@ export function validateImageBuffer(
     bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a &&
     bytes[6] === 0x1a && bytes[7] === 0x0a
   ) {
+    const tail = fileBytes.slice(fileBytes.length - 12)
+    let hasIend = false
+    for (let i = 0; i <= tail.length - 4; i++) {
+      if (tail[i] === 0x49 && tail[i + 1] === 0x45 && tail[i + 2] === 0x4e && tail[i + 3] === 0x44) {
+        hasIend = true
+        break
+      }
+    }
+    if (!hasIend) {
+      return { valid: false, error: 'Invalid PNG image', status: 415 }
+    }
     return validImage('png', 'image/png')
   }
 
@@ -49,6 +69,10 @@ export function validateImageBuffer(
     bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
     bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
   ) {
+    const riffSize = new DataView(buf).getUint32(4, true) + 8
+    if (riffSize !== buf.byteLength) {
+      return { valid: false, error: 'Invalid WebP image', status: 415 }
+    }
     return validImage('webp', 'image/webp')
   }
 

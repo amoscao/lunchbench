@@ -26,10 +26,6 @@ export type LeaderboardLunch = Lunch & {
 
 export type LeaderboardPage = {
   lunches: LeaderboardLunch[]
-  total: number
-  page: number
-  per_page: number
-  total_pages: number
 }
 
 export type LunchDetail = Lunch & {
@@ -99,8 +95,8 @@ export async function submitVote(
   return res.json()
 }
 
-export async function getLeaderboard(veganOnly = false, page = 1, perPage = 10): Promise<LeaderboardPage> {
-  const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+export async function getLeaderboard(veganOnly = false): Promise<LeaderboardPage> {
+  const params = new URLSearchParams()
   if (veganOnly) params.set('vegan', 'true')
   const res = await fetch(`${BASE}/lunches/leaderboard?${params}`)
   if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`)

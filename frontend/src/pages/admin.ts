@@ -117,19 +117,9 @@ async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number;
 async function exportLeaderboardPDF(token: string | null): Promise<void> {
   void token
 
-  async function fetchLeaderboardPage(page: number): Promise<LeaderboardPage> {
-    const res = await fetch(`/api/lunches/leaderboard?page=${page}`)
-    if (!res.ok) throw new Error('Failed to load leaderboard')
-    return res.json()
-  }
-
-  const firstPage = await fetchLeaderboardPage(1)
-  const lunches: LeaderboardLunch[] = [...firstPage.lunches]
-
-  for (let page = 2; page <= firstPage.total_pages; page += 1) {
-    const data = await fetchLeaderboardPage(page)
-    lunches.push(...data.lunches)
-  }
+  const res = await fetch('/api/lunches/leaderboard')
+  if (!res.ok) throw new Error('Failed to load leaderboard')
+  const { lunches }: LeaderboardPage = await res.json()
 
   const dateString = new Date().toLocaleDateString('en-US', {
     year: 'numeric',

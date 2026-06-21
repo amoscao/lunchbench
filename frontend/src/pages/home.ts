@@ -144,14 +144,14 @@ function showVoteOverlay(
 
     const ratingEl = document.createElement('span')
     ratingEl.className = 'vote-stat-rating'
-    ratingEl.textContent = String(Math.round(lunch.rating))
+    ratingEl.textContent = String(Math.round(lunch.conservative_rating))
 
     statLine.appendChild(rankEl)
     statLine.appendChild(sep)
     statLine.appendChild(ratingEl)
     info.appendChild(statLine)
 
-    animateCountUp(ratingEl, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.rating))
+    animateCountUp(ratingEl, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.conservative_rating))
     return
   }
 
@@ -177,7 +177,7 @@ function showVoteOverlay(
 
   const ratingValue = document.createElement('div')
   ratingValue.className = 'overlay-rating-value'
-  ratingValue.textContent = String(Math.round(lunch.rating))
+  ratingValue.textContent = String(Math.round(lunch.conservative_rating))
 
   overlay.appendChild(rankLabel)
   overlay.appendChild(rankValue)
@@ -185,7 +185,7 @@ function showVoteOverlay(
   overlay.appendChild(ratingValue)
   card.appendChild(overlay)
 
-  animateCountUp(ratingValue, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.rating))
+  animateCountUp(ratingValue, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.conservative_rating))
 }
 
 export function renderHome(

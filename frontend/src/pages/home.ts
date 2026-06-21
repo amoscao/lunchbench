@@ -206,7 +206,7 @@ export function renderHome(
     buttons.forEach((b) => (b.disabled = true))
 
     const bar = document.querySelector<HTMLDivElement>('.vote-gradient-bar')
-    if (bar) bar.classList.add('loading')
+    if (bar) bar.classList.add('waiting')
 
     // Fade buttons visually
     const voteRow = document.querySelector<HTMLElement>('.vote-buttons')
@@ -230,6 +230,7 @@ export function renderHome(
     try {
       const [res] = await Promise.all([
         submitVote(leftLunch.id, rightLunch.id, result).then((r) => {
+          if (bar) { bar.classList.remove('waiting'); bar.classList.add('loading') }
           const leftCard = cards[0]
           const rightCard = cards[1]
           const leftColor =
@@ -257,7 +258,7 @@ export function renderHome(
 
       await load(res.next)
     } catch (e) {
-      if (bar) bar.classList.remove('loading')
+      if (bar) { bar.classList.remove('waiting'); bar.classList.remove('loading') }
       buttons.forEach((b) => (b.disabled = false))
       const err = document.createElement('p')
       err.style.cssText = 'text-align:center;color:#dc2626;margin-top:12px;font-size:13px;'

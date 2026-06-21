@@ -546,6 +546,11 @@ img {
   to   { width: 100%; box-shadow: 0 0 6px hsl(168 88% 52%), 0 0 16px hsl(168 88% 52% / 0.6); }
 }
 
+@keyframes bar-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.88); }
+  50%       { opacity: 0.80; transform: scaleX(1); }
+}
+
 /* Arena crossfade on vote */
 @keyframes arena-fade-out {
   from { opacity: 1; transform: none; }
@@ -625,6 +630,17 @@ img {
   );
   border-radius: 1px;
   opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+/* Waiting for backend: pulse the track itself */
+.vote-gradient-bar.waiting {
+  animation: bar-pulse 1.1s ease-in-out infinite;
+}
+
+/* Backend responded: stop pulse, run fill */
+.vote-gradient-bar.loading {
+  animation: none;
 }
 
 .vote-gradient-bar.loading::after {

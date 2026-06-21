@@ -2,17 +2,17 @@ export type ImageValidationResult =
   | { valid: true; ext: string; contentType: string }
   | { valid: false; error: string; status: 413 | 415 }
 
-const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 
 export function validateImageBuffer(
   buf: ArrayBuffer,
   declaredSize: number
 ): ImageValidationResult {
-  if (declaredSize > MAX_SIZE) {
+  if (declaredSize > MAX_IMAGE_SIZE_BYTES) {
     return { valid: false, error: 'File exceeds 5MB limit', status: 413 }
   }
 
-  if (buf.byteLength > MAX_SIZE) {
+  if (buf.byteLength > MAX_IMAGE_SIZE_BYTES) {
     return { valid: false, error: 'File exceeds 5MB limit', status: 413 }
   }
 

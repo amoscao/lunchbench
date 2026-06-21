@@ -2,11 +2,12 @@ import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
 import { checkRateLimit } from '../rate-limit'
-import { validateImageBuffer } from '../image-validator'
+import { MAX_IMAGE_SIZE_BYTES, validateImageBuffer } from '../image-validator'
 import { resizeImage } from '../image-resize'
 import { isAllowedOrigin } from '../middleware'
 
 const images = new Hono<{ Bindings: Bindings }>()
+const MAX_MULTIPART_BODY_BYTES = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.1)
 
 // POST /api/lunches/:id/image - handled in lunches router but implemented here
 // This file handles GET /api/images/:key
@@ -28,6 +29,43 @@ images.get('/:key{.+}', async (c) => {
 
 export { images as imagesRouter }
 
+async function readBodyWithinLimit(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes: number
+): Promise<ArrayBuffer | null> {
+  if (!body) return new ArrayBuffer(0)
+
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      totalBytes += value.byteLength
+      if (totalBytes > maxBytes) {
+        await reader.cancel()
+        return null
+      }
+
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const rawBody = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    rawBody.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return rawBody.buffer
+}
+
 // Upload handler - exported separately for use in lunches router
 export async function handleImageUpload(
   request: Request,
@@ -37,11 +75,6 @@ export async function handleImageUpload(
 ): Promise<Response> {
   if (!(await validateAdminSession(request, db))) {
     return Response.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
-  }
-
-  const contentLength = Number(request.headers.get('Content-Length') ?? '0')
-  if (contentLength > 5 * 1024 * 1024) {
-    return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
   }
 
   const origin = request.headers.get('Origin')
@@ -69,7 +102,17 @@ export async function handleImageUpload(
 
   let formData: FormData
   try {
-    formData = await request.formData()
+    const rawBody = await readBodyWithinLimit(request.body, MAX_MULTIPART_BODY_BYTES)
+    if (rawBody === null) {
+      return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+    }
+
+    const checkedRequest = new Request(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: rawBody,
+    })
+    formData = await checkedRequest.formData()
   } catch {
     return Response.json({ error: 'Invalid form data', code: 'BAD_REQUEST' }, { status: 400 })
   }
@@ -80,6 +123,10 @@ export async function handleImageUpload(
   }
 
   const imageFile = file as File
+  if (imageFile.size > MAX_IMAGE_SIZE_BYTES) {
+    return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+  }
+
   const buf = await imageFile.arrayBuffer()
   const validation = validateImageBuffer(buf, imageFile.size)
   if (!validation.valid) {

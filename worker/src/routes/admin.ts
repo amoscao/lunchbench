@@ -53,7 +53,10 @@ admin.delete('/session', async (c) => {
   }
 
   const token = auth.slice(7)
-  await c.env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run()
+  const result = await c.env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run()
+  if ((result.meta?.changes ?? 0) === 0) {
+    return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
+  }
 
   return c.json({ revoked: true })
 })

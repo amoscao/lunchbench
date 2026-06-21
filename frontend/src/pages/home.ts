@@ -3,20 +3,21 @@ import { getMatchup, submitVote, type Lunch, type Matchup, type VoteResult } fro
 import { isVeganMode } from '../vegan-mode'
 import { hasSeen, markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
+import { escapeHtml } from '../utils/escape-html'
 
 function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
   card.className = 'lunch-card'
 
   const mediaArea = lunch.image_url
-    ? `<div class="lunch-card-image"><img src="${lunch.image_url}" alt="${lunch.name}" loading="lazy" /></div>`
+    ? `<div class="lunch-card-image"><img src="${escapeHtml(lunch.image_url)}" alt="${escapeHtml(lunch.name)}" loading="lazy" /></div>`
     : `<div class="lunch-card-placeholder">
         <div class="placeholder-question">?</div>
         <span class="placeholder-text">no picture yet</span>
        </div>`
   const veganBadge = lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''
   const description = lunch.description
-    ? `<div class="lunch-card-description">${lunch.description}</div>`
+    ? `<div class="lunch-card-description">${escapeHtml(lunch.description)}</div>`
     : ''
 
   const shortLabel = label === 'DISH A' ? 'A' : 'B'
@@ -24,7 +25,7 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
     <div class="vote-card-label" data-short="${shortLabel}">${label}</div>
     ${mediaArea}
     <div class="lunch-card-info">
-      <div class="lunch-card-name">${lunch.name}${veganBadge}</div>
+      <div class="lunch-card-name">${escapeHtml(lunch.name)}${veganBadge}</div>
       ${description}
     </div>
   `

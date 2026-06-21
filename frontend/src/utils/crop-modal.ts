@@ -198,7 +198,8 @@ export function openCropModal(file: File): Promise<File | null> {
       const srcY = (cropY - iTop) * scaleY
       const srcW = cropSize * scaleX
       const srcH = cropSize * scaleY
-      const outputSize = Math.max(1, Math.round(Math.min(srcW, srcH)))
+      const MAX_PX = 800
+      const outputSize = Math.max(1, Math.min(Math.round(Math.min(srcW, srcH)), MAX_PX))
 
       const canvas = document.createElement('canvas')
       canvas.width = outputSize
@@ -211,7 +212,7 @@ export function openCropModal(file: File): Promise<File | null> {
         if (!blob) { resolve(null); return }
         const ext = file.name.replace(/\.[^.]+$/, '')
         resolve(new File([blob], `${ext}.jpg`, { type: 'image/jpeg' }))
-      }, 'image/jpeg', 0.92)
+      }, 'image/jpeg', 0.85)
     })
   })
 }

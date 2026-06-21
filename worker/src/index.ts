@@ -22,9 +22,9 @@ app.use(sentry(app, (env) => ({
   dsn: env.SENTRY_DSN,
   tracesSampleRate: 0,
 })))
-app.use('/api/*', cors(corsOptions))
 app.use('*', securityHeaders)
 app.use('/api/*', restrictBrowserOrigins)
+app.use('/api/*', cors(corsOptions))
 
 app.get('/api/health', (c) => c.json({ ok: true }))
 

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/browser'
 import { getMatchup, submitVote, type Lunch, type Matchup, type VoteResult } from '../api'
 import { isVeganMode } from '../vegan-mode'
 import { hasSeen, markSeen } from '../utils/seen-pairs'
@@ -278,11 +279,13 @@ export function renderHome(
     if (rightCard) showVoteOverlay(rightCard, votedRight, projected.right)
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
-    const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async () => {
+    const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async (firstErr: unknown) => {
       try {
         await submitVote(votedLeft.id, votedRight.id, result)
-      } catch {
-        // Swallow until production error reporting is added.
+      } catch (secondErr: unknown) {
+        Sentry.captureException(secondErr ?? firstErr, {
+          extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
+        })
       }
     })
 

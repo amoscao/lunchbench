@@ -7,7 +7,10 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "vite": "^5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^5"
+  },
+  "dependencies": {
+    "@sentry/browser": "^10.59.0"
   }
 }

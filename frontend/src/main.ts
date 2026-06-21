@@ -1,3 +1,4 @@
+import './instrument'
 import './styles/main.css'
 import { Router } from './router'
 import { createNav } from './components/nav'

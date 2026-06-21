@@ -25,10 +25,12 @@ export function openCropModal(file: File): Promise<File | null> {
 
     const cropBox = document.createElement('div')
     cropBox.className = 'crop-box'
+    cropBox.style.touchAction = 'none'
     ;(['nw', 'ne', 'sw', 'se'] as const).forEach((pos) => {
       const h = document.createElement('div')
       h.className = `crop-handle crop-handle-${pos}`
       h.dataset.handle = pos
+      h.style.touchAction = 'none'
       cropBox.appendChild(h)
     })
 
@@ -52,6 +54,7 @@ export function openCropModal(file: File): Promise<File | null> {
     modal.appendChild(actions)
     backdrop.appendChild(modal)
     document.body.appendChild(backdrop)
+    document.body.style.overflow = 'hidden'
 
     // Crop state in wrap-relative pixels
     let cropX = 0, cropY = 0, cropSize = 100
@@ -122,6 +125,7 @@ export function openCropModal(file: File): Promise<File | null> {
     }
 
     function onPointerMove(e: PointerEvent) {
+      e.preventDefault()
       if (!dragging) return
       const dx = e.clientX - dragStartClient.x
       const dy = e.clientY - dragStartClient.y
@@ -182,6 +186,7 @@ export function openCropModal(file: File): Promise<File | null> {
 
     function cleanup() {
       URL.revokeObjectURL(objectUrl)
+      document.body.style.overflow = ''
       document.body.removeChild(backdrop)
     }
 

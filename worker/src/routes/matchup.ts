@@ -4,6 +4,7 @@ import { lunchFromRow } from '../helpers'
 import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 import { conservativeScore, updateRatingPair } from '../elo'
+import { checkRateLimit, getClientIp } from '../rate-limit'
 
 const matchup = new Hono<{ Bindings: Bindings }>()
 
@@ -45,6 +46,16 @@ function rankWithHeadToHead(rankRow: RankRow | null, score: number, otherScore: 
 }
 
 matchup.get('/', async (c) => {
+  const ip = getClientIp(c.req.raw)
+  const rl = await checkRateLimit(c.env.DB, ip, 'matchup', 120, 3600)
+  if (!rl.allowed) {
+    return c.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
+      429,
+      { 'Retry-After': String(rl.retryAfter ?? 3600) }
+    )
+  }
+
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
     ? 'SELECT * FROM lunches WHERE is_vegan = 1'

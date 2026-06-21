@@ -8,6 +8,16 @@ import type { LunchRow } from '../types'
 const lunches = new Hono<{ Bindings: Bindings }>()
 
 lunches.get('/', async (c) => {
+  const ip = getClientIp(c.req.raw)
+  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_list', 120, 3600)
+  if (!rl.allowed) {
+    return c.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
+      429,
+      { 'Retry-After': String(rl.retryAfter ?? 3600) }
+    )
+  }
+
   const missingImage = c.req.query('missing_image') === 'true'
   const query = missingImage
     ? 'SELECT * FROM lunches WHERE image_key IS NULL ORDER BY name ASC'
@@ -49,6 +59,16 @@ lunches.get('/:id{[0-9]+}', async (c) => {
 })
 
 lunches.get('/leaderboard', async (c) => {
+  const ip = getClientIp(c.req.raw)
+  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_leaderboard', 60, 3600)
+  if (!rl.allowed) {
+    return c.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
+      429,
+      { 'Retry-After': String(rl.retryAfter ?? 3600) }
+    )
+  }
+
   const veganOnly = c.req.query('vegan') === 'true'
 
   const dataQuery = veganOnly

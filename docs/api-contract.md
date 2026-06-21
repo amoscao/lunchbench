@@ -174,9 +174,10 @@ When present, each `next` lunch includes `rank`, its pre-vote leaderboard positi
 - `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides
 - `404 NOT_FOUND` — lunch id(s) not found
 - `409 CONFLICT` — concurrent vote conflict after retries
-- `429 RATE_LIMITED` — exceeded 300 votes/hour/IP
+- `429 RATE_LIMITED` — exceeded 30 votes/hour/IP, or voted on the same unordered lunch pair from the same IP within 24 hours
 
 Vote writes retry from a fresh rating snapshot when another vote updates either lunch first. Counters are incremented in SQL so concurrent vote requests do not overwrite W/L/T totals.
+Vote pair cooldowns use the same unordered lunch pair regardless of left/right side.
 
 **Rate limit response:**
 ```json
@@ -252,7 +253,7 @@ Cache-Control: public, max-age=31536000, immutable
 
 | Route | Limit | Window | Key |
 |-------|-------|--------|-----|
-| POST /api/vote | 300 | 1 hour | IP |
+| POST /api/vote | 30 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |
 | POST /api/lunches | 10 | 24 hours | IP |
 

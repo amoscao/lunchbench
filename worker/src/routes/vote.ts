@@ -1,13 +1,15 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow } from '../helpers'
-import { checkRateLimit, getClientIp } from '../rate-limit'
+import { checkCooldown, checkRateLimit, clearRateLimit, getClientIp } from '../rate-limit'
 import { conservativeScore, updateRatingPair } from '../elo'
 import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 
 const vote = new Hono<{ Bindings: Bindings }>()
 export const MAX_VOTE_WRITE_ATTEMPTS = 10
+export const VOTE_RATE_LIMIT_PER_HOUR = 30
+export const VOTE_PAIR_COOLDOWN_SECONDS = 24 * 60 * 60
 
 type VoteResult = 'left_win' | 'right_win' | 'tie'
 type VoteWriteResult =
@@ -18,6 +20,21 @@ type VoteWriteResult =
 function uniqueIsoTimestamp(): string {
   const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0')
   return new Date().toISOString().replace('Z', `${suffix}Z`)
+}
+
+export async function getVotePairRateLimitKey(
+  ip: string,
+  leftLunchId: number,
+  rightLunchId: number
+): Promise<string> {
+  const [minId, maxId] = [leftLunchId, rightLunchId].sort((a, b) => a - b)
+  const ipBytes = new TextEncoder().encode(ip)
+  const ipDigest = await crypto.subtle.digest('SHA-256', ipBytes)
+  const ipHash = Array.from(new Uint8Array(ipDigest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+
+  return `vote_pair_${ipHash}_${minId}_${maxId}`
 }
 
 export async function recordVoteWithRetry(
@@ -165,14 +182,6 @@ type RankRow = {
 
 vote.post('/', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'vote', 300, 3600)
-  if (!rl.allowed) {
-    return c.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      429,
-      { 'Retry-After': String(rl.retryAfter ?? 3600) }
-    )
-  }
 
   const body: {
     left_lunch_id?: number
@@ -202,11 +211,37 @@ vote.post('/', async (c) => {
     return c.json({ error: 'Lunches must be different', code: 'BAD_REQUEST' }, 400)
   }
 
+  const rl = await checkRateLimit(c.env.DB, ip, 'vote', VOTE_RATE_LIMIT_PER_HOUR, 3600)
+  if (!rl.allowed) {
+    return c.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
+      429,
+      { 'Retry-After': String(rl.retryAfter ?? 3600) }
+    )
+  }
+
+  const pairRateLimitKey = await getVotePairRateLimitKey(ip, left_lunch_id, right_lunch_id)
+  const pairRl = await checkCooldown(
+    c.env.DB,
+    pairRateLimitKey,
+    'vote_pair',
+    VOTE_PAIR_COOLDOWN_SECONDS
+  )
+  if (!pairRl.allowed) {
+    return c.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
+      429,
+      { 'Retry-After': String(pairRl.retryAfter ?? VOTE_PAIR_COOLDOWN_SECONDS) }
+    )
+  }
+
   const writeResult = await recordVoteWithRetry(c.env.DB, left_lunch_id, right_lunch_id, result, ip)
   if (writeResult.status === 'not_found') {
+    await clearRateLimit(c.env.DB, pairRateLimitKey, 'vote_pair')
     return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
   }
   if (writeResult.status === 'conflict') {
+    await clearRateLimit(c.env.DB, pairRateLimitKey, 'vote_pair')
     return c.json({ error: 'Vote conflict, please retry', code: 'CONFLICT' }, 409)
   }
 

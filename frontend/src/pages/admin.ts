@@ -1,4 +1,5 @@
 import { type LeaderboardLunch, type LeaderboardPage, type Lunch } from '../api'
+import { escapeHtml } from '../utils/escape-html'
 
 const API_URL = '/api'
 
@@ -23,15 +24,6 @@ export function renderAdmin(container: HTMLElement): void {
   } else {
     renderDashboard(content)
   }
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
 }
 
 function renderLogin(container: HTMLElement): void {

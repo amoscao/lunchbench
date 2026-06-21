@@ -1,5 +1,6 @@
 import { getLunch, type LunchDetail } from '../api'
 import { animateCountUp } from '../utils/count-up'
+import { escapeHtml } from '../utils/escape-html'
 
 function metricTile(
   label: string,
@@ -127,14 +128,14 @@ function renderDetail(content: HTMLElement, lunch: LunchDetail, navigate: (p: st
   const hero = document.createElement('div')
   hero.className = 'detail-hero detail-enter detail-enter-1'
   const img = lunch.image_url
-    ? `<img class="detail-image" src="${lunch.image_url}" alt="${lunch.name}" />`
+    ? `<img class="detail-image" src="${escapeHtml(lunch.image_url)}" alt="${escapeHtml(lunch.name)}" />`
     : `<div class="detail-image-placeholder"><span>?</span></div>`
   const veganBadge = lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿 Vegan</span>' : ''
   hero.innerHTML = `
     ${img}
     <div class="detail-hero-info">
-      <h1 class="detail-name">${lunch.name}${veganBadge}</h1>
-      ${lunch.description ? `<p class="detail-description">${lunch.description}</p>` : ''}
+      <h1 class="detail-name">${escapeHtml(lunch.name)}${veganBadge}</h1>
+      ${lunch.description ? `<p class="detail-description">${escapeHtml(lunch.description)}</p>` : ''}
     </div>
   `
   content.appendChild(hero)

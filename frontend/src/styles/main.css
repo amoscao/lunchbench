@@ -1227,7 +1227,117 @@ img {
   }
 }
 
-@media (max-width: 480px) and (pointer: coarse) {
+/* Landscape phones: wide but short, gets desktop layout by default — compact it */
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  .page-content {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Cards stay side-by-side but switch to horizontal thumbnail layout */
+  .vote-arena {
+    flex-direction: row;
+    gap: var(--space-3);
+    align-items: stretch;
+  }
+
+  .vote-arena .lunch-card {
+    min-height: unset;
+    flex-direction: row;
+    align-items: center;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+  }
+
+  .vote-arena .vote-card-label {
+    min-height: unset;
+    padding: 0;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+    font-size: 0;
+    writing-mode: vertical-rl;
+    width: 28px;
+    align-self: stretch;
+  }
+
+  .vote-arena .vote-card-label::before {
+    content: attr(data-short);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    writing-mode: vertical-rl;
+  }
+
+  .vote-arena .lunch-card-image {
+    flex: 0 0 80px;
+    min-height: 80px;
+    height: 80px;
+  }
+
+  .vote-arena .lunch-card-image img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+  }
+
+  .vote-arena .lunch-card-placeholder {
+    flex: 0 0 80px;
+    min-height: 80px;
+    height: 80px;
+    border-radius: 0;
+  }
+
+  .vote-arena .lunch-card-info {
+    padding: var(--space-2) var(--space-3);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .vote-arena .lunch-card-name {
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vote-arena .lunch-card-description {
+    display: none;
+  }
+
+  .vote-vs {
+    display: none;
+  }
+
+  .vote-gradient-bar {
+    margin-top: var(--space-2);
+  }
+
+  .vote-buttons {
+    flex-direction: row;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .vote-button-wrap {
+    flex: 1;
+  }
+
+  .vote-buttons .btn {
+    min-width: unset;
+    width: 100%;
+    padding: 8px var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .vote-key-hint {
+    display: none;
+  }
+
+  .how-it-works {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) and (pointer: coarse) and (orientation: portrait) {
   .vote-arena .vote-card-label {
     min-height: 48px;
     padding: 0 var(--space-4);
@@ -1611,7 +1721,7 @@ img {
   display: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
   .vote-result-overlay {
     display: none;
   }

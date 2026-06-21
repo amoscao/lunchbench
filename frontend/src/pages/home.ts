@@ -126,7 +126,9 @@ function showVoteOverlay(
   lunch: Lunch,
   voteResult: VoteResult
 ): void {
-  const isMobile = window.matchMedia('(max-width: 600px)').matches
+  const isMobile = window.matchMedia(
+  '(max-width: 600px), (orientation: landscape) and (max-height: 520px) and (pointer: coarse)'
+).matches
   const rankOutcome = getRankOutcome(lunch.rank, voteResult.rank)
   const colorClass =
     rankOutcome === 'improved' ? 'overlay-rank-up' :

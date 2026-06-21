@@ -6,6 +6,7 @@ export type Lunch = {
   image_url: string | null
   is_vegan: number
   rating: number
+  conservative_rating: number
   wins: number
   losses: number
   ties: number

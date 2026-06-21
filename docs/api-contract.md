@@ -110,8 +110,8 @@ Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when poss
 **Response 200:**
 ```json
 {
-  "left": { /* Lunch object */ },
-  "right": { /* Lunch object */ }
+  "left": { /* full Lunch object, including conservative_rating */ },
+  "right": { /* full Lunch object, including conservative_rating */ }
 }
 ```
 
@@ -138,6 +138,16 @@ Submit a vote for a matchup.
 ```json
 {
   "vote_id": 42,
+  "left_result": {
+    "rating": 1520,
+    "conservative_rating": 1320,
+    "rank": 2
+  },
+  "right_result": {
+    "rating": 1480,
+    "conservative_rating": 1280,
+    "rank": 3
+  },
   "next": {
     "left": { /* Lunch object */ },
     "right": { /* Lunch object */ }
@@ -145,6 +155,7 @@ Submit a vote for a matchup.
 }
 ```
 
+`left_result` and `right_result` contain the post-vote ratings and current rank for each lunch.
 `next` is `null` if fewer than 2 lunches are available for the next matchup.
 
 **Errors:**

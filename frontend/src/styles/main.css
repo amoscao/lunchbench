@@ -1395,7 +1395,7 @@ img {
 .confidence-rd  { font-size: 11px; color: var(--text-muted); }
 
 /* =====================
-   Consistency cell
+   Consensus cell
    ===================== */
 .consistency-row    { display: flex; align-items: center; gap: 8px; }
 .consistency-num    { font-size: var(--text-sm); font-weight: 600; width: 2.5rem; text-align: right; flex-shrink: 0; }
@@ -1510,7 +1510,7 @@ img {
   margin-top: 1px;
 }
 
-/* Consistency section */
+/* Consensus section */
 .detail-consistency {
   margin-bottom: var(--space-6);
 }

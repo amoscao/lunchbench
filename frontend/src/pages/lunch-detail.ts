@@ -63,7 +63,7 @@ function consistencySection(consistency: number | null, band: string | null): HT
 
   if (consistency === null) {
     wrap.innerHTML = `<div class="detail-consistency-header">
-      <span class="detail-consistency-label">Consistency</span>
+      <span class="detail-consistency-label">Consensus</span>
       <span class="consistency-empty">—</span>
     </div>`
     return wrap
@@ -75,7 +75,7 @@ function consistencySection(consistency: number | null, band: string | null): HT
 
   wrap.innerHTML = `
     <div class="detail-consistency-header">
-      <span class="detail-consistency-label">Consistency</span>
+      <span class="detail-consistency-label">Consensus</span>
       <span class="detail-consistency-band">
         <span class="consistency-dot" style="background:${color}"></span>
         <span style="color:${color}">${bandLabel(band)}</span>
@@ -189,7 +189,7 @@ function renderDetail(content: HTMLElement, lunch: LunchDetail, navigate: (p: st
     })
   })
 
-  // Consistency
+  // Consensus
   content.appendChild(consistencySection(lunch.consistency, lunch.consistency_band))
 
   // W/L/T

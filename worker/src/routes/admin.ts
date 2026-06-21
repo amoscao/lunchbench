@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context, Next } from 'hono'
 import type { Bindings, LunchRow } from '../types'
-import { lunchFromRow } from '../helpers'
+import { lunchFromRow, validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 
 type AdminEnv = { Bindings: Bindings }
@@ -21,7 +21,10 @@ admin.post('/verify', async (c) => {
   }
 
   const pw = body.password
-  const stored = c.env.ADMIN_MANAGER_PASSWORD
+  const stored = c.env.ADMIN_MANAGER_PASSWORD || c.env.VOTE_PASSWORD
+  if (!stored) {
+    return c.json({ error: 'Admin password not configured', code: 'SERVER_ERROR' }, 500)
+  }
   if (pw.length !== stored.length) {
     return c.json({ error: 'Invalid password', code: 'UNAUTHORIZED' }, 401)
   }
@@ -44,18 +47,9 @@ admin.post('/verify', async (c) => {
 })
 
 async function requireAdminSession(c: Context<AdminEnv>, next: Next): Promise<Response | void> {
-  const auth = c.req.header('Authorization')
-  if (!auth?.startsWith('Bearer ')) {
+  const hasSession = await validateAdminSession(c.req.raw, c.env.DB)
+  if (!hasSession) {
     return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
-  }
-
-  const token = auth.slice(7)
-  const session = await c.env.DB.prepare(
-    'SELECT expires_at FROM admin_sessions WHERE token = ?'
-  ).bind(token).first<{ expires_at: string }>()
-
-  if (!session || new Date(session.expires_at) < new Date()) {
-    return c.json({ error: 'Session expired', code: 'UNAUTHORIZED' }, 401)
   }
 
   await next()

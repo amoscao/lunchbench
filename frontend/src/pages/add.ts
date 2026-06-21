@@ -1,4 +1,4 @@
-import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch } from '../api'
+import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch, verifyAdminToken } from '../api'
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 import { openCropModal } from '../utils/crop-modal'
@@ -185,10 +185,11 @@ export function renderAdd(container: HTMLElement): void {
         const isVegan = (veganGroup.querySelector('input') as HTMLInputElement).checked
 
         try {
-          const lunch = await createLunch(name, token, description || null, isVegan)
+          const sessionToken = await verifyAdminToken(token)
+          const lunch = await createLunch(name, sessionToken, description || null, isVegan)
           const hadImage = !!selectedFile
           if (selectedFile) {
-            await uploadImage(lunch.id, selectedFile, token)
+            await uploadImage(lunch.id, selectedFile, sessionToken)
           }
           nameInput.value = '';
           (descriptionGroup.querySelector('textarea') as HTMLTextAreaElement).value = '';
@@ -330,14 +331,15 @@ export function renderAdd(container: HTMLElement): void {
     formContainer.appendChild(alertEl)
 
     submitBtn.addEventListener('click', async () => {
-      const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
-      if (!token) { showAlert('Password is required.', 'error'); return }
+        const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
+        if (!token) { showAlert('Password is required.', 'error'); return }
       if (!selectedExistingId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
       if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
       submitBtn.disabled = true
       submitBtn.textContent = 'Uploading…'
       try {
-        await uploadImage(selectedExistingId, selectedFile, token)
+        const sessionToken = await verifyAdminToken(token)
+        await uploadImage(selectedExistingId, selectedFile, sessionToken)
         selectedFile = null
         imagePreview.style.display = 'none'
         showAlert('Image uploaded!', 'success')

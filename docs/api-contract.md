@@ -12,7 +12,7 @@ All responses are JSON. All errors use the format:
 
 Protected routes require:
 ```
-Authorization: Bearer <ADMIN_TOKEN>
+Authorization: Bearer <SESSION_TOKEN>
 ```
 
 Returns `401` if missing or invalid.
@@ -190,6 +190,9 @@ Headers: `Retry-After: <seconds>`
 ### POST /api/lunches
 Create a new lunch. **Requires auth.**
 
+Use `POST /api/admin/verify` with the admin password to obtain a session token, then send that token in `Authorization` for this request.
+Tokens expire 8 hours after issuance.
+
 **Request body:**
 ```json
 { "name": "Chicken Tacos" }
@@ -209,6 +212,8 @@ Create a new lunch. **Requires auth.**
 
 ### POST /api/lunches/:id/image
 Upload an image for a lunch. **Requires auth.** Multipart form.
+
+Use a current admin session token from `POST /api/admin/verify` in the `Authorization` header. Tokens expire 8 hours after issuance.
 
 **Form field:** `image` (file)
 

@@ -39,10 +39,10 @@ Never commit `.dev.vars` or `.env*` files.
 
 ### `ADMIN_TOKEN`
 
-Used by protected admin routes:
+Used by admin authentication:
 
-- `POST /api/lunches`
-- `POST /api/lunches/:id/image`
+- `POST /api/admin/verify` mints a 8-hour admin session token.
+- `POST /api/lunches` and `POST /api/lunches/:id/image` require that session token in the `Authorization` header.
 
 Local value lives in `worker/.dev.vars`.
 

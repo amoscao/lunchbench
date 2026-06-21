@@ -155,3 +155,17 @@ export async function uploadImage(lunchId: number, file: File, token: string): P
     throw new Error((err as any).error ?? `Upload failed: ${res.status}`)
   }
 }
+
+export async function verifyAdminToken(password: string): Promise<string> {
+  const res = await fetch(`${BASE}/admin/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as any).error ?? `Admin verification failed: ${res.status}`)
+  }
+  const body = await res.json() as { token: string }
+  return body.token
+}

@@ -68,14 +68,22 @@ curl -X POST http://localhost:8787/api/vote \
   -H "Content-Type: application/json" \
   -d '{"left_lunch_id":1,"right_lunch_id":2,"result":"left_win"}'
 
-# Add a lunch (requires admin token)
+# Add a lunch (requires active admin session)
+```
+# Get session token (password stored in env)
+curl -X POST http://localhost:8787/api/admin/verify \
+  -H "Content-Type: application/json" \
+  -d '{"password":"your-admin-manager-password"}'
+```
+
+# Add a lunch (replace <SESSION_TOKEN> with token from /api/admin/verify)
 curl -X POST http://localhost:8787/api/lunches \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-admin-token-here" \
+  -H "Authorization: Bearer <SESSION_TOKEN>" \
   -d '{"name":"Sushi Roll"}'
 
-# Upload image for lunch #1 (requires admin token)
+# Upload image for lunch #1 (replace <SESSION_TOKEN> with token from /api/admin/verify)
 curl -X POST http://localhost:8787/api/lunches/1/image \
-  -H "Authorization: Bearer your-admin-token-here" \
+  -H "Authorization: Bearer <SESSION_TOKEN>" \
   -F "image=@/path/to/image.jpg"
 ```

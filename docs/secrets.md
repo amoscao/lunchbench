@@ -1,10 +1,10 @@
 # Secrets
 
 ## ADMIN_TOKEN
-- **Purpose**: Protects POST /api/lunches and POST /api/lunches/:id/image routes
+- **Purpose**: Protects `POST /api/admin/verify` (used to mint `SESSION_TOKEN`)
 - **Generate**: `openssl rand -hex 32`
 - **Add as Worker secret**: `npx wrangler secret put ADMIN_TOKEN` (enter value when prompted)
-- **Add to .dev.vars**: `ADMIN_TOKEN=<value>` (never commit this file)
+- **Add to `.dev.vars`**: `ADMIN_TOKEN=<value>` (never commit this file)
 - **Do NOT share** this value publicly
 
 ## CLOUDFLARE_API_TOKEN

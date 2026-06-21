@@ -122,10 +122,18 @@ function renderError(retry: () => void): HTMLElement {
 function showVoteOverlay(
   card: HTMLElement,
   lunch: Lunch,
-  voteResult: VoteResult,
-  colorClass: 'overlay-rank-up' | 'overlay-rank-down' | 'overlay-rank-neutral'
+  voteResult: VoteResult
 ): void {
   const isMobile = window.matchMedia('(max-width: 600px)').matches
+  const rankOutcome = getRankOutcome(lunch.rank, voteResult.rank)
+  const colorClass =
+    rankOutcome === 'improved' ? 'overlay-rank-up' :
+    rankOutcome === 'worsened' ? 'overlay-rank-down' :
+    'overlay-rank-neutral'
+  const slideClass =
+    rankOutcome === 'improved' ? 'rank-slide-down' :
+    rankOutcome === 'worsened' ? 'rank-slide-up' :
+    'rank-fade'
 
   if (isMobile) {
     const info = card.querySelector<HTMLElement>('.lunch-card-info')
@@ -135,8 +143,9 @@ function showVoteOverlay(
     statLine.className = `vote-stat-line ${colorClass}`
 
     const rankEl = document.createElement('span')
-    rankEl.className = 'vote-stat-rank'
-    rankEl.textContent = `#${voteResult.rank}`
+    rankEl.className = `vote-stat-rank ${slideClass}`
+    setRankWidth(rankEl, lunch.rank, voteResult.rank)
+    rankEl.appendChild(renderRankOdometry(lunch.rank, voteResult.rank, rankOutcome))
 
     const sep = document.createElement('span')
     sep.className = 'vote-stat-sep'
@@ -167,8 +176,9 @@ function showVoteOverlay(
   rankValue.className = 'overlay-rank-value'
 
   const rankNumber = document.createElement('span')
-  rankNumber.className = 'overlay-rank-number'
-  rankNumber.textContent = `#${voteResult.rank}`
+  rankNumber.className = `overlay-rank-number ${slideClass}`
+  setRankWidth(rankNumber, lunch.rank, voteResult.rank)
+  rankNumber.appendChild(renderRankOdometry(lunch.rank, voteResult.rank, rankOutcome))
   rankValue.appendChild(rankNumber)
 
   const ratingLabel = document.createElement('div')
@@ -186,6 +196,38 @@ function showVoteOverlay(
   card.appendChild(overlay)
 
   animateCountUp(ratingValue, Math.round(voteResult.conservative_rating), (v) => String(v), 800, Math.round(lunch.conservative_rating))
+}
+
+type RankOutcome = 'improved' | 'worsened' | 'unchanged'
+
+function getRankOutcome(oldRank: number, newRank: number): RankOutcome {
+  if (newRank < oldRank) return 'improved'
+  if (newRank > oldRank) return 'worsened'
+  return 'unchanged'
+}
+
+function setRankWidth(element: HTMLElement, oldRank: number, newRank: number): void {
+  const width = Math.max(`#${oldRank}`.length, `#${newRank}`.length)
+  element.style.setProperty('--rank-width', `${width + 0.5}ch`)
+}
+
+function renderRankOdometry(oldRank: number, newRank: number, outcome: RankOutcome): DocumentFragment {
+  const fragment = document.createDocumentFragment()
+  const newSpan = document.createElement('span')
+  newSpan.className = 'rank-new'
+  newSpan.textContent = `#${newRank}`
+
+  if (outcome === 'unchanged') {
+    fragment.appendChild(newSpan)
+    return fragment
+  }
+
+  const oldSpan = document.createElement('span')
+  oldSpan.className = 'rank-old'
+  oldSpan.textContent = `#${oldRank}`
+  fragment.appendChild(oldSpan)
+  fragment.appendChild(newSpan)
+  return fragment
 }
 
 export function renderHome(
@@ -233,16 +275,8 @@ export function renderHome(
           if (bar) { bar.classList.remove('waiting'); bar.classList.add('loading') }
           const leftCard = cards[0]
           const rightCard = cards[1]
-          const leftColor =
-            result === 'left_win' ? 'overlay-rank-up' :
-            result === 'right_win' ? 'overlay-rank-down' :
-            'overlay-rank-neutral'
-          const rightColor =
-            result === 'right_win' ? 'overlay-rank-up' :
-            result === 'left_win' ? 'overlay-rank-down' :
-            'overlay-rank-neutral'
-          if (leftCard && leftLunch) showVoteOverlay(leftCard, leftLunch, r.left_result, leftColor)
-          if (rightCard && rightLunch) showVoteOverlay(rightCard, rightLunch, r.right_result, rightColor)
+          if (leftCard && leftLunch) showVoteOverlay(leftCard, leftLunch, r.left_result)
+          if (rightCard && rightLunch) showVoteOverlay(rightCard, rightLunch, r.right_result)
           return r
         }),
         delay,

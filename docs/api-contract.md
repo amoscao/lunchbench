@@ -106,12 +106,13 @@ Returns lunches sorted by `conservative_rating` descending, then `name` ascendin
 ### GET /api/matchup
 Returns two selected lunches for voting.
 Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
+Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_rating`.
 
 **Response 200:**
 ```json
 {
-  "left": { /* full Lunch object, including conservative_rating */ },
-  "right": { /* full Lunch object, including conservative_rating */ }
+  "left": { "rank": 1, /* full Lunch object, including conservative_rating */ },
+  "right": { "rank": 2, /* full Lunch object, including conservative_rating */ }
 }
 ```
 
@@ -157,6 +158,7 @@ Submit a vote for a matchup.
 
 `left_result` and `right_result` contain the post-vote ratings and current rank for each lunch.
 `next` is `null` if fewer than 2 lunches are available for the next matchup.
+When present, each `next` lunch includes `rank`, its pre-vote leaderboard position for that next vote.
 
 **Errors:**
 - `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides

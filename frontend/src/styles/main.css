@@ -1545,17 +1545,69 @@ img {
 
 .overlay-rank-number {
   display: block;
-  animation: rank-slide-in 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  position: relative;
+  width: var(--rank-width, 2.5em);
+  height: 1.2em;
+  overflow: hidden;
 }
 
-@keyframes rank-slide-in {
+.rank-old,
+.rank-new {
+  position: absolute;
+  inset: 0;
+  display: block;
+  text-align: center;
+}
+
+.rank-fade .rank-new {
+  position: static;
+  animation: rank-fade-in 0.4s ease-in-out forwards;
+}
+
+.rank-slide-down .rank-old {
+  animation: rank-slide-down-old 0.4s ease-in-out forwards;
+}
+
+.rank-slide-down .rank-new {
+  animation: rank-slide-down-new 0.4s ease-in-out forwards;
+}
+
+.rank-slide-up .rank-old {
+  animation: rank-slide-up-old 0.4s ease-in-out forwards;
+}
+
+.rank-slide-up .rank-new {
+  animation: rank-slide-up-new 0.4s ease-in-out forwards;
+}
+
+@keyframes rank-slide-down-old {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes rank-slide-down-new {
   from { transform: translateY(-100%); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
+  to   { transform: translateY(0); opacity: 1; }
 }
 
-.overlay-rank-up    .overlay-rank-number { color: #4ade80; }
-.overlay-rank-down  .overlay-rank-number { color: #f87171; }
-.overlay-rank-neutral .overlay-rank-number { color: #d1d5db; }
+@keyframes rank-slide-up-old {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-100%); opacity: 0; }
+}
+
+@keyframes rank-slide-up-new {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes rank-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.overlay-rank-up    .rank-new { color: #4ade80; }
+.overlay-rank-down  .rank-new { color: #f87171; }
+.overlay-rank-neutral .rank-new { color: #9ca3af; }
 
 .overlay-rating-label {
   font-size: 13px;
@@ -1596,6 +1648,11 @@ img {
   }
 
   .vote-stat-rank {
+    position: relative;
+    display: inline-block;
+    width: var(--rank-width, 2.5em);
+    height: 1.2em;
+    overflow: hidden;
     letter-spacing: 0.02em;
   }
 
@@ -1609,9 +1666,10 @@ img {
     font-weight: 600;
   }
 
-  .vote-stat-line.overlay-rank-up    .vote-stat-rank { color: #4ade80; }
-  .vote-stat-line.overlay-rank-down  .vote-stat-rank { color: #f87171; }
-  .vote-stat-line.overlay-rank-neutral .vote-stat-rank { color: #9ca3af; }
+  .vote-stat-rank .rank-old,
+  .vote-stat-rank .rank-new {
+    text-align: left;
+  }
 }
 
 /* ── Crop modal ─────────────────────────────────────────── */

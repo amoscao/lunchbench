@@ -25,7 +25,7 @@ function clearAdminToken(): void {
 window.addEventListener('pagehide', clearAdminToken)
 window.addEventListener('beforeunload', clearAdminToken)
 
-export function renderAdmin(container: HTMLElement): void {
+export function renderAdmin(container: HTMLElement): () => void {
   container.innerHTML = ''
   const content = document.createElement('div')
   content.className = 'page-content'
@@ -36,6 +36,8 @@ export function renderAdmin(container: HTMLElement): void {
   } else {
     renderDashboard(content)
   }
+
+  return clearAdminToken
 }
 
 function renderLogin(container: HTMLElement): void {
@@ -405,14 +407,12 @@ function renderDashboard(container: HTMLElement): void {
     }
   })
 
-  container.querySelector('#logout-btn')!.addEventListener('click', async () => {
-    try {
-      await revokeAdminSession(adminToken)
-    } finally {
-      clearAdminToken()
-      container.innerHTML = ''
-      renderLogin(container)
-    }
+  container.querySelector('#logout-btn')!.addEventListener('click', () => {
+    const token = adminToken
+    clearAdminToken()
+    container.innerHTML = ''
+    renderLogin(container)
+    void revokeAdminSession(token).catch(() => undefined)
   })
 
   const alertEl = container.querySelector<HTMLElement>('#admin-alert')!
@@ -492,6 +492,12 @@ function renderDashboard(container: HTMLElement): void {
               },
               body: JSON.stringify(updates),
             })
+            if (res.status === 401) {
+              clearAdminToken()
+              container.innerHTML = ''
+              renderLogin(container)
+              return
+            }
             if (!res.ok) throw new Error('Update failed')
             showAlert('Updated!', 'success')
             await loadTable()
@@ -513,6 +519,12 @@ function renderDashboard(container: HTMLElement): void {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${adminToken}` },
           })
+          if (res.status === 401) {
+            clearAdminToken()
+            container.innerHTML = ''
+            renderLogin(container)
+            return
+          }
           if (!res.ok) throw new Error('Delete failed')
           showAlert('Deleted!', 'success')
           await loadTable()

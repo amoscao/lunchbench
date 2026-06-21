@@ -49,9 +49,27 @@ export type VoteResult = {
   rank: number
 }
 
+export type ProjectedResult = {
+  rating: number
+  conservative_rating: number
+  rank: number
+}
+
+export type ProjectedOutcomes = {
+  left_win: { left: ProjectedResult; right: ProjectedResult }
+  right_win: { left: ProjectedResult; right: ProjectedResult }
+  tie: { left: ProjectedResult; right: ProjectedResult }
+}
+
+export type Matchup = {
+  left: Lunch
+  right: Lunch
+  projected: ProjectedOutcomes
+}
+
 const BASE = '/api'
 
-export async function getMatchup(veganOnly = false): Promise<{ left: Lunch; right: Lunch } | null> {
+export async function getMatchup(veganOnly = false): Promise<Matchup | null> {
   const res = await fetch(`${BASE}/matchup${veganOnly ? '?vegan=true' : ''}`)
   if (res.status === 204) return null
   if (!res.ok) throw new Error(`Matchup fetch failed: ${res.status}`)

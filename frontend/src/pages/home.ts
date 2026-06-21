@@ -426,7 +426,7 @@ export function renderHome(
     content.appendChild(renderHowItWorks())
 
     addKeyboardShortcuts()
-    nextMatchupPromise = getMatchup(isVeganMode())
+    nextMatchupPromise = getMatchup(isVeganMode()).catch(() => null)
   }
 
   load(undefined)

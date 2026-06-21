@@ -40,6 +40,10 @@ function projectOutcome(
   }
 }
 
+function rankWithHeadToHead(rankRow: RankRow | null, score: number, otherScore: number): number {
+  return (rankRow?.rank ?? 1) + (otherScore > score ? 1 : 0)
+}
+
 matchup.get('/', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
@@ -62,13 +66,18 @@ matchup.get('/', async (c) => {
   const leftWin = projectOutcome(pair[0], pair[1], 'A_WIN')
   const rightWin = projectOutcome(pair[0], pair[1], 'B_WIN')
   const tie = projectOutcome(pair[0], pair[1], 'DRAW')
+  const [leftId, rightId] = [pair[0].id, pair[1].id]
 
   const [leftRankRow, rightRankRow] = await Promise.all([
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(pair[0].conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, pair[0].conservative_rating)
       .first<RankRow>(),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(pair[1].conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, pair[1].conservative_rating)
       .first<RankRow>(),
   ])
   const [
@@ -79,48 +88,113 @@ matchup.get('/', async (c) => {
     tieLeftRank,
     tieRightRank,
   ] = await Promise.all([
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(leftWin.left.conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, leftWin.left.conservative_rating)
       .first<RankRow>(),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(leftWin.right.conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, leftWin.right.conservative_rating)
       .first<RankRow>(),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(rightWin.left.conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, rightWin.left.conservative_rating)
       .first<RankRow>(),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(rightWin.right.conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, rightWin.right.conservative_rating)
       .first<RankRow>(),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(tie.left.conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, tie.left.conservative_rating)
       .first<RankRow>(),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
-      .bind(tie.right.conservative_rating)
+    c.env.DB.prepare(
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+    )
+      .bind(leftId, rightId, tie.right.conservative_rating)
       .first<RankRow>(),
   ])
+
+  const leftRank = rankWithHeadToHead(
+    leftRankRow,
+    pair[0].conservative_rating,
+    pair[1].conservative_rating
+  )
+  const rightRank = rankWithHeadToHead(
+    rightRankRow,
+    pair[1].conservative_rating,
+    pair[0].conservative_rating
+  )
 
   return c.json(
     {
       left: {
         ...lunchFromRow(pair[0], baseUrl),
-        rank: leftRankRow?.rank ?? 1,
+        rank: leftRank,
       },
       right: {
         ...lunchFromRow(pair[1], baseUrl),
-        rank: rightRankRow?.rank ?? 1,
+        rank: rightRank,
       },
       projected: {
         left_win: {
-          left: { ...leftWin.left, rank: leftWinLeftRank?.rank ?? 1 },
-          right: { ...leftWin.right, rank: leftWinRightRank?.rank ?? 1 },
+          left: {
+            ...leftWin.left,
+            rank: rankWithHeadToHead(
+              leftWinLeftRank,
+              leftWin.left.conservative_rating,
+              leftWin.right.conservative_rating
+            ),
+          },
+          right: {
+            ...leftWin.right,
+            rank: rankWithHeadToHead(
+              leftWinRightRank,
+              leftWin.right.conservative_rating,
+              leftWin.left.conservative_rating
+            ),
+          },
         },
         right_win: {
-          left: { ...rightWin.left, rank: rightWinLeftRank?.rank ?? 1 },
-          right: { ...rightWin.right, rank: rightWinRightRank?.rank ?? 1 },
+          left: {
+            ...rightWin.left,
+            rank: rankWithHeadToHead(
+              rightWinLeftRank,
+              rightWin.left.conservative_rating,
+              rightWin.right.conservative_rating
+            ),
+          },
+          right: {
+            ...rightWin.right,
+            rank: rankWithHeadToHead(
+              rightWinRightRank,
+              rightWin.right.conservative_rating,
+              rightWin.left.conservative_rating
+            ),
+          },
         },
         tie: {
-          left: { ...tie.left, rank: tieLeftRank?.rank ?? 1 },
-          right: { ...tie.right, rank: tieRightRank?.rank ?? 1 },
+          left: {
+            ...tie.left,
+            rank: rankWithHeadToHead(
+              tieLeftRank,
+              tie.left.conservative_rating,
+              tie.right.conservative_rating
+            ),
+          },
+          right: {
+            ...tie.right,
+            rank: rankWithHeadToHead(
+              tieRightRank,
+              tie.right.conservative_rating,
+              tie.left.conservative_rating
+            ),
+          },
         },
       },
     },

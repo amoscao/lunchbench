@@ -6,6 +6,10 @@ import type { LunchRow } from '../types'
 
 const matchup = new Hono<{ Bindings: Bindings }>()
 
+type RankRow = {
+  rank: number
+}
+
 matchup.get('/', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
@@ -25,10 +29,25 @@ matchup.get('/', async (c) => {
   if (!pair) return c.body(null, 204, { 'Cache-Control': 'no-store' })
 
   const baseUrl = new URL(c.req.url).origin
+  const [leftRankRow, rightRankRow] = await Promise.all([
+    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
+      .bind(pair[0].conservative_rating)
+      .first<RankRow>(),
+    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
+      .bind(pair[1].conservative_rating)
+      .first<RankRow>(),
+  ])
+
   return c.json(
     {
-      left: lunchFromRow(pair[0], baseUrl),
-      right: lunchFromRow(pair[1], baseUrl),
+      left: {
+        ...lunchFromRow(pair[0], baseUrl),
+        rank: leftRankRow?.rank ?? 1,
+      },
+      right: {
+        ...lunchFromRow(pair[1], baseUrl),
+        rank: rightRankRow?.rank ?? 1,
+      },
     },
     200,
     { 'Cache-Control': 'no-store' }

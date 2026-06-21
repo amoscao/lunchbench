@@ -18,7 +18,6 @@ export function renderAdd(container: HTMLElement): void {
 
   const alertEl = document.createElement('div')
   alertEl.style.display = 'none'
-  content.appendChild(alertEl)
 
   function showAlert(msg: string, type: 'success' | 'error'): void {
     alertEl.className = `alert alert-${type}`
@@ -164,6 +163,7 @@ export function renderAdd(container: HTMLElement): void {
       formContainer.appendChild(uploadGroup)
       formContainer.appendChild(tokenGroup)
       formContainer.appendChild(submitBtn)
+      formContainer.appendChild(alertEl)
 
       submitBtn.addEventListener('click', async () => {
         const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
@@ -327,6 +327,7 @@ export function renderAdd(container: HTMLElement): void {
     formContainer.appendChild(uploadGroup)
     formContainer.appendChild(tokenGroup)
     formContainer.appendChild(submitBtn)
+    formContainer.appendChild(alertEl)
 
     submitBtn.addEventListener('click', async () => {
       const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()

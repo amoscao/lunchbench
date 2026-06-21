@@ -1235,6 +1235,7 @@ img {
 
   /* Cards stay side-by-side but switch to horizontal thumbnail layout */
   .vote-arena {
+    flex-direction: row;
     gap: var(--space-3);
     align-items: stretch;
   }
@@ -1336,7 +1337,7 @@ img {
   }
 }
 
-@media (max-width: 480px) and (pointer: coarse) {
+@media (max-width: 480px) and (pointer: coarse) and (orientation: portrait) {
   .vote-arena .vote-card-label {
     min-height: 48px;
     padding: 0 var(--space-4);
@@ -1720,7 +1721,7 @@ img {
   display: none;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
   .vote-result-overlay {
     display: none;
   }

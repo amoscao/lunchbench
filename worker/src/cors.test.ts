@@ -70,7 +70,7 @@ describe('CORS', () => {
   test('does not allow arbitrary origins on vote routes', async () => {
     const res = await preflight('/api/vote', 'https://evil.example')
 
-    expect(res.status).toBe(204)
+    expect(res.status).toBe(403)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 
@@ -102,7 +102,7 @@ describe('CORS', () => {
   test('does not allow arbitrary lunchbench.xyz subdomains', async () => {
     const res = await preflight('/api/vote', 'https://attacker.lunchbench.xyz')
 
-    expect(res.status).toBe(204)
+    expect(res.status).toBe(403)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 })

@@ -47,6 +47,13 @@ describe('CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173')
   })
 
+  test('allows Docker E2E frontend origin', async () => {
+    const res = await preflight('/api/vote', 'http://frontend:5173')
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://frontend:5173')
+  })
+
   test('does not allow arbitrary origins on vote routes', async () => {
     const res = await preflight('/api/vote', 'https://evil.example')
 

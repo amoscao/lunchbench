@@ -30,6 +30,8 @@ jobs:
 
       - name: Build frontend
         run: pnpm --filter lunchbench-frontend build
+        env:
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
 
       - name: Deploy Worker
         run: pnpm --filter lunchbench-api exec wrangler deploy

@@ -289,14 +289,6 @@ export function renderHome(
     try {
       await Promise.all([delay, votePromise])
 
-      // Fade out the arena, then load next matchup
-      const arena = document.querySelector<HTMLElement>('.vote-arena')
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (arena && !reducedMotion) {
-        arena.classList.add('fading-out')
-        await new Promise<void>((r) => setTimeout(r, 260))
-      }
-
       let next: Matchup | null
       try {
         next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
@@ -341,13 +333,12 @@ export function renderHome(
   }
 
   async function load(matchup?: Matchup | null): Promise<void> {
-    container.innerHTML = ''
-    const content = document.createElement('div')
-    content.className = 'page-content'
-    container.appendChild(content)
-
     if (matchup === undefined) {
       // Initial load - show skeleton.
+      container.innerHTML = ''
+      const content = document.createElement('div')
+      content.className = 'page-content'
+      container.appendChild(content)
       content.appendChild(renderSkeleton())
       try {
         const data = await getMatchup(isVeganMode())
@@ -359,10 +350,14 @@ export function renderHome(
       return
     }
 
+    const content = document.createElement('div')
+    content.className = 'page-content'
+
     if (!matchup) {
       currentMatchup = null
       nextMatchupPromise = null
       content.appendChild(renderEmpty(navigate, isVeganMode()))
+      container.replaceChildren(content)
       return
     }
 
@@ -376,6 +371,7 @@ export function renderHome(
       currentMatchup = null
       nextMatchupPromise = null
       content.appendChild(renderEmpty(navigate, isVeganMode()))
+      container.replaceChildren(content)
       return
     }
     markSeen(displayMatchup.left.id, displayMatchup.right.id)
@@ -393,7 +389,6 @@ export function renderHome(
     arena.appendChild(vs)
     arena.appendChild(renderCard(rightLunch, 'DISH B'))
     const reducedMotionFadeIn = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!reducedMotionFadeIn) arena.classList.add('fading-in')
     content.appendChild(arena)
 
     const gradientBar = document.createElement('div')
@@ -424,6 +419,9 @@ export function renderHome(
     arenaCards[1]?.addEventListener('click', () => { if (!isSubmitting) hintPulse(right.button) })
     content.appendChild(voteRow)
     content.appendChild(renderHowItWorks())
+
+    container.replaceChildren(content)
+    if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
     nextMatchupPromise = getMatchup(isVeganMode()).catch(() => null)

@@ -650,6 +650,7 @@ img {
 
 .vote-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: center;
   margin-top: var(--space-4);
@@ -682,6 +683,7 @@ img {
 
 .vote-buttons .btn {
   min-width: 140px;
+  min-height: 44px;
 }
 
 /* Vote feedback: faded buttons after voting */
@@ -1191,7 +1193,7 @@ img {
   }
 
   .vote-button-wrap {
-    flex: 1;
+    flex: 1 1 calc(50% - var(--space-2));
   }
 
   .vote-buttons .btn {

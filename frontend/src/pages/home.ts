@@ -39,7 +39,7 @@ function renderHowItWorks(): HTMLElement {
     <div class="hiw-step">
       <span class="hiw-num">01</span>
       <h3 class="hiw-title">Vote</h3>
-      <p class="hiw-desc">Two lunch dishes go head to head. Pick the one you'd rather eat or call it a tie.</p>
+      <p class="hiw-desc">Two lunch dishes go head to head. Pick one, call it a tie, or skip dishes you haven't eaten.</p>
     </div>
     <div class="hiw-step">
       <span class="hiw-num">02</span>
@@ -310,6 +310,32 @@ export function renderHome(
     }
   }
 
+  const skipMatchup = async (): Promise<void> => {
+    if (isSubmitting || !leftLunch || !rightLunch || !currentMatchup) return
+
+    isSubmitting = true
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.vote-buttons .btn')
+    buttons.forEach((b) => (b.disabled = true))
+
+    const bar = document.querySelector<HTMLDivElement>('.vote-gradient-bar')
+    if (bar) bar.classList.add('loading')
+
+    try {
+      let next: Matchup | null
+      try {
+        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+      } catch {
+        next = await getMatchup(isVeganMode())
+      }
+      await load(next)
+    } catch {
+      if (bar) bar.classList.remove('loading')
+      await load(undefined)
+    } finally {
+      isSubmitting = false
+    }
+  }
+
   const addKeyboardShortcuts = (): void => {
     const handler = (event: KeyboardEvent): void => {
       const active = document.activeElement
@@ -327,6 +353,8 @@ export function renderHome(
         void castVote('tie')
       } else if (event.key === '3') {
         void castVote('right_win')
+      } else if (event.key === '4') {
+        void skipMatchup()
       }
     }
 
@@ -407,10 +435,12 @@ export function renderHome(
     const left = createVoteButton('A wins', '[1]', () => void castVote('left_win'), 'btn-primary')
     const tie = createVoteButton('Tie', '[2]', () => void castVote('tie'), 'btn-secondary')
     const right = createVoteButton('B wins', '[3]', () => void castVote('right_win'), 'btn-primary')
+    const skip = createVoteButton("Haven't Eaten", '[4]', () => void skipMatchup(), 'btn-secondary')
 
     voteRow.appendChild(left.wrapper)
     voteRow.appendChild(tie.wrapper)
     voteRow.appendChild(right.wrapper)
+    voteRow.appendChild(skip.wrapper)
 
     const hintPulse = (btn: HTMLButtonElement): void => {
       btn.classList.remove('btn-hint-pulse')

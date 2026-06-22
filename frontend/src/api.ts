@@ -68,6 +68,7 @@ const BASE = '/api'
 export async function getMatchup(veganOnly = false): Promise<Matchup | null> {
   const res = await fetch(`${BASE}/matchup${veganOnly ? '?vegan=true' : ''}`)
   if (res.status === 204) return null
+  if (res.status === 429) throw new Error('rate_limited')
   if (!res.ok) throw new Error(`Matchup fetch failed: ${res.status}`)
   return res.json()
 }

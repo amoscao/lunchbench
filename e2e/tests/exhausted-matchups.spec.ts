@@ -130,7 +130,10 @@ test.describe('Exhausted matchups', () => {
       timeout: 8000,
     })
     await expect(page.locator('.state-desc')).toContainText('Check back later')
-    await expect(page.locator('.state-center button')).toContainText('leaderboard', { ignoreCase: true })
+
+    // CTA button navigates to the leaderboard
+    await page.locator('.state-center button').click()
+    await expect(page).toHaveURL(/\/leaderboard/, { timeout: 3000 })
 
     // Verify no duplicate pairs were displayed
     const pairKeys = shownPairs.map(({ left, right }) => [left, right].sort().join('|'))
@@ -142,12 +145,11 @@ test.describe('Exhausted matchups', () => {
 
     // Verify all 3 combinations appeared (order-independent)
     for (const [a, b] of FAKE_PAIRS) {
-      const key = [a.name, b.name].sort().join('|')
-      const seen = pairKeys.some((k) => {
-        const parts = k.split('|')
-        return parts.includes(a.name) && parts.includes(b.name)
-      })
-      expect(seen, `Pair "${a.name}" vs "${b.name}" was never shown`).toBe(true)
+      const expectedKey = [a.name, b.name].sort().join('|')
+      expect(
+        uniqueKeys.has(expectedKey),
+        `Pair "${a.name}" vs "${b.name}" was never shown`
+      ).toBe(true)
     }
   })
 })

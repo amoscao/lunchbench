@@ -491,16 +491,14 @@ export function renderHome(
     addKeyboardShortcuts()
     nextMatchupExhausted = false
     nextMatchupPromise = (async (): Promise<Matchup | null> => {
-      let fallback: Matchup | null = null
       for (let i = 0; i < 3; i++) {
         const m = await getMatchup(isVeganMode())
         if (!m) return null
         if (!hasSeen(m.left.id, m.right.id)) return m
-        if (!fallback) fallback = m
       }
       nextMatchupExhausted = true
       return null
-    })().catch(() => null)
+    })()
   }
 
   load(undefined)

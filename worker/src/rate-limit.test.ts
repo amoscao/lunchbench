@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { checkCooldown, checkRateLimit, clearRateLimit } from './rate-limit'
+import {
+  checkCooldown,
+  checkRateLimit,
+  clearRateLimit,
+  incrementRateLimit,
+  peekRateLimit,
+} from './rate-limit'
 
 type RateLimitRow = {
   count: number
@@ -99,6 +105,33 @@ describe('checkRateLimit', () => {
 
     await expect(checkRateLimit(db, 'pair', 'vote_pair', 1, 3600)).resolves.toEqual({
       allowed: true,
+    })
+  })
+
+  test('peeks without incrementing the counter', async () => {
+    vi.setSystemTime(new Date('2026-01-01T00:10:00.000Z'))
+    const db = fakeDb()
+
+    await expect(peekRateLimit(db, 'ip', 'admin_verify', 1, 3600)).resolves.toEqual({
+      allowed: true,
+    })
+    await expect(peekRateLimit(db, 'ip', 'admin_verify', 1, 3600)).resolves.toEqual({
+      allowed: true,
+    })
+    await expect(incrementRateLimit(db, 'ip', 'admin_verify', 1, 3600)).resolves.toEqual({
+      allowed: true,
+    })
+  })
+
+  test('peek blocks the attempt after the failed-attempt quota is spent', async () => {
+    vi.setSystemTime(new Date('2026-01-01T00:10:00.000Z'))
+    const db = fakeDb()
+
+    await incrementRateLimit(db, 'ip', 'admin_verify', 1, 3600)
+
+    await expect(peekRateLimit(db, 'ip', 'admin_verify', 1, 3600)).resolves.toEqual({
+      allowed: false,
+      retryAfter: 3000,
     })
   })
 

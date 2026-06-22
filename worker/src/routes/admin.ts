@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context, Next } from 'hono'
 import type { Bindings, LunchRow } from '../types'
 import { lunchFromRow, validateAdminSession } from '../helpers'
-import { checkRateLimit, getClientIp } from '../rate-limit'
+import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
 
 type AdminEnv = { Bindings: Bindings }
 type SessionRole = 'admin' | 'lunch'
@@ -25,7 +25,7 @@ function constantTimeEquals(a: string, b: string): boolean {
 
 admin.post('/verify', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'admin_verify', 5, 3600)
+  const rl = await peekRateLimit(c.env.DB, ip, 'admin_verify', 5, 3600)
   if (!rl.allowed) {
     return c.json({ error: 'Too many attempts', code: 'RATE_LIMITED' }, 429)
   }
@@ -55,6 +55,7 @@ admin.post('/verify', async (c) => {
   }
 
   if (!role) {
+    await incrementRateLimit(c.env.DB, ip, 'admin_verify', 5, 3600)
     return c.json({ error: 'Invalid password', code: 'UNAUTHORIZED' }, 401)
   }
 

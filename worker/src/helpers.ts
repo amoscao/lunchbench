@@ -22,10 +22,10 @@ export function constantTimeEquals(a: string, b: string): boolean {
   return diff === 0
 }
 
-export function lunchFromRow(row: LunchRow, baseUrl: string): Lunch {
+export function lunchFromRow(row: LunchRow): Lunch {
   return {
     ...row,
-    image_url: row.image_key ? `${baseUrl}/api/images/${row.image_key}` : null,
+    image_url: row.image_key ? `/api/images/${row.image_key}` : null,
     glicko_rd: row.glicko_rd,
     glicko_volatility: row.glicko_volatility,
     conservative_rating: row.conservative_rating,

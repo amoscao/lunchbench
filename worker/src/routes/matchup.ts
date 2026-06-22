@@ -73,7 +73,6 @@ matchup.get('/', async (c) => {
   const pair = selectMatchup(allLunches.results, recentPairs)
   if (!pair) return c.body(null, 204, { 'Cache-Control': 'no-store' })
 
-  const baseUrl = new URL(c.req.url).origin
   const leftWin = projectOutcome(pair[0], pair[1], 'A_WIN')
   const rightWin = projectOutcome(pair[0], pair[1], 'B_WIN')
   const tie = projectOutcome(pair[0], pair[1], 'DRAW')
@@ -145,11 +144,11 @@ matchup.get('/', async (c) => {
   return c.json(
     {
       left: {
-        ...lunchFromRow(pair[0], baseUrl),
+        ...lunchFromRow(pair[0]),
         rank: leftRank,
       },
       right: {
-        ...lunchFromRow(pair[1], baseUrl),
+        ...lunchFromRow(pair[1]),
         rank: rightRank,
       },
       projected: {

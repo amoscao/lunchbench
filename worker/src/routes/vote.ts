@@ -279,7 +279,6 @@ vote.post('/', async (c) => {
   )
 
   const nextPair = selectMatchup(allLunches.results, recentPairs)
-  const baseUrl = new URL(c.req.url).origin
   const next = nextPair
     ? await Promise.all([
         c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE conservative_rating > ?')
@@ -290,11 +289,11 @@ vote.post('/', async (c) => {
           .first<RankRow>(),
       ]).then(([nextLeftRankRow, nextRightRankRow]) => ({
         left: {
-          ...lunchFromRow(nextPair[0], baseUrl),
+          ...lunchFromRow(nextPair[0]),
           rank: nextLeftRankRow?.rank ?? 1,
         },
         right: {
-          ...lunchFromRow(nextPair[1], baseUrl),
+          ...lunchFromRow(nextPair[1]),
           rank: nextRightRankRow?.rank ?? 1,
         },
       }))

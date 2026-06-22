@@ -23,8 +23,7 @@ lunches.get('/', async (c) => {
     ? 'SELECT * FROM lunches WHERE image_key IS NULL ORDER BY name ASC'
     : 'SELECT * FROM lunches ORDER BY name ASC'
   const result = await c.env.DB.prepare(query).all<LunchRow>()
-  const baseUrl = new URL(c.req.url).origin
-  return c.json({ lunches: result.results.map((r) => lunchFromRow(r, baseUrl)) })
+  return c.json({ lunches: result.results.map((r) => lunchFromRow(r)) })
 })
 
 lunches.get('/:id{[0-9]+}', async (c) => {
@@ -37,8 +36,7 @@ lunches.get('/:id{[0-9]+}', async (c) => {
   if (!row) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
 
   const momentum = 0
-  const baseUrl = new URL(c.req.url).origin
-  const lunch = lunchFromRow(row, baseUrl)
+  const lunch = lunchFromRow(row)
   const consistency = computeConsistency(row.wins, row.losses, row.ties)
 
   return c.json(
@@ -76,10 +74,9 @@ lunches.get('/leaderboard', async (c) => {
     : 'SELECT * FROM lunches WHERE is_vegan = 0 ORDER BY conservative_rating DESC, name ASC, id ASC'
   const result = await c.env.DB.prepare(dataQuery).all<LunchRow>()
 
-  const baseUrl = new URL(c.req.url).origin
   const ranked = result.results.map((r, i) => ({
     rank: i + 1,
-    ...lunchFromRow(r, baseUrl),
+    ...lunchFromRow(r),
     confidence: confidenceFromRd(r.glicko_rd),
     consistency: computeConsistency(r.wins, r.losses, r.ties),
     consistency_band: consistencyBand(computeConsistency(r.wins, r.losses, r.ties)),
@@ -153,8 +150,7 @@ lunches.post('/', async (c) => {
     return c.json({ error: 'Failed to create lunch', code: 'INTERNAL_ERROR' }, 500)
   }
 
-  const baseUrl = new URL(c.req.url).origin
-  return c.json({ lunch: lunchFromRow(result, baseUrl) }, 201)
+  return c.json({ lunch: lunchFromRow(result) }, 201)
 })
 
 export { lunches as lunchesRouter }

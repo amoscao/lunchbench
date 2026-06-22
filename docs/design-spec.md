@@ -347,6 +347,20 @@ Max content width: 960px, centered.
 - Vote outcome fade: after voting, cards fade out (`opacity: 0, transition: opacity 0.2s`), then new cards fade in
 - No animations that delay user interaction
 
+### Voting transition timing contract
+
+The loading bar animation is exactly **1.5 s** (`bar-fill 1.5s linear forwards` in CSS; `setTimeout(r, 1500)` in JS). The transition to the next matchup must be **instant** the moment the bar fills — no visible pause.
+
+This requires two conditions to be true simultaneously:
+
+1. **Prefetch resolves before the bar fills.** As soon as a matchup renders, `home.ts` fires `nextMatchupPromise = getMatchup(isVeganMode())` in the background. The user has at least their full matchup-viewing time plus up to 1.5 s of vote time for this fetch to complete. `GET /api/matchup` must return in well under 1.5 s.
+
+2. **`votePromise` resolves before the bar fills.** `castVote` runs `Promise.all([delay, votePromise])`. `delay` is the 1.5 s timer; `votePromise` is the `POST /api/vote` response. If the POST outlasts the timer, the JS transition is blocked even though the CSS bar is already full. `POST /api/vote` must complete in well under 1.5 s.
+
+After `Promise.all` settles, the code does `next = await (nextMatchupPromise ?? getMatchup(...))`. If `nextMatchupPromise` is already resolved, this `await` returns synchronously and the new matchup appears immediately.
+
+**Implication for backend work:** Any sequential D1 round trips added to `POST /api/vote` or `GET /api/matchup` eat directly into this budget. At ~100–150 ms D1 latency per round trip, the vote POST should target **≤ 6 sequential round trips** to stay comfortably under 1.5 s. `GET /api/matchup` should target **≤ 5 sequential round trips**.
+
 ---
 
 ## 13. Implementation Notes for Codex

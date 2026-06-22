@@ -1,9 +1,7 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
-import { lunchFromRow } from '../helpers'
 import { checkCooldown, checkRateLimit, clearRateLimit, getClientIp } from '../rate-limit'
 import { conservativeScore, updateRatingPair } from '../elo'
-import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 
 const vote = new Hono<{ Bindings: Bindings }>()
@@ -13,9 +11,21 @@ export const VOTE_PAIR_COOLDOWN_SECONDS = 24 * 60 * 60
 
 type VoteResult = 'left_win' | 'right_win' | 'tie'
 type VoteWriteResult =
-  | { status: 'ok'; voteId: number }
+  | {
+      status: 'ok'
+      voteId: number
+      isVegan: number
+      leftResult: VoteResultRow
+      rightResult: VoteResultRow
+    }
   | { status: 'not_found' }
+  | { status: 'category_mismatch' }
   | { status: 'conflict' }
+
+type VoteLunchRows = {
+  left: LunchRow | null
+  right: LunchRow | null
+}
 
 function uniqueIsoTimestamp(): string {
   const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0')
@@ -37,23 +47,43 @@ export async function getVotePairRateLimitKey(
   return `vote_pair_${ipHash}_${minId}_${maxId}`
 }
 
+async function getVoteLunchRows(
+  db: D1Database,
+  leftLunchId: number,
+  rightLunchId: number
+): Promise<VoteLunchRows> {
+  const rows = await db.batch<LunchRow>([
+    db.prepare('SELECT * FROM lunches WHERE id = ?').bind(leftLunchId),
+    db.prepare('SELECT * FROM lunches WHERE id = ?').bind(rightLunchId),
+  ])
+
+  return {
+    left: rows[0]?.results?.[0] ?? null,
+    right: rows[1]?.results?.[0] ?? null,
+  }
+}
+
 export async function recordVoteWithRetry(
   db: D1Database,
   left_lunch_id: number,
   right_lunch_id: number,
   result: VoteResult,
-  voterKey: string
+  voterKey: string,
+  initialRows?: { left: LunchRow; right: LunchRow }
 ): Promise<VoteWriteResult> {
   let voteId: number | null = null
+  let okResult: Extract<VoteWriteResult, { status: 'ok' }> | null = null
 
   for (let attempt = 0; attempt < MAX_VOTE_WRITE_ATTEMPTS && voteId === null; attempt++) {
-    const [leftRow, rightRow] = await Promise.all([
-      db.prepare('SELECT * FROM lunches WHERE id = ?').bind(left_lunch_id).first<LunchRow>(),
-      db.prepare('SELECT * FROM lunches WHERE id = ?').bind(right_lunch_id).first<LunchRow>(),
-    ])
+    const { left: leftRow, right: rightRow } = attempt === 0 && initialRows
+      ? initialRows
+      : await getVoteLunchRows(db, left_lunch_id, right_lunch_id)
 
     if (!leftRow || !rightRow) {
       return { status: 'not_found' }
+    }
+    if (leftRow.is_vegan !== rightRow.is_vegan) {
+      return { status: 'category_mismatch' }
     }
 
     const outcome = result === 'left_win' ? 'A_WIN' : result === 'right_win' ? 'B_WIN' : 'DRAW'
@@ -97,6 +127,7 @@ export async function recordVoteWithRetry(
           AND EXISTS (
             SELECT 1 FROM lunches
             WHERE id = ?
+              AND is_vegan = ?
               AND rating = ?
               AND glicko_rd = ?
               AND glicko_volatility = ?
@@ -105,6 +136,7 @@ export async function recordVoteWithRetry(
           AND EXISTS (
             SELECT 1 FROM lunches
             WHERE id = ?
+              AND is_vegan = ?
               AND rating = ?
               AND glicko_rd = ?
               AND glicko_volatility = ?
@@ -122,11 +154,13 @@ export async function recordVoteWithRetry(
         now,
         left_lunch_id, right_lunch_id,
         left_lunch_id,
+        leftRow.is_vegan,
         leftRow.rating,
         leftRow.glicko_rd,
         leftRow.glicko_volatility,
         leftRow.conservative_rating,
         right_lunch_id,
+        rightRow.is_vegan,
         rightRow.rating,
         rightRow.glicko_rd,
         rightRow.glicko_volatility,
@@ -166,9 +200,24 @@ export async function recordVoteWithRetry(
 
     const voteRow = writeResults[1]?.results?.[0] as { id: number } | undefined
     voteId = voteRow?.id ?? null
+    if (voteId !== null) {
+      okResult = {
+        status: 'ok',
+        voteId,
+        isVegan: leftRow.is_vegan,
+        leftResult: {
+          rating: newLeft.rating,
+          conservative_rating: newLeftConservative,
+        },
+        rightResult: {
+          rating: newRight.rating,
+          conservative_rating: newRightConservative,
+        },
+      }
+    }
   }
 
-  return voteId === null ? { status: 'conflict' } : { status: 'ok', voteId }
+  return okResult ?? { status: 'conflict' }
 }
 
 type VoteResultRow = {
@@ -211,18 +260,6 @@ vote.post('/', async (c) => {
     return c.json({ error: 'Lunches must be different', code: 'BAD_REQUEST' }, 400)
   }
 
-  const [leftPreCheck, rightPreCheck] = await Promise.all([
-    c.env.DB.prepare('SELECT is_vegan FROM lunches WHERE id = ?').bind(left_lunch_id).first<{ is_vegan: number }>(),
-    c.env.DB.prepare('SELECT is_vegan FROM lunches WHERE id = ?').bind(right_lunch_id).first<{ is_vegan: number }>(),
-  ])
-  if (!leftPreCheck || !rightPreCheck) {
-    return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
-  }
-  if (leftPreCheck.is_vegan !== rightPreCheck.is_vegan) {
-    return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
-  }
-  const isVegan = leftPreCheck.is_vegan
-
   const rl = await checkRateLimit(c.env.DB, ip, 'vote', VOTE_RATE_LIMIT_PER_HOUR, 3600)
   if (!rl.allowed) {
     return c.json(
@@ -231,6 +268,15 @@ vote.post('/', async (c) => {
       { 'Retry-After': String(rl.retryAfter ?? 3600) }
     )
   }
+
+  const initialRows = await getVoteLunchRows(c.env.DB, left_lunch_id, right_lunch_id)
+  if (!initialRows.left || !initialRows.right) {
+    return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
+  }
+  if (initialRows.left.is_vegan !== initialRows.right.is_vegan) {
+    return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
+  }
+  const isVegan = initialRows.left.is_vegan
 
   const pairRateLimitKey = await getVotePairRateLimitKey(ip, left_lunch_id, right_lunch_id)
   const pairRl = await checkCooldown(
@@ -247,10 +293,21 @@ vote.post('/', async (c) => {
     )
   }
 
-  const writeResult = await recordVoteWithRetry(c.env.DB, left_lunch_id, right_lunch_id, result, ip)
+  const writeResult = await recordVoteWithRetry(
+    c.env.DB,
+    left_lunch_id,
+    right_lunch_id,
+    result,
+    ip,
+    { left: initialRows.left, right: initialRows.right }
+  )
   if (writeResult.status === 'not_found') {
     await clearRateLimit(c.env.DB, pairRateLimitKey, 'vote_pair')
     return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
+  }
+  if (writeResult.status === 'category_mismatch') {
+    await clearRateLimit(c.env.DB, pairRateLimitKey, 'vote_pair')
+    return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
   }
   if (writeResult.status === 'conflict') {
     await clearRateLimit(c.env.DB, pairRateLimitKey, 'vote_pair')
@@ -279,40 +336,6 @@ vote.post('/', async (c) => {
       .first<RankRow>(),
   ])
 
-  // Get next matchup — keep same vegan group as the pair that was just voted on
-  const allLunches = await c.env.DB.prepare(
-    'SELECT * FROM lunches WHERE is_vegan = ?'
-  ).bind(isVegan).all<LunchRow>()
-  const recentVotes = await c.env.DB.prepare(
-    // id DESC makes same-second D1 timestamps deterministic.
-    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
-  ).all<{ left_lunch_id: number; right_lunch_id: number }>()
-
-  const recentPairs: [number, number][] = recentVotes.results.map(
-    (v) => [v.left_lunch_id, v.right_lunch_id]
-  )
-
-  const nextPair = selectMatchup(allLunches.results, recentPairs)
-  const next = nextPair
-    ? await Promise.all([
-        c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
-          .bind(isVegan, nextPair[0].conservative_rating)
-          .first<RankRow>(),
-        c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
-          .bind(isVegan, nextPair[1].conservative_rating)
-          .first<RankRow>(),
-      ]).then(([nextLeftRankRow, nextRightRankRow]) => ({
-        left: {
-          ...lunchFromRow(nextPair[0]),
-          rank: nextLeftRankRow?.rank ?? 1,
-        },
-        right: {
-          ...lunchFromRow(nextPair[1]),
-          rank: nextRightRankRow?.rank ?? 1,
-        },
-      }))
-    : null
-
   return c.json({
     vote_id: writeResult.voteId,
     left_result: {
@@ -325,7 +348,6 @@ vote.post('/', async (c) => {
       conservative_rating: rightResultRow.conservative_rating,
       rank: rightRankRow?.rank ?? 1,
     },
-    next,
   })
 })
 

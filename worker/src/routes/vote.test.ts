@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { voteRouter } from './vote'
+import { VOTE_RATE_LIMIT_PER_HOUR, voteRouter } from './vote'
 import type { Bindings, LunchRow } from '../types'
 
 function lunchRow(id: number, isVegan: number): LunchRow {
@@ -34,6 +34,10 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
     prepare(sql: string) {
       let bound: unknown[] = []
       const self = {
+        sql,
+        get bound() {
+          return bound
+        },
         bind(...args: unknown[]) {
           bound = args
           return self
@@ -51,6 +55,17 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
           return { success: true, meta: { changes: 1 } }
         },
         async first() {
+          if (sql.includes('INSERT INTO rate_limits')) {
+            const [key, action, windowStart] = bound as [string, string, string]
+            const rowKey = `${key}:${action}`
+            const existing = rateLimits.get(rowKey)
+            const row = {
+              count: existing?.window_start === windowStart ? existing.count + 1 : 1,
+              window_start: windowStart,
+            }
+            rateLimits.set(rowKey, row)
+            return row
+          }
           if (sql.includes('rate_limits') || sql.includes('cooldown')) {
             const [key, action] = bound as [string, string]
             return rateLimits.get(`${key}:${action}`) ?? null
@@ -72,16 +87,27 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
       }
       return self
     },
-    batch: async () => [],
+    batch: async (statements: Array<{ sql: string; bound: unknown[] }>) => {
+      if (statements.every((statement) => statement.sql.includes('SELECT * FROM lunches'))) {
+        return statements.map((statement) => {
+          const [id] = statement.bound as [number]
+          const row = rows.find((r) => r.id === id)
+          return { results: row ? [row] : [] }
+        })
+      }
+      return []
+    },
   } as unknown as D1Database
 }
 
-const env: Bindings = {
-  DB: fakeDb(),
-  IMAGES: undefined,
-  VOTE_PASSWORD: 'test-vote-token',
-  ADMIN_MANAGER_PASSWORD: 'test-admin-password',
-  SENTRY_DSN: '',
+function testEnv(rows: LunchRow[] = ROWS): Bindings {
+  return {
+    DB: fakeDb(rows),
+    IMAGES: undefined,
+    VOTE_PASSWORD: 'test-vote-token',
+    ADMIN_MANAGER_PASSWORD: 'test-admin-password',
+    SENTRY_DSN: '',
+  }
 }
 
 function voteBody(leftId: number, rightId: number) {
@@ -94,6 +120,7 @@ function voteBody(leftId: number, rightId: number) {
 
 describe('POST /api/vote vegan category enforcement', () => {
   test('rejects vote between vegan and non-vegan lunch', async () => {
+    const env = testEnv()
     const res = await voteRouter.request('/', voteBody(1, 3), env)
     expect(res.status).toBe(400)
     const data = await res.json() as { code: string }
@@ -101,12 +128,28 @@ describe('POST /api/vote vegan category enforcement', () => {
   })
 
   test('rejects vote where left lunch does not exist', async () => {
+    const env = testEnv()
     const res = await voteRouter.request('/', voteBody(99, 1), env)
     expect(res.status).toBe(404)
   })
 
   test('rejects vote where right lunch does not exist', async () => {
+    const env = testEnv()
     const res = await voteRouter.request('/', voteBody(1, 99), env)
     expect(res.status).toBe(404)
+  })
+
+  test('rate limits repeated votes with missing lunch IDs', async () => {
+    const env = testEnv()
+
+    for (let i = 0; i < VOTE_RATE_LIMIT_PER_HOUR; i++) {
+      const res = await voteRouter.request('/', voteBody(99, 1), env)
+      expect(res.status).toBe(404)
+    }
+
+    const res = await voteRouter.request('/', voteBody(99, 1), env)
+    expect(res.status).toBe(429)
+    const data = await res.json() as { code: string }
+    expect(data.code).toBe('RATE_LIMITED')
   })
 })

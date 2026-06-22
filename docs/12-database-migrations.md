@@ -26,6 +26,8 @@ Current files include:
 - `0004_admin_sessions.sql`
 - `0005_glicko.sql`
 - `0006_glicko_defaults.sql`
+- `0007_session_roles.sql`
+- `0008_vegan_leaderboard_index.sql`
 - `seed.sql`
 
 `0006_glicko_defaults.sql` repairs the schema defaults for new lunches, resets invalid-only self-match histories to the unrated Glicko baseline, drops copied self-match votes, and shifts obvious valid old-default `1000` starts onto the `1500` scale. It does not replay mixed historical Glicko games. Exact historical replay requires an explicitly approved repair command because the Glicko update is application logic, not SQL.

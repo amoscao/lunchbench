@@ -482,11 +482,11 @@ export function renderHome(
     addKeyboardShortcuts()
     nextMatchupPromise = (async (): Promise<Matchup | null> => {
       for (let i = 0; i < 10; i++) {
-        const m = await getMatchup(isVeganMode()).catch(() => null)
+        const m = await getMatchup(isVeganMode())
         if (!m) return null
         if (!hasSeen(m.left.id, m.right.id)) return m
       }
-      return null
+      throw new Error('prefetch_seen_matchups_exhausted')
     })()
   }
 

@@ -415,12 +415,7 @@ export function renderHome(
       return
     }
 
-    let displayMatchup: Matchup | null = matchup
-    let retries = 0
-    while (displayMatchup && hasSeen(displayMatchup.left.id, displayMatchup.right.id) && retries < 10) {
-      displayMatchup = await getMatchup(isVeganMode())
-      retries++
-    }
+    const displayMatchup: Matchup | null = matchup
     if (!displayMatchup) {
       currentMatchup = null
       nextMatchupPromise = null
@@ -481,12 +476,14 @@ export function renderHome(
 
     addKeyboardShortcuts()
     nextMatchupPromise = (async (): Promise<Matchup | null> => {
-      for (let i = 0; i < 10; i++) {
+      let fallback: Matchup | null = null
+      for (let i = 0; i < 3; i++) {
         const m = await getMatchup(isVeganMode())
         if (!m) return null
         if (!hasSeen(m.left.id, m.right.id)) return m
+        if (!fallback) fallback = m
       }
-      throw new Error('prefetch_seen_matchups_exhausted')
+      return fallback
     })()
   }
 

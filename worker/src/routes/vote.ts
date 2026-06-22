@@ -174,6 +174,7 @@ export async function recordVoteWithRetry(
 type VoteResultRow = {
   rating: number
   conservative_rating: number
+  is_vegan: number
 }
 
 type RankRow = {
@@ -246,10 +247,10 @@ vote.post('/', async (c) => {
   }
 
   const [leftResultRow, rightResultRow] = await Promise.all([
-    c.env.DB.prepare('SELECT rating, conservative_rating FROM lunches WHERE id = ?')
+    c.env.DB.prepare('SELECT rating, conservative_rating, is_vegan FROM lunches WHERE id = ?')
       .bind(left_lunch_id)
       .first<VoteResultRow>(),
-    c.env.DB.prepare('SELECT rating, conservative_rating FROM lunches WHERE id = ?')
+    c.env.DB.prepare('SELECT rating, conservative_rating, is_vegan FROM lunches WHERE id = ?')
       .bind(right_lunch_id)
       .first<VoteResultRow>(),
   ])
@@ -267,8 +268,11 @@ vote.post('/', async (c) => {
       .first<RankRow>(),
   ])
 
-  // Get next matchup
-  const allLunches = await c.env.DB.prepare('SELECT * FROM lunches').all<LunchRow>()
+  // Get next matchup — keep same vegan group as the pair that was just voted on
+  const isVegan = leftResultRow.is_vegan
+  const allLunches = await c.env.DB.prepare(
+    'SELECT * FROM lunches WHERE is_vegan = ?'
+  ).bind(isVegan).all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
     // id DESC makes same-second D1 timestamps deterministic.
     'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'

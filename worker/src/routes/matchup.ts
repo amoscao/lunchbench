@@ -59,7 +59,7 @@ matchup.get('/', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
     ? 'SELECT * FROM lunches WHERE is_vegan = 1'
-    : 'SELECT * FROM lunches'
+    : 'SELECT * FROM lunches WHERE is_vegan = 0'
   const allLunches = await c.env.DB.prepare(query).all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
     // id DESC makes same-second D1 timestamps deterministic.

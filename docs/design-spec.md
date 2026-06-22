@@ -308,6 +308,19 @@ Centered in the page content area, vertical flex, gap 16px.
 - Subtext: `--text-base`, `--text-muted`
 - CTA button: primary button style linking to /add
 
+### Exhausted matchups state
+
+Shown when the user has seen every available pair (seen-pairs localStorage set covers all combinations in the current lunch pool). Replaces the vote arena — navigation and other UI remain intact.
+
+- Icon: 🎉 or ✅ (celebratory, not an error)
+- Heading: "You've seen them all!"
+- Subtext: "New matchups may appear as lunches are added. Check back later."
+- CTA: secondary button linking to `/leaderboard` — "See the leaderboard"
+
+**Detection**: the prefetch IIFE in `home.ts` tries up to 3 `GET /api/matchup` calls. If every returned pair is in the seen-pairs set, exhaustion is declared and this state is rendered instead of a seen pair.
+
+**Reset**: no explicit user action needed. When new lunches are added (expanding the pair pool beyond what localStorage covers), unseen pairs will appear naturally on the next visit.
+
 ---
 
 ## 10. Error States

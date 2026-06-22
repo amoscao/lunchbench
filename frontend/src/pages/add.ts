@@ -331,19 +331,24 @@ export function renderAdd(container: HTMLElement): void {
     formContainer.appendChild(alertEl)
 
     submitBtn.addEventListener('click', async () => {
-        const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
-        if (!token) { showAlert('Password is required.', 'error'); return }
+      const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
+      if (!token) { showAlert('Password is required.', 'error'); return }
       if (!selectedExistingId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
       if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
       submitBtn.disabled = true
       submitBtn.textContent = 'Uploading…'
       try {
         const sessionToken = await verifyAdminToken(token)
-        await uploadImage(selectedExistingId, selectedFile, sessionToken)
+        const upload = await uploadImage(selectedExistingId, selectedFile, sessionToken)
+        imagelessLunches = imagelessLunches.filter((lunch) => lunch.id !== selectedExistingId)
+        selectedExistingId = null
         selectedFile = null
-        imagePreview.style.display = 'none'
+        searchInput.value = ''
+        imagePreview.src = upload.image_url
+        imagePreview.style.display = 'block'
+        uploadArea.querySelector('p')!.textContent = 'Uploaded image'
+        renderDropdown('')
         showAlert('Image uploaded!', 'success')
-        await renderForm()
       } catch (e: unknown) {
         showAlert((e as Error).message ?? 'Upload failed.', 'error')
       } finally {

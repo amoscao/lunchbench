@@ -61,6 +61,7 @@ export async function validateAdminSession(
   const token = auth.slice(7)
 
   const session = await findMatchingAdminSession(db, token)
+
   if (!session) return false
   if (new Date(session.expires_at) <= new Date()) return false
 

@@ -121,6 +121,22 @@ function renderError(retry: () => void): HTMLElement {
   return div
 }
 
+function renderRateLimit(retry: () => void): HTMLElement {
+  const div = document.createElement('div')
+  div.className = 'state-center'
+  div.innerHTML = `
+    <div class="error-icon-wrap">⚠</div>
+    <div class="state-title">Too many requests</div>
+    <div class="state-desc">You've loaded too many matchups. Wait a minute and try again.</div>
+  `
+  const btn = document.createElement('button')
+  btn.className = 'btn btn-secondary'
+  btn.textContent = 'Retry'
+  btn.addEventListener('click', retry)
+  div.appendChild(btn)
+  return div
+}
+
 function showVoteOverlay(
   card: HTMLElement,
   lunch: Lunch,
@@ -377,9 +393,13 @@ export function renderHome(
       try {
         const data = await getMatchup(isVeganMode())
         await load(data)
-      } catch {
+      } catch (error) {
         content.innerHTML = ''
-        content.appendChild(renderError(() => load(undefined)))
+        if (error instanceof Error && error.message === 'rate_limited') {
+          content.appendChild(renderRateLimit(() => load(undefined)))
+        } else {
+          content.appendChild(renderError(() => load(undefined)))
+        }
       }
       return
     }

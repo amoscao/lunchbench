@@ -270,7 +270,7 @@ Cache-Control: public, max-age=31536000, immutable
 | Route | Limit | Window | Key |
 |-------|-------|--------|-----|
 | GET /api/lunches | 120 | 1 hour | IP |
-| GET /api/matchup | 120 | 1 hour | IP |
+| GET /api/matchup | 2000 | 1 hour | IP |
 | GET /api/lunches/leaderboard | 60 | 1 hour | IP |
 | POST /api/vote | 30 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |

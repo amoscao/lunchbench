@@ -47,7 +47,7 @@ function rankWithHeadToHead(rankRow: RankRow | null, score: number, otherScore: 
 
 matchup.get('/', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'matchup', 120, 3600)
+  const rl = await checkRateLimit(c.env.DB, ip, 'matchup', 2000, 3600)
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },

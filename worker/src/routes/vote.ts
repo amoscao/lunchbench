@@ -1,9 +1,7 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
-import { lunchFromRow } from '../helpers'
 import { checkCooldown, checkRateLimit, clearRateLimit, getClientIp } from '../rate-limit'
 import { conservativeScore, updateRatingPair } from '../elo'
-import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 
 const vote = new Hono<{ Bindings: Bindings }>()
@@ -338,40 +336,6 @@ vote.post('/', async (c) => {
       .first<RankRow>(),
   ])
 
-  // Get next matchup — keep same vegan group as the pair that was just voted on
-  const allLunches = await c.env.DB.prepare(
-    'SELECT * FROM lunches WHERE is_vegan = ?'
-  ).bind(isVegan).all<LunchRow>()
-  const recentVotes = await c.env.DB.prepare(
-    // id DESC makes same-second D1 timestamps deterministic.
-    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
-  ).all<{ left_lunch_id: number; right_lunch_id: number }>()
-
-  const recentPairs: [number, number][] = recentVotes.results.map(
-    (v) => [v.left_lunch_id, v.right_lunch_id]
-  )
-
-  const nextPair = selectMatchup(allLunches.results, recentPairs)
-  const next = nextPair
-    ? await Promise.all([
-        c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
-          .bind(isVegan, nextPair[0].conservative_rating)
-          .first<RankRow>(),
-        c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
-          .bind(isVegan, nextPair[1].conservative_rating)
-          .first<RankRow>(),
-      ]).then(([nextLeftRankRow, nextRightRankRow]) => ({
-        left: {
-          ...lunchFromRow(nextPair[0]),
-          rank: nextLeftRankRow?.rank ?? 1,
-        },
-        right: {
-          ...lunchFromRow(nextPair[1]),
-          rank: nextRightRankRow?.rank ?? 1,
-        },
-      }))
-    : null
-
   return c.json({
     vote_id: writeResult.voteId,
     left_result: {
@@ -384,7 +348,6 @@ vote.post('/', async (c) => {
       conservative_rating: rightResultRow.conservative_rating,
       rank: rightRankRow?.rank ?? 1,
     },
-    next,
   })
 })
 

@@ -109,6 +109,7 @@ Returns non-vegan lunches sorted by `conservative_rating` descending, then `name
 ### GET /api/matchup
 Returns two selected lunches for voting.
 Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
+The opponent pool is limited to lunches with the same `is_vegan` value as the selected anchor lunch; if that group has fewer than 2 lunches, the endpoint returns 204.
 Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_rating`.
 
 **Response 200:**

@@ -480,7 +480,14 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
-    nextMatchupPromise = getMatchup(isVeganMode()).catch(() => null)
+    nextMatchupPromise = (async (): Promise<Matchup | null> => {
+      for (let i = 0; i < 10; i++) {
+        const m = await getMatchup(isVeganMode()).catch(() => null)
+        if (!m) return null
+        if (!hasSeen(m.left.id, m.right.id)) return m
+      }
+      return null
+    })()
   }
 
   load(undefined)

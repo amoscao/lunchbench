@@ -2,6 +2,7 @@ export type LunchForMatchup = {
   id: number
   rating: number
   glicko_rd: number
+  is_vegan?: number
   [key: string]: unknown
 }
 
@@ -21,11 +22,15 @@ export function selectMatchup<T extends LunchForMatchup>(
     lunches.some((other) => other.id !== lunch.id && !recentSet.has(pairKey(lunch.id, other.id)))
   )
   const anchor = weightedByRd(anchorPool.length > 0 ? anchorPool : lunches)
-  const opponentPool = lunches.filter((lunch) =>
-    lunch.id !== anchor.id && (
-      anchorPool.length === 0 || !recentSet.has(pairKey(anchor.id, lunch.id))
-    )
+  const sameGroup = lunches.filter((lunch) => sameVeganGroup(anchor, lunch))
+  if (sameGroup.length < 2) return null
+
+  const nonRecentOpponentPool = sameGroup.filter((lunch) =>
+    lunch.id !== anchor.id && !recentSet.has(pairKey(anchor.id, lunch.id))
   )
+  const opponentPool = nonRecentOpponentPool.length > 0
+    ? nonRecentOpponentPool
+    : sameGroup.filter((lunch) => lunch.id !== anchor.id)
   const opponent = closestRated(anchor, opponentPool)
   const pair: [T, T] = [anchor, opponent]
 
@@ -56,4 +61,8 @@ function closestRated<T extends LunchForMatchup>(anchor: T, lunches: T[]): T {
 function pairKey(a: number, b: number): string {
   const [lo, hi] = a < b ? [a, b] : [b, a]
   return `${lo}:${hi}`
+}
+
+function sameVeganGroup(a: LunchForMatchup, b: LunchForMatchup): boolean {
+  return a.is_vegan === undefined || b.is_vegan === undefined || a.is_vegan === b.is_vegan
 }

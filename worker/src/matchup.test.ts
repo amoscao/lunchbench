@@ -85,6 +85,32 @@ describe('selectMatchup', () => {
     expect(result.map((lunch) => lunch.id)).toEqual([1, 3])
   })
 
+  it('only pairs lunches from the same vegan group', () => {
+    const lunches = [
+      { id: 1, name: 'Vegan anchor', is_vegan: 1, rating: 1500, glicko_rd: 100 },
+      { id: 2, name: 'Closest non-vegan', is_vegan: 0, rating: 1510, glicko_rd: 100 },
+      { id: 3, name: 'Closest vegan', is_vegan: 1, rating: 1550, glicko_rd: 100 },
+    ]
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
+
+    const result = selectMatchup(lunches, [])!
+
+    expect(result.map((lunch) => lunch.id)).toEqual([1, 3])
+  })
+
+  it('returns null when the selected anchor has no same-group opponent', () => {
+    const lunches = [
+      { id: 1, name: 'Only vegan', is_vegan: 1, rating: 1500, glicko_rd: 100 },
+      { id: 2, name: 'Non-vegan 1', is_vegan: 0, rating: 1510, glicko_rd: 100 },
+      { id: 3, name: 'Non-vegan 2', is_vegan: 0, rating: 1520, glicko_rd: 100 },
+    ]
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0)
+
+    expect(selectMatchup(lunches, [])).toBeNull()
+  })
+
   it('randomly swaps left and right sides', () => {
     const lunches = makeLunches(2)
     vi.spyOn(Math, 'random')

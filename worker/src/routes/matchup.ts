@@ -47,7 +47,18 @@ function rankWithHeadToHead(rankRow: RankRow | null, score: number, otherScore: 
 
 matchup.get('/', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'matchup', 2000, 3600)
+  const veganOnly = c.req.query('vegan') === 'true'
+  const query = veganOnly
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1'
+    : 'SELECT * FROM lunches WHERE is_vegan = 0'
+  const [rl, allLunches, recentVotes] = await Promise.all([
+    checkRateLimit(c.env.DB, ip, 'matchup', 2000, 3600),
+    c.env.DB.prepare(query).all<LunchRow>(),
+    c.env.DB.prepare(
+      // id DESC makes same-second D1 timestamps deterministic.
+      'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
+    ).all<{ left_lunch_id: number; right_lunch_id: number }>(),
+  ])
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
@@ -55,16 +66,6 @@ matchup.get('/', async (c) => {
       { 'Retry-After': String(rl.retryAfter ?? 3600) }
     )
   }
-
-  const veganOnly = c.req.query('vegan') === 'true'
-  const query = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1'
-    : 'SELECT * FROM lunches WHERE is_vegan = 0'
-  const allLunches = await c.env.DB.prepare(query).all<LunchRow>()
-  const recentVotes = await c.env.DB.prepare(
-    // id DESC makes same-second D1 timestamps deterministic.
-    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
-  ).all<{ left_lunch_id: number; right_lunch_id: number }>()
 
   const recentPairs: [number, number][] = recentVotes.results.map(
     (v) => [v.left_lunch_id, v.right_lunch_id]
@@ -78,8 +79,16 @@ matchup.get('/', async (c) => {
   const rightWin = projectOutcome(pair[0], pair[1], 'B_WIN')
   const tie = projectOutcome(pair[0], pair[1], 'DRAW')
   const [leftId, rightId] = [pair[0].id, pair[1].id]
-
-  const [leftRankRow, rightRankRow] = await Promise.all([
+  const [
+    leftRankRow,
+    rightRankRow,
+    leftWinLeftRank,
+    leftWinRightRank,
+    rightWinLeftRank,
+    rightWinRightRank,
+    tieLeftRank,
+    tieRightRank,
+  ] = await Promise.all([
     c.env.DB.prepare(
       'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
@@ -90,15 +99,6 @@ matchup.get('/', async (c) => {
     )
       .bind(pairIsVegan, leftId, rightId, pair[1].conservative_rating)
       .first<RankRow>(),
-  ])
-  const [
-    leftWinLeftRank,
-    leftWinRightRank,
-    rightWinLeftRank,
-    rightWinRightRank,
-    tieLeftRank,
-    tieRightRank,
-  ] = await Promise.all([
     c.env.DB.prepare(
       'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )

@@ -108,9 +108,15 @@ Returns non-vegan lunches sorted by `conservative_rating` descending, then `name
 
 ### GET /api/matchup
 Returns two selected lunches for voting.
+
+**Query params:**
+- `?vegan=true` — return a vegan-only matchup (`is_vegan = 1`)
+- (no param or any other value) — return a non-vegan matchup (`is_vegan = 0`)
+
+Both lunches in the pair always share the same `is_vegan` value.
 Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
-The opponent pool is limited to lunches with the same `is_vegan` value as the selected anchor lunch; if that group has fewer than 2 lunches, the endpoint returns 204.
-Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_rating`.
+If the requested group has fewer than 2 lunches, the endpoint returns 204.
+Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.
 
 **Response 200:**
 ```json
@@ -153,7 +159,7 @@ Submit a vote for a matchup.
 ```
 
 `result` must be one of: `"left_win"`, `"right_win"`, `"tie"`
-`left_lunch_id` and `right_lunch_id` must be different.
+`left_lunch_id` and `right_lunch_id` must be different and must share the same `is_vegan` value. A vote between a vegan and non-vegan lunch returns 400 `BAD_REQUEST`.
 
 **Response 200:**
 ```json

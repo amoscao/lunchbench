@@ -56,7 +56,7 @@ export async function incrementRateLimit(
   const now = new Date()
   const windowStartStr = getWindowStart(now, windowSeconds)
 
-  await db.prepare(`
+  const row = await db.prepare(`
     INSERT INTO rate_limits (key, action, count, window_start)
     VALUES (?, ?, 1, ?)
     ON CONFLICT(key, action) DO UPDATE SET
@@ -65,11 +65,8 @@ export async function incrementRateLimit(
         ELSE 1
       END,
       window_start = excluded.window_start
-  `).bind(key, action, windowStartStr).run()
-
-  const row = await db.prepare(
-    'SELECT count, window_start FROM rate_limits WHERE key = ? AND action = ?'
-  ).bind(key, action).first<RateLimitRow>()
+    RETURNING count, window_start
+  `).bind(key, action, windowStartStr).first<RateLimitRow>()
 
   return getRateLimitResult(row, now, limit, windowSeconds, false)
 }

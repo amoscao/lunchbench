@@ -101,7 +101,6 @@ export async function submitVote(
   result: 'left_win' | 'right_win' | 'tie'
 ): Promise<{
   vote_id: number
-  next: { left: Lunch; right: Lunch } | null
   left_result: VoteResult
   right_result: VoteResult
 }> {
@@ -117,19 +116,10 @@ export async function submitVote(
   }
   const data = await res.json() as {
     vote_id: number
-    next: { left: Lunch; right: Lunch } | null
     left_result: VoteResult
     right_result: VoteResult
   }
-  return {
-    ...data,
-    next: data.next
-      ? {
-          left: normalizeLunch(data.next.left),
-          right: normalizeLunch(data.next.right),
-        }
-      : null,
-  }
+  return data
 }
 
 export async function getLeaderboard(veganOnly = false): Promise<LeaderboardPage> {

@@ -174,17 +174,12 @@ Submit a vote for a matchup.
     "rating": 1480,
     "conservative_rating": 1280,
     "rank": 3
-  },
-  "next": {
-    "left": { /* Lunch object */ },
-    "right": { /* Lunch object */ }
   }
 }
 ```
 
 `left_result` and `right_result` contain the post-vote ratings and current rank for each lunch.
-`next` is `null` if fewer than 2 lunches are available for the next matchup.
-When present, each `next` lunch includes `rank`, its pre-vote leaderboard position for that next vote.
+The frontend prefetches the next full matchup with `GET /api/matchup`; the vote response does not include next matchup data.
 
 **Errors:**
 - `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides

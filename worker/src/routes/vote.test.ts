@@ -34,6 +34,10 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
     prepare(sql: string) {
       let bound: unknown[] = []
       const self = {
+        sql,
+        get bound() {
+          return bound
+        },
         bind(...args: unknown[]) {
           bound = args
           return self
@@ -72,7 +76,16 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
       }
       return self
     },
-    batch: async () => [],
+    batch: async (statements: Array<{ sql: string; bound: unknown[] }>) => {
+      if (statements.every((statement) => statement.sql.includes('SELECT * FROM lunches'))) {
+        return statements.map((statement) => {
+          const [id] = statement.bound as [number]
+          const row = rows.find((r) => r.id === id)
+          return { results: row ? [row] : [] }
+        })
+      }
+      return []
+    },
   } as unknown as D1Database
 }
 

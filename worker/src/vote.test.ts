@@ -21,28 +21,44 @@ function lunchRow(id: number): LunchRow {
   }
 }
 
-function fakeDb(batchVoteIds: Array<number | null>): D1Database & { batchCalls: number } {
+type FakeStatement = {
+  sql: string
+  bound: unknown[]
+  bind: (...args: unknown[]) => FakeStatement
+  first: () => Promise<LunchRow | null>
+}
+
+function fakeDb(batchVoteIds: Array<number | null>): D1Database & { writeBatchCalls: number } {
   const rows = new Map<number, LunchRow>([
     [1, lunchRow(1)],
     [2, lunchRow(2)],
   ])
   const db = {
-    batchCalls: 0,
-    prepare() {
-      let bound: unknown[] = []
-      return {
+    writeBatchCalls: 0,
+    prepare(sql: string): FakeStatement {
+      const statement: FakeStatement = {
+        sql,
+        bound: [],
         bind(...args: unknown[]) {
-          bound = args
-          return this
+          statement.bound = args
+          return statement
         },
         async first() {
-          return rows.get(bound[0] as number) ?? null
+          return rows.get(statement.bound[0] as number) ?? null
         },
       }
+      return statement
     },
-    async batch() {
-      const voteId = batchVoteIds[this.batchCalls] ?? null
-      this.batchCalls += 1
+    async batch(statements: FakeStatement[]) {
+      if (statements.every((statement) => statement.sql.includes('SELECT * FROM lunches'))) {
+        return statements.map((statement) => {
+          const row = rows.get(statement.bound[0] as number)
+          return { results: row ? [row] : [] }
+        })
+      }
+
+      const voteId = batchVoteIds[this.writeBatchCalls] ?? null
+      this.writeBatchCalls += 1
       return [
         { results: [{ id: 1 }, { id: 2 }] },
         { results: voteId === null ? [] : [{ id: voteId }] },
@@ -59,7 +75,7 @@ describe('recordVoteWithRetry', () => {
     const result = await recordVoteWithRetry(db, 1, 2, 'left_win', 'test-voter')
 
     expect(result).toEqual({ status: 'conflict' })
-    expect(db.batchCalls).toBe(MAX_VOTE_WRITE_ATTEMPTS)
+    expect(db.writeBatchCalls).toBe(MAX_VOTE_WRITE_ATTEMPTS)
   })
 
   test('returns the vote id when a retry succeeds', async () => {
@@ -67,8 +83,8 @@ describe('recordVoteWithRetry', () => {
 
     const result = await recordVoteWithRetry(db, 1, 2, 'left_win', 'test-voter')
 
-    expect(result).toEqual({ status: 'ok', voteId: 42 })
-    expect(db.batchCalls).toBe(2)
+    expect(result).toMatchObject({ status: 'ok', voteId: 42, isVegan: 0 })
+    expect(db.writeBatchCalls).toBe(2)
   })
 })
 

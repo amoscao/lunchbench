@@ -93,7 +93,7 @@ lunches.get('/leaderboard', async (c) => {
 })
 
 lunches.post('/', async (c) => {
-  if (!(await validateAdminSession(c.req.raw, c.env.DB))) {
+  if (!(await validateAdminSession(c.req.raw, c.env.DB, 'lunch'))) {
     return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
   }
 

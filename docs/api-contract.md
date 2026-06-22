@@ -15,6 +15,15 @@ Protected routes require:
 Authorization: Bearer <SESSION_TOKEN>
 ```
 
+Create a session with `POST /api/admin/verify`.
+
+Two session roles exist:
+- `admin` — password from `ADMIN_MANAGER_PASSWORD`. Can access every protected route.
+- `lunch` — password from `VOTE_PASSWORD`. Can create lunches and upload lunch images only.
+
+Routes that require `lunch` accept either `admin` or `lunch` sessions.
+Routes that require `admin` reject `lunch` sessions.
+
 Returns `401` if missing or invalid.
 
 ---
@@ -188,9 +197,9 @@ Headers: `Retry-After: <seconds>`
 ---
 
 ### POST /api/lunches
-Create a new lunch. **Requires auth.**
+Create a new lunch. **Requires lunch auth.**
 
-Use `POST /api/admin/verify` with the admin password to obtain a session token, then send that token in `Authorization` for this request.
+Use `POST /api/admin/verify` with the admin or lunch password to obtain a session token, then send that token in `Authorization` for this request.
 Tokens expire 8 hours after issuance.
 
 **Request body:**
@@ -211,9 +220,9 @@ Tokens expire 8 hours after issuance.
 ---
 
 ### POST /api/lunches/:id/image
-Upload an image for a lunch. **Requires auth.** Multipart form.
+Upload an image for a lunch. **Requires lunch auth.** Multipart form.
 
-Use a current admin session token from `POST /api/admin/verify` in the `Authorization` header. Tokens expire 8 hours after issuance.
+Use a current admin or lunch session token from `POST /api/admin/verify` in the `Authorization` header. Tokens expire 8 hours after issuance.
 
 **Form field:** `image` (file)
 

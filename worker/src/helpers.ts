@@ -1,5 +1,7 @@
 import type { Lunch, LunchRow } from './types'
 
+type SessionRole = 'admin' | 'lunch'
+
 export function lunchFromRow(row: LunchRow, baseUrl: string): Lunch {
   return {
     ...row,
@@ -12,16 +14,22 @@ export function lunchFromRow(row: LunchRow, baseUrl: string): Lunch {
 
 export async function validateAdminSession(
   request: Request,
-  db: D1Database
+  db: D1Database,
+  requiredRole?: SessionRole
 ): Promise<boolean> {
   const auth = request.headers.get('Authorization')
   if (!auth?.startsWith('Bearer ')) return false
   const token = auth.slice(7)
 
   const session = await db.prepare(
-    'SELECT expires_at FROM admin_sessions WHERE token = ?'
-  ).bind(token).first<{ expires_at: string }>()
+    'SELECT role, expires_at FROM admin_sessions WHERE token = ?'
+  ).bind(token).first<{ role: SessionRole; expires_at: string }>()
 
   if (!session) return false
-  return new Date(session.expires_at) > new Date()
+  if (new Date(session.expires_at) <= new Date()) return false
+
+  if (requiredRole === 'admin') return session.role === 'admin'
+  if (requiredRole === 'lunch') return session.role === 'admin' || session.role === 'lunch'
+
+  return true
 }

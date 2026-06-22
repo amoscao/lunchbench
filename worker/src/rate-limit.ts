@@ -1,17 +1,61 @@
 import type { D1Database } from '@cloudflare/workers-types'
 
-export async function checkRateLimit(
+type RateLimitResult = { allowed: boolean; retryAfter?: number }
+type RateLimitRow = { count: number; window_start: string }
+
+function getWindowStart(now: Date, windowSeconds: number): string {
+  return new Date(
+    Math.floor(now.getTime() / (windowSeconds * 1000)) * windowSeconds * 1000
+  ).toISOString()
+}
+
+function getRateLimitResult(
+  row: RateLimitRow | null,
+  now: Date,
+  limit: number,
+  windowSeconds: number,
+  blockAtLimit: boolean
+): RateLimitResult {
+  if (!row) return { allowed: true }
+
+  const windowEnd = new Date(new Date(row.window_start).getTime() + windowSeconds * 1000)
+  if (windowEnd <= now) return { allowed: true }
+
+  const overLimit = blockAtLimit ? row.count >= limit : row.count > limit
+  if (overLimit) {
+    const retryAfter = Math.ceil((windowEnd.getTime() - now.getTime()) / 1000)
+    return { allowed: false, retryAfter }
+  }
+
+  return { allowed: true }
+}
+
+export async function peekRateLimit(
   db: D1Database,
   key: string,
   action: string,
   limit: number,
   windowSeconds: number
-): Promise<{ allowed: boolean; retryAfter?: number }> {
+): Promise<RateLimitResult> {
   const now = new Date()
-  const windowStart = new Date(Math.floor(now.getTime() / (windowSeconds * 1000)) * windowSeconds * 1000)
-  const windowStartStr = windowStart.toISOString()
 
-  // Upsert rate limit row
+  const row = await db.prepare(
+    'SELECT count, window_start FROM rate_limits WHERE key = ? AND action = ?'
+  ).bind(key, action).first<RateLimitRow>()
+
+  return getRateLimitResult(row, now, limit, windowSeconds, true)
+}
+
+export async function incrementRateLimit(
+  db: D1Database,
+  key: string,
+  action: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  const now = new Date()
+  const windowStartStr = getWindowStart(now, windowSeconds)
+
   await db.prepare(`
     INSERT INTO rate_limits (key, action, count, window_start)
     VALUES (?, ?, 1, ?)
@@ -25,17 +69,19 @@ export async function checkRateLimit(
 
   const row = await db.prepare(
     'SELECT count, window_start FROM rate_limits WHERE key = ? AND action = ?'
-  ).bind(key, action).first<{ count: number; window_start: string }>()
+  ).bind(key, action).first<RateLimitRow>()
 
-  if (!row) return { allowed: true }
+  return getRateLimitResult(row, now, limit, windowSeconds, false)
+}
 
-  if (row.count > limit) {
-    const windowEnd = new Date(new Date(row.window_start).getTime() + windowSeconds * 1000)
-    const retryAfter = Math.ceil((windowEnd.getTime() - now.getTime()) / 1000)
-    return { allowed: false, retryAfter }
-  }
-
-  return { allowed: true }
+export async function checkRateLimit(
+  db: D1Database,
+  key: string,
+  action: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  return incrementRateLimit(db, key, action, limit, windowSeconds)
 }
 
 export async function clearRateLimit(

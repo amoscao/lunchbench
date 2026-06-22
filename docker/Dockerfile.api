@@ -31,6 +31,7 @@ RUN printf '%s\n' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0004_admin_sessions.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0005_glicko.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0006_glicko_defaults.sql' \
+  'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0007_session_roles.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/seed.sql' \
   'cd /app/worker' \
   'exec pnpm exec wrangler dev --local --ip 0.0.0.0 --port 8787 --persist-to /data' \

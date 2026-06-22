@@ -72,7 +72,7 @@ Returns all lunches.
 ---
 
 ### GET /api/lunches/leaderboard
-Returns lunches sorted by `conservative_rating` descending, then `name` ascending, then `id` ascending, with rank.
+Returns non-vegan lunches sorted by `conservative_rating` descending, then `name` ascending, then `id` ascending, with rank.
 
 **Query params:**
 - `?vegan=true` — only include vegan lunches

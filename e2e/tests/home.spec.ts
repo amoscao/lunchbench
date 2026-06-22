@@ -1,5 +1,30 @@
 import { test, expect } from '@playwright/test'
-import { waitForMatchup, castVote } from './helpers'
+import { waitForMatchup, castVote, API_URL } from './helpers'
+
+type LunchSnapshot = {
+  id: number
+  name: string
+  rating: number
+  conservative_rating: number
+  wins: number
+  losses: number
+  ties: number
+}
+
+async function getLunchSnapshot(id: number): Promise<LunchSnapshot> {
+  const res = await fetch(`${API_URL}/api/lunches/${id}`)
+  if (!res.ok) throw new Error(`Failed to fetch lunch ${id}: ${res.status}`)
+  const lunch = await res.json() as LunchSnapshot
+  return {
+    id: lunch.id,
+    name: lunch.name,
+    rating: lunch.rating,
+    conservative_rating: lunch.conservative_rating,
+    wins: lunch.wins,
+    losses: lunch.losses,
+    ties: lunch.ties,
+  }
+}
 
 test.describe('Home / Voting', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,11 +57,11 @@ test.describe('Home / Voting', () => {
     await expect(placeholders).toHaveCount(2)
   })
 
-  test('three vote buttons are present', async ({ page }) => {
+  test('four vote buttons are present', async ({ page }) => {
     await waitForMatchup(page)
 
     const buttons = page.locator('.vote-buttons .btn')
-    await expect(buttons).toHaveCount(3)
+    await expect(buttons).toHaveCount(4)
   })
 
   test('left vote button label is A wins', async ({ page }) => {
@@ -56,6 +81,59 @@ test.describe('Home / Voting', () => {
     await waitForMatchup(page)
     const rightBtn = page.locator('.vote-buttons .btn').nth(2)
     await expect(rightBtn).toHaveText('B wins')
+  })
+
+  test("skip button is labeled Haven't Eaten", async ({ page }) => {
+    await waitForMatchup(page)
+    const skipBtn = page.locator('.vote-buttons .btn').nth(3)
+    await expect(skipBtn).toHaveText("Haven't Eaten")
+  })
+
+  test('skipping a matchup loads the next pair without writing a vote', async ({ page }) => {
+    let voteRequested = false
+    let initialMatchup: { left: LunchSnapshot; right: LunchSnapshot } | null = null
+
+    await page.route('/api/vote', async (route) => {
+      voteRequested = true
+      await route.abort()
+    })
+    await page.route('/api/matchup**', async (route) => {
+      const response = await route.fetch()
+      if (response.status() === 200) {
+        const body = await response.json() as { left: LunchSnapshot; right: LunchSnapshot }
+        initialMatchup ??= body
+        await route.fulfill({ response, json: body })
+        return
+      }
+      await route.fulfill({ response })
+    })
+
+    await page.goto('/')
+    await waitForMatchup(page)
+    expect(initialMatchup).not.toBeNull()
+
+    const names = page.locator('.lunch-card-name')
+    const initialNames = [
+      (await names.nth(0).textContent())?.trim(),
+      (await names.nth(1).textContent())?.trim(),
+    ]
+
+    const beforeLeft = await getLunchSnapshot(initialMatchup!.left.id)
+    const beforeRight = await getLunchSnapshot(initialMatchup!.right.id)
+
+    await page.locator('.vote-buttons .btn').nth(3).click()
+
+    await expect.poll(async () => {
+      const currentNames = [
+        (await names.nth(0).textContent())?.trim(),
+        (await names.nth(1).textContent())?.trim(),
+      ]
+      return currentNames.join('|')
+    }).not.toBe(initialNames.join('|'))
+
+    expect(voteRequested).toBe(false)
+    expect(await getLunchSnapshot(beforeLeft.id)).toEqual(beforeLeft)
+    expect(await getLunchSnapshot(beforeRight.id)).toEqual(beforeRight)
   })
 
   test('casting a left vote loads a new matchup', async ({ page }) => {

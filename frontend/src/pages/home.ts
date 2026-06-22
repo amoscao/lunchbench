@@ -343,9 +343,9 @@ export function renderHome(
 
       let next: Matchup | null
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? fetchNextUnseen())
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await fetchNextUnseen()
       }
       await load(next)
     } catch {
@@ -369,9 +369,9 @@ export function renderHome(
     try {
       let next: Matchup | null
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? fetchNextUnseen())
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await fetchNextUnseen()
       }
       await load(next)
     } catch {

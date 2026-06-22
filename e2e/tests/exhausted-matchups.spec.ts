@@ -152,4 +152,32 @@ test.describe('Exhausted matchups', () => {
       ).toBe(true)
     }
   })
+
+  test('shows exhausted message immediately on page load when all pairs already seen', async ({ page }) => {
+    // Pre-populate localStorage with all 3 pair keys before the page JS runs.
+    // Simulates a refresh after exhaustion has already been reached.
+    await page.addInitScript(() => {
+      const allPairs = ['9001-9002', '9001-9003', '9002-9003']
+      localStorage.setItem('lb_seen_pairs', JSON.stringify(allPairs))
+    })
+
+    // Always return a seen pair — no unseen pairs available
+    await page.route('**/api/matchup**', async (route) => {
+      const [left, right] = FAKE_PAIRS[0]
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeMatchupJson(left, right)),
+      })
+    })
+
+    await page.goto('/')
+
+    // Exhausted state must appear without any user interaction
+    await expect(page.locator('.state-title')).toHaveText("You've seen them all!", { timeout: 8000 })
+    await expect(page.locator('.state-desc')).toContainText('Check back later')
+
+    // Vote arena must NOT be shown
+    await expect(page.locator('.vote-arena')).not.toBeVisible()
+  })
 })

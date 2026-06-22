@@ -278,6 +278,19 @@ export function renderHome(
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
 
+  // Tries up to 3 API calls to find an unseen pair.
+  // If all return seen pairs, sets nextMatchupExhausted and returns null.
+  // If the API has no lunches at all, returns null without setting the flag.
+  async function fetchNextUnseen(): Promise<Matchup | null> {
+    for (let i = 0; i < 3; i++) {
+      const m = await getMatchup(isVeganMode())
+      if (!m) return null
+      if (!hasSeen(m.left.id, m.right.id)) return m
+    }
+    nextMatchupExhausted = true
+    return null
+  }
+
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
     if (isSubmitting || !leftLunch || !rightLunch || !currentMatchup) return
 
@@ -330,9 +343,9 @@ export function renderHome(
 
       let next: Matchup | null
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? fetchNextUnseen())
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await fetchNextUnseen()
       }
       await load(next)
     } catch {
@@ -356,9 +369,9 @@ export function renderHome(
     try {
       let next: Matchup | null
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? fetchNextUnseen())
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await fetchNextUnseen()
       }
       await load(next)
     } catch {
@@ -408,7 +421,7 @@ export function renderHome(
       container.appendChild(content)
       content.appendChild(renderSkeleton())
       try {
-        const data = await getMatchup(isVeganMode())
+        const data = await fetchNextUnseen()
         await load(data)
       } catch (error) {
         content.innerHTML = ''
@@ -490,15 +503,7 @@ export function renderHome(
 
     addKeyboardShortcuts()
     nextMatchupExhausted = false
-    nextMatchupPromise = (async (): Promise<Matchup | null> => {
-      for (let i = 0; i < 3; i++) {
-        const m = await getMatchup(isVeganMode())
-        if (!m) return null
-        if (!hasSeen(m.left.id, m.right.id)) return m
-      }
-      nextMatchupExhausted = true
-      return null
-    })()
+    nextMatchupPromise = fetchNextUnseen()
   }
 
   load(undefined)

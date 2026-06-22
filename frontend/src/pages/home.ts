@@ -137,6 +137,22 @@ function renderRateLimit(retry: () => void): HTMLElement {
   return div
 }
 
+function renderExhausted(navigate: (p: string) => void): HTMLElement {
+  const div = document.createElement('div')
+  div.className = 'state-center'
+  div.innerHTML = `
+    <div class="state-icon">🎉</div>
+    <div class="state-title">You've seen them all!</div>
+    <div class="state-desc">New matchups may appear as lunches are added. Check back later.</div>
+  `
+  const btn = document.createElement('button')
+  btn.className = 'btn btn-secondary'
+  btn.textContent = 'See the leaderboard'
+  btn.addEventListener('click', () => navigate('/leaderboard'))
+  div.appendChild(btn)
+  return div
+}
+
 function showVoteOverlay(
   card: HTMLElement,
   lunch: Lunch,
@@ -258,6 +274,7 @@ export function renderHome(
   let rightLunch: Lunch | null = null
   let currentMatchup: Matchup | null = null
   let nextMatchupPromise: Promise<Matchup | null> | null = null
+  let nextMatchupExhausted = false
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
 
@@ -410,24 +427,21 @@ export function renderHome(
     if (!matchup) {
       currentMatchup = null
       nextMatchupPromise = null
-      content.appendChild(renderEmpty(navigate, isVeganMode()))
+      if (nextMatchupExhausted) {
+        nextMatchupExhausted = false
+        content.appendChild(renderExhausted(navigate))
+      } else {
+        content.appendChild(renderEmpty(navigate, isVeganMode()))
+      }
       container.replaceChildren(content)
       return
     }
 
-    const displayMatchup: Matchup | null = matchup
-    if (!displayMatchup) {
-      currentMatchup = null
-      nextMatchupPromise = null
-      content.appendChild(renderEmpty(navigate, isVeganMode()))
-      container.replaceChildren(content)
-      return
-    }
-    markSeen(displayMatchup.left.id, displayMatchup.right.id)
+    markSeen(matchup.left.id, matchup.right.id)
 
-    currentMatchup = displayMatchup
-    leftLunch = displayMatchup.left
-    rightLunch = displayMatchup.right
+    currentMatchup = matchup
+    leftLunch = matchup.left
+    rightLunch = matchup.right
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
@@ -475,15 +489,15 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
+    nextMatchupExhausted = false
     nextMatchupPromise = (async (): Promise<Matchup | null> => {
-      let fallback: Matchup | null = null
       for (let i = 0; i < 3; i++) {
         const m = await getMatchup(isVeganMode())
         if (!m) return null
         if (!hasSeen(m.left.id, m.right.id)) return m
-        if (!fallback) fallback = m
       }
-      return fallback
+      nextMatchupExhausted = true
+      return null
     })()
   }
 

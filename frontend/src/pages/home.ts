@@ -328,13 +328,19 @@ export function renderHome(
     if (rightCard) showVoteOverlay(rightCard, votedRight, projected.right)
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
+    const isRateLimited = (err: unknown): boolean =>
+      err instanceof Error && err.message === 'rate_limited'
     const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async (firstErr: unknown) => {
+      if (isRateLimited(firstErr)) return
       try {
         await submitVote(votedLeft.id, votedRight.id, result)
       } catch (secondErr: unknown) {
-        Sentry.captureException(secondErr ?? firstErr, {
-          extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
-        })
+        const err = secondErr ?? firstErr
+        if (!isRateLimited(err)) {
+          Sentry.captureException(err, {
+            extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
+          })
+        }
       }
     })
 
@@ -504,6 +510,8 @@ export function renderHome(
     addKeyboardShortcuts()
     nextMatchupExhausted = false
     nextMatchupPromise = fetchNextUnseen()
+    // Suppress unhandledrejection — castVote/skipMatchup always await this.
+    nextMatchupPromise.catch(() => {})
   }
 
   load(undefined)

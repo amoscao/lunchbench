@@ -6,13 +6,27 @@ import type { Bindings } from './types'
 function mockDb(): D1Database {
   return {
     prepare(sql: string) {
+      const all = async () => {
+        if (sql.includes('admin_sessions')) {
+          return {
+            results: [
+              {
+                token: 'test-session',
+                role: 'lunch',
+                expires_at: new Date(Date.now() + 60_000).toISOString(),
+              },
+            ],
+          }
+        }
+        return { results: [] }
+      }
+
       return {
+        all,
         bind() {
           return {
+            all,
             async first() {
-              if (sql.includes('admin_sessions')) {
-                return { role: 'lunch', expires_at: new Date(Date.now() + 60_000).toISOString() }
-              }
               if (sql.includes('rate_limits')) {
                 return { count: 1, window_start: new Date().toISOString() }
               }

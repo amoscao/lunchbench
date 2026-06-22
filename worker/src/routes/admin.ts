@@ -5,8 +5,23 @@ import { lunchFromRow, validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 
 type AdminEnv = { Bindings: Bindings }
+type SessionRole = 'admin' | 'lunch'
 
 const admin = new Hono<{ Bindings: Bindings }>()
+const textEncoder = new TextEncoder()
+
+function constantTimeEquals(a: string, b: string): boolean {
+  const aBytes = textEncoder.encode(a)
+  const bBytes = textEncoder.encode(b)
+  const maxLength = Math.max(aBytes.length, bBytes.length)
+  let diff = aBytes.length ^ bBytes.length
+
+  for (let i = 0; i < maxLength; i++) {
+    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0)
+  }
+
+  return diff === 0
+}
 
 admin.post('/verify', async (c) => {
   const ip = getClientIp(c.req.raw)
@@ -21,27 +36,33 @@ admin.post('/verify', async (c) => {
   }
 
   const pw = body.password
-  const stored = c.env.ADMIN_MANAGER_PASSWORD || c.env.VOTE_PASSWORD
-  if (!stored) {
+  if (!c.env.ADMIN_MANAGER_PASSWORD && !c.env.VOTE_PASSWORD) {
     return c.json({ error: 'Admin password not configured', code: 'SERVER_ERROR' }, 500)
   }
-  if (pw.length !== stored.length) {
-    return c.json({ error: 'Invalid password', code: 'UNAUTHORIZED' }, 401)
+
+  const adminMatches = c.env.ADMIN_MANAGER_PASSWORD
+    ? constantTimeEquals(pw, c.env.ADMIN_MANAGER_PASSWORD)
+    : false
+  const lunchMatches = c.env.VOTE_PASSWORD
+    ? constantTimeEquals(pw, c.env.VOTE_PASSWORD)
+    : false
+
+  let role: SessionRole | null = null
+  if (adminMatches) {
+    role = 'admin'
+  } else if (lunchMatches) {
+    role = 'lunch'
   }
 
-  const a = new TextEncoder().encode(pw)
-  const b = new TextEncoder().encode(stored)
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
-  if (diff !== 0) {
+  if (!role) {
     return c.json({ error: 'Invalid password', code: 'UNAUTHORIZED' }, 401)
   }
 
   const token = crypto.randomUUID()
   const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
   await c.env.DB.prepare(
-    'INSERT OR REPLACE INTO admin_sessions (token, expires_at) VALUES (?, ?)'
-  ).bind(token, expiresAt).run()
+    'INSERT OR REPLACE INTO admin_sessions (token, expires_at, role) VALUES (?, ?, ?)'
+  ).bind(token, expiresAt, role).run()
 
   return c.json({ token })
 })
@@ -62,7 +83,7 @@ admin.delete('/session', async (c) => {
 })
 
 async function requireAdminSession(c: Context<AdminEnv>, next: Next): Promise<Response | void> {
-  const hasSession = await validateAdminSession(c.req.raw, c.env.DB)
+  const hasSession = await validateAdminSession(c.req.raw, c.env.DB, 'admin')
   if (!hasSession) {
     return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
   }

@@ -10,7 +10,7 @@ function mockDb(): D1Database {
           return {
             async first() {
               if (sql.includes('admin_sessions')) {
-                return { expires_at: new Date(Date.now() + 60_000).toISOString() }
+                return { role: 'lunch', expires_at: new Date(Date.now() + 60_000).toISOString() }
               }
               if (sql.includes('rate_limits')) {
                 return { count: 1, window_start: new Date().toISOString() }

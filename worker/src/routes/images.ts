@@ -73,7 +73,7 @@ export async function handleImageUpload(
   db: D1Database,
   bucket: R2Bucket | undefined
 ): Promise<Response> {
-  if (!(await validateAdminSession(request, db))) {
+  if (!(await validateAdminSession(request, db, 'lunch'))) {
     return Response.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 

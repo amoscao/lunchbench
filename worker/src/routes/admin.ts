@@ -1,27 +1,18 @@
 import { Hono } from 'hono'
 import type { Context, Next } from 'hono'
 import type { Bindings, LunchRow } from '../types'
-import { lunchFromRow, validateAdminSession } from '../helpers'
+import {
+  constantTimeEquals,
+  findMatchingAdminSession,
+  lunchFromRow,
+  validateAdminSession,
+} from '../helpers'
 import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
 
 type AdminEnv = { Bindings: Bindings }
 type SessionRole = 'admin' | 'lunch'
 
 const admin = new Hono<{ Bindings: Bindings }>()
-const textEncoder = new TextEncoder()
-
-function constantTimeEquals(a: string, b: string): boolean {
-  const aBytes = textEncoder.encode(a)
-  const bBytes = textEncoder.encode(b)
-  const maxLength = Math.max(aBytes.length, bBytes.length)
-  let diff = aBytes.length ^ bBytes.length
-
-  for (let i = 0; i < maxLength; i++) {
-    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0)
-  }
-
-  return diff === 0
-}
 
 admin.post('/verify', async (c) => {
   const ip = getClientIp(c.req.raw)
@@ -75,10 +66,12 @@ admin.delete('/session', async (c) => {
   }
 
   const token = auth.slice(7)
-  const result = await c.env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(token).run()
-  if ((result.meta?.changes ?? 0) === 0) {
+  const session = await findMatchingAdminSession(c.env.DB, token)
+  if (session === null) {
     return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
   }
+
+  await c.env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(session.token).run()
 
   return c.json({ revoked: true })
 })

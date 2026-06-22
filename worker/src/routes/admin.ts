@@ -89,9 +89,8 @@ admin.get('/lunches', requireAdminSession, async (c) => {
   const result = await c.env.DB.prepare(
     'SELECT * FROM lunches ORDER BY id ASC'
   ).all<LunchRow>()
-  const baseUrl = new URL(c.req.url).origin
   return c.json({
-    lunches: result.results.map((r) => lunchFromRow(r, baseUrl)),
+    lunches: result.results.map((r) => lunchFromRow(r)),
   })
 })
 
@@ -142,8 +141,7 @@ admin.patch('/lunches/:id', requireAdminSession, async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM lunches WHERE id = ?').bind(id).first<LunchRow>()
   if (!row) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
 
-  const baseUrl = new URL(c.req.url).origin
-  return c.json({ lunch: lunchFromRow(row, baseUrl) })
+  return c.json({ lunch: lunchFromRow(row) })
 })
 
 admin.delete('/lunches/:id', requireAdminSession, async (c) => {

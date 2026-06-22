@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
+import { lunchFromRow } from '../helpers'
 import { checkCooldown, checkRateLimit, clearRateLimit, getClientIp } from '../rate-limit'
 import { conservativeScore, updateRatingPair } from '../elo'
+import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 
 const vote = new Hono<{ Bindings: Bindings }>()
@@ -260,14 +262,6 @@ vote.post('/', async (c) => {
     return c.json({ error: 'Lunches must be different', code: 'BAD_REQUEST' }, 400)
   }
 
-  const initialRows = await getVoteLunchRows(c.env.DB, left_lunch_id, right_lunch_id)
-  if (!initialRows.left || !initialRows.right) {
-    return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
-  }
-  if (initialRows.left.is_vegan !== initialRows.right.is_vegan) {
-    return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
-  }
-
   const rl = await checkRateLimit(c.env.DB, ip, 'vote', VOTE_RATE_LIMIT_PER_HOUR, 3600)
   if (!rl.allowed) {
     return c.json(
@@ -276,6 +270,15 @@ vote.post('/', async (c) => {
       { 'Retry-After': String(rl.retryAfter ?? 3600) }
     )
   }
+
+  const initialRows = await getVoteLunchRows(c.env.DB, left_lunch_id, right_lunch_id)
+  if (!initialRows.left || !initialRows.right) {
+    return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
+  }
+  if (initialRows.left.is_vegan !== initialRows.right.is_vegan) {
+    return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
+  }
+  const isVegan = initialRows.left.is_vegan
 
   const pairRateLimitKey = await getVotePairRateLimitKey(ip, left_lunch_id, right_lunch_id)
   const pairRl = await checkCooldown(
@@ -313,28 +316,75 @@ vote.post('/', async (c) => {
     return c.json({ error: 'Vote conflict, please retry', code: 'CONFLICT' }, 409)
   }
 
-  const isVegan = writeResult.isVegan
-  const rankRows = await c.env.DB.batch<RankRow>([
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
-      .bind(isVegan, writeResult.leftResult.conservative_rating),
-    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
-      .bind(isVegan, writeResult.rightResult.conservative_rating),
+  const [leftResultRow, rightResultRow] = await Promise.all([
+    c.env.DB.prepare('SELECT rating, conservative_rating FROM lunches WHERE id = ?')
+      .bind(left_lunch_id)
+      .first<VoteResultRow>(),
+    c.env.DB.prepare('SELECT rating, conservative_rating FROM lunches WHERE id = ?')
+      .bind(right_lunch_id)
+      .first<VoteResultRow>(),
   ])
-  const leftRankRow = rankRows[0]?.results?.[0]
-  const rightRankRow = rankRows[1]?.results?.[0]
+
+  if (!leftResultRow || !rightResultRow) {
+    return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
+  }
+
+  const [leftRankRow, rightRankRow] = await Promise.all([
+    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
+      .bind(isVegan, leftResultRow.conservative_rating)
+      .first<RankRow>(),
+    c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
+      .bind(isVegan, rightResultRow.conservative_rating)
+      .first<RankRow>(),
+  ])
+
+  // Get next matchup — keep same vegan group as the pair that was just voted on
+  const allLunches = await c.env.DB.prepare(
+    'SELECT * FROM lunches WHERE is_vegan = ?'
+  ).bind(isVegan).all<LunchRow>()
+  const recentVotes = await c.env.DB.prepare(
+    // id DESC makes same-second D1 timestamps deterministic.
+    'SELECT left_lunch_id, right_lunch_id FROM votes ORDER BY created_at DESC, id DESC LIMIT 10'
+  ).all<{ left_lunch_id: number; right_lunch_id: number }>()
+
+  const recentPairs: [number, number][] = recentVotes.results.map(
+    (v) => [v.left_lunch_id, v.right_lunch_id]
+  )
+
+  const nextPair = selectMatchup(allLunches.results, recentPairs)
+  const next = nextPair
+    ? await Promise.all([
+        c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
+          .bind(isVegan, nextPair[0].conservative_rating)
+          .first<RankRow>(),
+        c.env.DB.prepare('SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND conservative_rating > ?')
+          .bind(isVegan, nextPair[1].conservative_rating)
+          .first<RankRow>(),
+      ]).then(([nextLeftRankRow, nextRightRankRow]) => ({
+        left: {
+          ...lunchFromRow(nextPair[0]),
+          rank: nextLeftRankRow?.rank ?? 1,
+        },
+        right: {
+          ...lunchFromRow(nextPair[1]),
+          rank: nextRightRankRow?.rank ?? 1,
+        },
+      }))
+    : null
 
   return c.json({
     vote_id: writeResult.voteId,
     left_result: {
-      rating: writeResult.leftResult.rating,
-      conservative_rating: writeResult.leftResult.conservative_rating,
+      rating: leftResultRow.rating,
+      conservative_rating: leftResultRow.conservative_rating,
       rank: leftRankRow?.rank ?? 1,
     },
     right_result: {
-      rating: writeResult.rightResult.rating,
-      conservative_rating: writeResult.rightResult.conservative_rating,
+      rating: rightResultRow.rating,
+      conservative_rating: rightResultRow.conservative_rating,
       rank: rightRankRow?.rank ?? 1,
     },
+    next,
   })
 })
 

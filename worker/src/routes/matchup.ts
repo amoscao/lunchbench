@@ -59,7 +59,7 @@ matchup.get('/', async (c) => {
   const veganOnly = c.req.query('vegan') === 'true'
   const query = veganOnly
     ? 'SELECT * FROM lunches WHERE is_vegan = 1'
-    : 'SELECT * FROM lunches'
+    : 'SELECT * FROM lunches WHERE is_vegan = 0'
   const allLunches = await c.env.DB.prepare(query).all<LunchRow>()
   const recentVotes = await c.env.DB.prepare(
     // id DESC makes same-second D1 timestamps deterministic.
@@ -73,6 +73,7 @@ matchup.get('/', async (c) => {
   const pair = selectMatchup(allLunches.results, recentPairs)
   if (!pair) return c.body(null, 204, { 'Cache-Control': 'no-store' })
 
+  const pairIsVegan = pair[0].is_vegan
   const leftWin = projectOutcome(pair[0], pair[1], 'A_WIN')
   const rightWin = projectOutcome(pair[0], pair[1], 'B_WIN')
   const tie = projectOutcome(pair[0], pair[1], 'DRAW')
@@ -80,14 +81,14 @@ matchup.get('/', async (c) => {
 
   const [leftRankRow, rightRankRow] = await Promise.all([
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, pair[0].conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, pair[0].conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, pair[1].conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, pair[1].conservative_rating)
       .first<RankRow>(),
   ])
   const [
@@ -99,34 +100,34 @@ matchup.get('/', async (c) => {
     tieRightRank,
   ] = await Promise.all([
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, leftWin.left.conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, leftWin.left.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, leftWin.right.conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, leftWin.right.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, rightWin.left.conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, rightWin.left.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, rightWin.right.conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, rightWin.right.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, tie.left.conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, tie.left.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
-      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE id NOT IN (?, ?) AND conservative_rating > ?'
+      'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(leftId, rightId, tie.right.conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, tie.right.conservative_rating)
       .first<RankRow>(),
   ])
 

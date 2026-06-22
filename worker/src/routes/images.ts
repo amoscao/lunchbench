@@ -8,16 +8,21 @@ import { isAllowedOrigin } from '../middleware'
 
 const images = new Hono<{ Bindings: Bindings }>()
 const MAX_MULTIPART_BODY_BYTES = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.1)
+const PUBLIC_IMAGE_KEY_RE = /^images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i
 
 // POST /api/lunches/:id/image - handled in lunches router but implemented here
 // This file handles GET /api/images/:key
 
 images.get('/:key{.+}', async (c) => {
+  const key = c.req.param('key')
+  if (!PUBLIC_IMAGE_KEY_RE.test(key)) {
+    return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
+  }
+
   if (!c.env.IMAGES) {
     return c.json({ error: 'Image storage not configured', code: 'NOT_CONFIGURED' }, 503)
   }
 
-  const key = c.req.param('key')
   const obj = await c.env.IMAGES.get(key)
   if (!obj) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
 

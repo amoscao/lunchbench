@@ -45,6 +45,11 @@ export type VoteResult = {
   rank: number
 }
 
+export type ImageUploadResult = {
+  image_key: string
+  image_url: string
+}
+
 export type ProjectedResult = {
   rating: number
   conservative_rating: number
@@ -65,12 +70,29 @@ export type Matchup = {
 
 const BASE = '/api'
 
+function resolveImageUrl(imageUrl: string | null): string | null {
+  if (!imageUrl) return null
+  return new URL(imageUrl, window.location.origin).toString()
+}
+
+function normalizeLunch<T extends { image_url: string | null }>(lunch: T): T {
+  return {
+    ...lunch,
+    image_url: resolveImageUrl(lunch.image_url),
+  }
+}
+
 export async function getMatchup(veganOnly = false): Promise<Matchup | null> {
   const res = await fetch(`${BASE}/matchup${veganOnly ? '?vegan=true' : ''}`)
   if (res.status === 204) return null
   if (res.status === 429) throw new Error('rate_limited')
   if (!res.ok) throw new Error(`Matchup fetch failed: ${res.status}`)
-  return res.json()
+  const data = await res.json() as Matchup
+  return {
+    ...data,
+    left: normalizeLunch(data.left),
+    right: normalizeLunch(data.right),
+  }
 }
 
 export async function submitVote(
@@ -93,7 +115,21 @@ export async function submitVote(
     const err = await res.json().catch(() => ({}))
     throw new Error((err as any).error ?? `Vote failed: ${res.status}`)
   }
-  return res.json()
+  const data = await res.json() as {
+    vote_id: number
+    next: { left: Lunch; right: Lunch } | null
+    left_result: VoteResult
+    right_result: VoteResult
+  }
+  return {
+    ...data,
+    next: data.next
+      ? {
+          left: normalizeLunch(data.next.left),
+          right: normalizeLunch(data.next.right),
+        }
+      : null,
+  }
 }
 
 export async function getLeaderboard(veganOnly = false): Promise<LeaderboardPage> {
@@ -101,27 +137,29 @@ export async function getLeaderboard(veganOnly = false): Promise<LeaderboardPage
   if (veganOnly) params.set('vegan', 'true')
   const res = await fetch(`${BASE}/lunches/leaderboard?${params}`)
   if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`)
-  return res.json()
+  const data = await res.json() as LeaderboardPage
+  return { lunches: data.lunches.map(normalizeLunch) }
 }
 
 export async function getLunches(): Promise<Lunch[]> {
   const res = await fetch(`${BASE}/lunches`)
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
   const data = await res.json()
-  return data.lunches
+  return data.lunches.map(normalizeLunch)
 }
 
 export async function getLunchesWithoutImages(): Promise<Lunch[]> {
   const res = await fetch(`${BASE}/lunches?missing_image=true`)
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
   const data = await res.json()
-  return data.lunches
+  return data.lunches.map(normalizeLunch)
 }
 
 export async function getLunch(id: number): Promise<LunchDetail> {
   const res = await fetch(`${BASE}/lunches/${id}`)
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
-  return res.json()
+  const data = await res.json() as LunchDetail
+  return normalizeLunch(data)
 }
 
 export async function createLunch(
@@ -140,10 +178,10 @@ export async function createLunch(
     throw new Error((err as any).error ?? `Create failed: ${res.status}`)
   }
   const data = await res.json()
-  return data.lunch
+  return normalizeLunch(data.lunch)
 }
 
-export async function uploadImage(lunchId: number, file: File, token: string): Promise<void> {
+export async function uploadImage(lunchId: number, file: File, token: string): Promise<ImageUploadResult> {
   const form = new FormData()
   form.append('image', file)
   const res = await fetch(`${BASE}/lunches/${lunchId}/image`, {
@@ -154,6 +192,11 @@ export async function uploadImage(lunchId: number, file: File, token: string): P
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as any).error ?? `Upload failed: ${res.status}`)
+  }
+  const data = await res.json() as ImageUploadResult
+  return {
+    ...data,
+    image_url: resolveImageUrl(data.image_url) ?? data.image_url,
   }
 }
 

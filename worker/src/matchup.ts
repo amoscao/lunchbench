@@ -3,12 +3,19 @@ export type LunchForMatchup = {
   rating: number
   glicko_rd: number
   is_vegan?: number
+  presentation_count?: number
   [key: string]: unknown
 }
 
+const MAX_RD = 350
+const EXPLOITATION_WEIGHT = 0.5
+const UNCERTAINTY_WEIGHT = 0.25
+const FRESHNESS_WEIGHT = 0.2
+const JITTER_WEIGHT = 0.05
+
 /**
  * Selects two distinct lunches for a voting matchup.
- * Weights anchor selection by uncertainty, then picks the closest-rated opponent.
+ * Weights anchor selection by uncertainty, then samples an opponent by pair score.
  * Tries to avoid pairs that appeared in recentPairs, falling back only when needed.
  */
 export function selectMatchup<T extends LunchForMatchup>(
@@ -54,7 +61,7 @@ export function selectMatchup<T extends LunchForMatchup>(
     )
   if (opponentPool.length === 0) return null
 
-  const opponent = closestRated(anchor, opponentPool)
+  const opponent = weightedByOpponentScore(anchor, opponentPool)
   const pair: [T, T] = [anchor, opponent]
 
   return Math.random() < 0.5 ? [pair[1], pair[0]] : pair
@@ -74,11 +81,39 @@ function weightedByRd<T extends LunchForMatchup>(lunches: T[]): T {
   return lunches[lunches.length - 1]
 }
 
-function closestRated<T extends LunchForMatchup>(anchor: T, lunches: T[]): T {
-  return [...lunches].sort((a, b) => {
-    const ratingDiff = Math.abs(a.rating - anchor.rating) - Math.abs(b.rating - anchor.rating)
-    return ratingDiff || a.id - b.id
-  })[0]
+function weightedByOpponentScore<T extends LunchForMatchup>(anchor: T, lunches: T[]): T {
+  const scored = lunches.map((lunch) => ({
+    lunch,
+    score: opponentScore(anchor, lunch),
+  }))
+  const total = scored.reduce((sum, item) => sum + item.score, 0)
+  if (total <= 0) return lunches[Math.floor(Math.random() * lunches.length)]
+
+  const target = Math.random() * total
+  let cumulative = 0
+  for (const item of scored) {
+    cumulative += item.score
+    if (target < cumulative) return item.lunch
+  }
+  return scored[scored.length - 1].lunch
+}
+
+function opponentScore(anchor: LunchForMatchup, opponent: LunchForMatchup): number {
+  const exploitation = 1 / (1 + Math.abs(anchor.rating - opponent.rating))
+  const uncertainty = clamp01(opponent.glicko_rd / MAX_RD)
+  const freshness = 1 / (1 + (opponent.presentation_count ?? 0))
+  const jitter = Math.random()
+
+  return (
+    EXPLOITATION_WEIGHT * exploitation +
+    UNCERTAINTY_WEIGHT * uncertainty +
+    FRESHNESS_WEIGHT * freshness +
+    JITTER_WEIGHT * jitter
+  )
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
 }
 
 function pairKey(a: number, b: number): string {

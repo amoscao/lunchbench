@@ -9,6 +9,12 @@ const makeLunches = (count: number) =>
     glicko_rd: 100,
   }))
 
+function mockRandom(...values: number[]) {
+  const spy = vi.spyOn(Math, 'random').mockReturnValue(0.75)
+  for (const value of values) spy.mockReturnValueOnce(value)
+  return spy
+}
+
 describe('selectMatchup', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -45,9 +51,7 @@ describe('selectMatchup', () => {
       { id: 3, name: 'Closest allowed opponent', rating: 1520, glicko_rd: 10 },
       { id: 4, name: 'Distant allowed opponent', rating: 1900, glicko_rd: 10 },
     ]
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.75)
+    mockRandom(0, 0, 0, 0, 0.75)
 
     const result = selectMatchup(lunches, [[1, 2], [1, 3], [1, 4]])!
 
@@ -60,27 +64,61 @@ describe('selectMatchup', () => {
       { id: 2, name: 'High uncertainty', rating: 1600, glicko_rd: 90 },
       { id: 3, name: 'Close opponent', rating: 1650, glicko_rd: 10 },
     ]
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0.5)
-      .mockReturnValueOnce(0.75)
+    mockRandom(0.5, 0, 0, 0.75, 0.75)
 
     const result = selectMatchup(lunches, [])!
 
     expect(result.map((lunch) => lunch.id)).toEqual([2, 3])
   })
 
-  it('picks the closest-rated opponent while excluding recent pairs', () => {
+  it('samples an allowed close opponent while excluding recent pairs', () => {
     const lunches = [
       { id: 1, name: 'Anchor', rating: 1500, glicko_rd: 100 },
       { id: 2, name: 'Recent close opponent', rating: 1510, glicko_rd: 100 },
       { id: 3, name: 'Allowed opponent', rating: 1530, glicko_rd: 100 },
       { id: 4, name: 'Distant opponent', rating: 1900, glicko_rd: 100 },
     ]
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.75)
+    mockRandom(0, 0, 0, 0, 0.75)
 
     const result = selectMatchup(lunches, [[1, 2]])!
+
+    expect(result.map((lunch) => lunch.id)).toEqual([1, 3])
+  })
+
+  it('can select a low-RD fresh opponent instead of sticking to a stale close option', () => {
+    const lunches = [
+      { id: 1, name: 'Anchor', rating: 1500, glicko_rd: 350 },
+      {
+        id: 2,
+        name: 'Low-RD fresh opponent',
+        rating: 1800,
+        glicko_rd: 10,
+        presentation_count: 0,
+      },
+      {
+        id: 3,
+        name: 'Stale close opponent',
+        rating: 1510,
+        glicko_rd: 100,
+        presentation_count: 100,
+      },
+    ]
+    mockRandom(0, 1, 0, 0, 0.75)
+
+    const result = selectMatchup(lunches, [])!
+
+    expect(result.map((lunch) => lunch.id)).toEqual([1, 2])
+  })
+
+  it('does not always return the closest-rated opponent', () => {
+    const lunches = [
+      { id: 1, name: 'Anchor', rating: 1500, glicko_rd: 350 },
+      { id: 2, name: 'Closest opponent', rating: 1501, glicko_rd: 100 },
+      { id: 3, name: 'Nearby sampled opponent', rating: 1502, glicko_rd: 100 },
+    ]
+    mockRandom(0, 0, 0, 0.7, 0.75)
+
+    const result = selectMatchup(lunches, [])!
 
     expect(result.map((lunch) => lunch.id)).toEqual([1, 3])
   })
@@ -91,9 +129,7 @@ describe('selectMatchup', () => {
       { id: 2, name: 'Closest non-vegan', is_vegan: 0, rating: 1510, glicko_rd: 100 },
       { id: 3, name: 'Closest vegan', is_vegan: 1, rating: 1550, glicko_rd: 100 },
     ]
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.75)
+    mockRandom(0, 0, 0, 0.75)
 
     const result = selectMatchup(lunches, [])!
 
@@ -106,9 +142,7 @@ describe('selectMatchup', () => {
       { id: 2, name: 'Non-vegan 1', is_vegan: 0, rating: 1510, glicko_rd: 100 },
       { id: 3, name: 'Non-vegan 2', is_vegan: 0, rating: 1520, glicko_rd: 100 },
     ]
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.75)
+    mockRandom(0, 0, 0.75, 0.75)
 
     expect(selectMatchup(lunches, [])!.map((lunch) => lunch.id)).toEqual([2, 3])
   })
@@ -130,9 +164,7 @@ describe('selectMatchup', () => {
 
   it('randomly swaps left and right sides', () => {
     const lunches = makeLunches(2)
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.25)
+    mockRandom(0, 0, 0, 0.25)
 
     const result = selectMatchup(lunches, [])!
 

@@ -167,6 +167,8 @@ describe('GET /api/matchup vegan filtering', () => {
     const data = await res.json() as { left: LunchRow; right: LunchRow }
     expect(data.left.is_vegan).toBe(0)
     expect(data.right.is_vegan).toBe(0)
+    expect(data.left).not.toHaveProperty('presentation_count')
+    expect(data.right).not.toHaveProperty('presentation_count')
   })
 
   test('vegan=true returns only vegan lunches', async () => {

@@ -32,7 +32,7 @@ Current steps:
 2. Set up pnpm.
 3. Set up Node.js 24.
 4. Install dependencies.
-5. Run API tests with `pnpm test`.
+5. Run workspace unit tests with `pnpm test`.
 6. Build the frontend.
 7. Deploy the Worker.
 8. Deploy the frontend to Cloudflare Pages.

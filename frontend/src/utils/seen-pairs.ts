@@ -1,31 +1,33 @@
 const KEY = 'lb_seen_pairs'
-const MAX = 200
+const MAX = 2000
 
 function pairKey(a: number, b: number): string {
   return a < b ? `${a}-${b}` : `${b}-${a}`
 }
 
 export function hasSeen(leftId: number, rightId: number): boolean {
-  return load().has(pairKey(leftId, rightId))
+  return load().includes(pairKey(leftId, rightId))
 }
 
 export function markSeen(leftId: number, rightId: number): void {
-  const set = load()
-  set.add(pairKey(leftId, rightId))
-  save(set.size >= MAX ? new Set() : set)
+  const key = pairKey(leftId, rightId)
+  const next = load().filter(item => item !== key)
+  next.push(key)
+  save(next.slice(-MAX))
 }
 
-function load(): Set<string> {
+function load(): string[] {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
+    const items = raw ? JSON.parse(raw) : []
+    return Array.isArray(items) ? items.filter(item => typeof item === 'string') : []
   } catch {
-    return new Set()
+    return []
   }
 }
 
-function save(set: Set<string>): void {
+function save(items: string[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify([...set]))
+    localStorage.setItem(KEY, JSON.stringify(items))
   } catch { /* storage full */ }
 }

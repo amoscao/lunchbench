@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm --filter lunchbench-api test"
+    "test": "pnpm --filter lunchbench-api --filter lunchbench-frontend test"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",

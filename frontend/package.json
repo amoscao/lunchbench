@@ -4,11 +4,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "devDependencies": {
     "typescript": "^5",
-    "vite": "^5"
+    "vite": "^5",
+    "vitest": "^2"
   },
   "dependencies": {
     "@sentry/browser": "^10.59.0"

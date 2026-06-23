@@ -7,8 +7,8 @@ CREATE TABLE matchup_sessions (
 CREATE TABLE matchup_presentations (
   session_key TEXT NOT NULL REFERENCES matchup_sessions(session_key),
   vegan_only INTEGER NOT NULL CHECK (vegan_only IN (0, 1)),
-  low_lunch_id INTEGER NOT NULL,
-  high_lunch_id INTEGER NOT NULL,
+  low_lunch_id INTEGER NOT NULL REFERENCES lunches(id),
+  high_lunch_id INTEGER NOT NULL REFERENCES lunches(id),
   presented_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (session_key, vegan_only, low_lunch_id, high_lunch_id),
   CHECK (low_lunch_id < high_lunch_id)

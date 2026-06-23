@@ -1,7 +1,15 @@
 import * as Sentry from '@sentry/browser'
-import { getMatchup, submitVote, type Lunch, type Matchup, type VoteResult } from '../api'
+import {
+  acknowledgeMatchupSeen,
+  getMatchup,
+  submitVote,
+  type Lunch,
+  type Matchup,
+  type MatchupResult,
+  type VoteResult,
+} from '../api'
 import { isVeganMode } from '../vegan-mode'
-import { hasSeen, markSeen } from '../utils/seen-pairs'
+import { markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
 
@@ -273,22 +281,16 @@ export function renderHome(
   let leftLunch: Lunch | null = null
   let rightLunch: Lunch | null = null
   let currentMatchup: Matchup | null = null
-  let nextMatchupPromise: Promise<Matchup | null> | null = null
-  let nextMatchupExhausted = false
+  let nextMatchupPromise: Promise<MatchupResult> | null = null
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
 
-  // Tries up to 3 API calls to find an unseen pair.
-  // If all return seen pairs, sets nextMatchupExhausted and returns null.
-  // If the API has no lunches at all, returns null without setting the flag.
-  async function fetchNextUnseen(): Promise<Matchup | null> {
-    for (let i = 0; i < 3; i++) {
-      const m = await getMatchup(isVeganMode())
-      if (!m) return null
-      if (!hasSeen(m.left.id, m.right.id)) return m
-    }
-    nextMatchupExhausted = true
-    return null
+  function acknowledgeRenderedMatchup(matchup: Matchup): Promise<void> {
+    return acknowledgeMatchupSeen(matchup.matchup_token).catch((error: unknown) => {
+      Sentry.captureException(error, {
+        extra: { leftId: matchup.left.id, rightId: matchup.right.id },
+      })
+    })
   }
 
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
@@ -347,11 +349,11 @@ export function renderHome(
     try {
       await Promise.all([delay, votePromise])
 
-      let next: Matchup | null
+      let next: MatchupResult
       try {
-        next = await (nextMatchupPromise ?? fetchNextUnseen())
+        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
       } catch {
-        next = await fetchNextUnseen()
+        next = await getMatchup(isVeganMode())
       }
       await load(next)
     } catch {
@@ -373,11 +375,11 @@ export function renderHome(
     if (bar) bar.classList.add('loading')
 
     try {
-      let next: Matchup | null
+      let next: MatchupResult
       try {
-        next = await (nextMatchupPromise ?? fetchNextUnseen())
+        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
       } catch {
-        next = await fetchNextUnseen()
+        next = await getMatchup(isVeganMode())
       }
       await load(next)
     } catch {
@@ -418,7 +420,7 @@ export function renderHome(
     }
   }
 
-  async function load(matchup?: Matchup | null): Promise<void> {
+  async function load(matchup?: MatchupResult): Promise<void> {
     if (matchup === undefined) {
       // Initial load - show skeleton.
       container.innerHTML = ''
@@ -427,7 +429,7 @@ export function renderHome(
       container.appendChild(content)
       content.appendChild(renderSkeleton())
       try {
-        const data = await fetchNextUnseen()
+        const data = await getMatchup(isVeganMode())
         await load(data)
       } catch (error) {
         content.innerHTML = ''
@@ -446,12 +448,15 @@ export function renderHome(
     if (!matchup) {
       currentMatchup = null
       nextMatchupPromise = null
-      if (nextMatchupExhausted) {
-        nextMatchupExhausted = false
-        content.appendChild(renderExhausted(navigate))
-      } else {
-        content.appendChild(renderEmpty(navigate, isVeganMode()))
-      }
+      content.appendChild(renderEmpty(navigate, isVeganMode()))
+      container.replaceChildren(content)
+      return
+    }
+
+    if (matchup.status === 'exhausted') {
+      currentMatchup = null
+      nextMatchupPromise = null
+      content.appendChild(renderExhausted(navigate))
       container.replaceChildren(content)
       return
     }
@@ -508,10 +513,9 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
-    nextMatchupExhausted = false
-    nextMatchupPromise = fetchNextUnseen()
-    // Suppress unhandledrejection — castVote/skipMatchup always await this.
-    nextMatchupPromise.catch(() => {})
+    nextMatchupPromise = acknowledgeRenderedMatchup(matchup)
+      .then(() => getMatchup(isVeganMode()))
+      .catch(() => null)
   }
 
   load(undefined)

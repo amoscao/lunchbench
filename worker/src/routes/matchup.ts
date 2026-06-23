@@ -23,6 +23,10 @@ type PresentedPairRow = {
   high_lunch_id: number
 }
 
+type LunchWithPresentationCount = LunchRow & {
+  presentation_count?: number
+}
+
 type MatchupTokenRow = PresentedPairRow & {
   session_key: string
   vegan_only: number
@@ -38,6 +42,11 @@ export function parseSessionKey(value: string | null): string | null {
 
 function orderedPairIds(leftId: number, rightId: number): [number, number] {
   return leftId < rightId ? [leftId, rightId] : [rightId, leftId]
+}
+
+function stripPresentationCount(lunch: LunchWithPresentationCount): LunchRow {
+  const { presentation_count: _presentationCount, ...row } = lunch
+  return row
 }
 
 async function upsertMatchupSession(db: D1Database, sessionKey: string): Promise<void> {
@@ -114,21 +123,31 @@ matchup.get('/', async (c) => {
   const seenPairs: [number, number][] = seenPairsResult.results.map(
     (p) => [p.low_lunch_id, p.high_lunch_id]
   )
+  const presentationCounts = new Map<number, number>()
+  for (const pair of seenPairsResult.results) {
+    presentationCounts.set(pair.low_lunch_id, (presentationCounts.get(pair.low_lunch_id) ?? 0) + 1)
+    presentationCounts.set(pair.high_lunch_id, (presentationCounts.get(pair.high_lunch_id) ?? 0) + 1)
+  }
 
   if (allLunches.results.length < 2) {
     return c.body(null, 204, { 'Cache-Control': 'no-store' })
   }
 
-  const pair = selectMatchup(allLunches.results, recentPairs, seenPairs)
+  const lunchesWithPresentationCounts = allLunches.results.map((lunch) => ({
+    ...lunch,
+    presentation_count: presentationCounts.get(lunch.id) ?? 0,
+  }))
+  const pair = selectMatchup(lunchesWithPresentationCounts, recentPairs, seenPairs)
   if (!pair) {
     return c.json({ status: 'exhausted' }, 200, { 'Cache-Control': 'no-store' })
   }
 
-  const pairIsVegan = pair[0].is_vegan
-  const leftWin = projectOutcome(pair[0], pair[1], 'A_WIN')
-  const rightWin = projectOutcome(pair[0], pair[1], 'B_WIN')
-  const tie = projectOutcome(pair[0], pair[1], 'DRAW')
-  const [leftId, rightId] = [pair[0].id, pair[1].id]
+  const [leftLunch, rightLunch] = pair.map(stripPresentationCount) as [LunchRow, LunchRow]
+  const pairIsVegan = leftLunch.is_vegan
+  const leftWin = projectOutcome(leftLunch, rightLunch, 'A_WIN')
+  const rightWin = projectOutcome(leftLunch, rightLunch, 'B_WIN')
+  const tie = projectOutcome(leftLunch, rightLunch, 'DRAW')
+  const [leftId, rightId] = [leftLunch.id, rightLunch.id]
   const [lowLunchId, highLunchId] = orderedPairIds(leftId, rightId)
   const matchupToken = crypto.randomUUID()
   const tokenSessionKey = sessionKey ?? crypto.randomUUID()
@@ -151,12 +170,12 @@ matchup.get('/', async (c) => {
     c.env.DB.prepare(
       'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(pairIsVegan, leftId, rightId, pair[0].conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, leftLunch.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
       'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
     )
-      .bind(pairIsVegan, leftId, rightId, pair[1].conservative_rating)
+      .bind(pairIsVegan, leftId, rightId, rightLunch.conservative_rating)
       .first<RankRow>(),
     c.env.DB.prepare(
       'SELECT COUNT(*) + 1 AS rank FROM lunches WHERE is_vegan = ? AND id NOT IN (?, ?) AND conservative_rating > ?'
@@ -192,13 +211,13 @@ matchup.get('/', async (c) => {
 
   const leftRank = rankWithHeadToHead(
     leftRankRow,
-    pair[0].conservative_rating,
-    pair[1].conservative_rating
+    leftLunch.conservative_rating,
+    rightLunch.conservative_rating
   )
   const rightRank = rankWithHeadToHead(
     rightRankRow,
-    pair[1].conservative_rating,
-    pair[0].conservative_rating
+    rightLunch.conservative_rating,
+    leftLunch.conservative_rating
   )
 
   return c.json(
@@ -206,11 +225,11 @@ matchup.get('/', async (c) => {
       status: 'ok',
       matchup_token: matchupToken,
       left: {
-        ...lunchFromRow(pair[0]),
+        ...lunchFromRow(leftLunch),
         rank: leftRank,
       },
       right: {
-        ...lunchFromRow(pair[1]),
+        ...lunchFromRow(rightLunch),
         rank: rightRank,
       },
       projected: {

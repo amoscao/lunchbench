@@ -12,11 +12,24 @@ The goals are:
 
 ## Current GitHub Actions Workflow
 
-Current workflow inventory (via `gh workflow list`) shows one active workflow:
+Current workflow inventory shows two active workflows:
 
 ```text
+.github/workflows/ci.yml
 .github/workflows/deploy.yml
 ```
+
+The CI workflow runs on pull requests.
+
+Current CI steps:
+
+1. Check out the repo.
+2. Set up pnpm.
+3. Set up Node.js 24.
+4. Install dependencies.
+5. Run workspace unit tests with `pnpm test`.
+6. Build the frontend.
+7. Publish the required CI status.
 
 The deploy workflow file is:
 
@@ -32,7 +45,7 @@ Current steps:
 2. Set up pnpm.
 3. Set up Node.js 24.
 4. Install dependencies.
-5. Run API tests with `pnpm test`.
+5. Run workspace unit tests with `pnpm test`.
 6. Build the frontend.
 7. Deploy the Worker.
 8. Deploy the frontend to Cloudflare Pages.

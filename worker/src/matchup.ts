@@ -13,24 +13,47 @@ export type LunchForMatchup = {
  */
 export function selectMatchup<T extends LunchForMatchup>(
   lunches: T[],
-  recentPairs: [number, number][]
+  recentPairs: [number, number][],
+  excludedPairs: [number, number][] = []
 ): [T, T] | null {
   if (lunches.length < 2) return null
 
   const recentSet = new Set(recentPairs.map(([a, b]) => pairKey(a, b)))
+  const excludedSet = new Set(excludedPairs.map(([a, b]) => pairKey(a, b)))
   const anchorPool = lunches.filter((lunch) =>
-    lunches.some((other) => other.id !== lunch.id && !recentSet.has(pairKey(lunch.id, other.id)))
+    lunches.some((other) =>
+      other.id !== lunch.id &&
+      sameVeganGroup(lunch, other) &&
+      !excludedSet.has(pairKey(lunch.id, other.id)) &&
+      !recentSet.has(pairKey(lunch.id, other.id))
+    )
   )
-  const anchor = weightedByRd(anchorPool.length > 0 ? anchorPool : lunches)
+  const fallbackAnchorPool = lunches.filter((lunch) =>
+    lunches.some((other) =>
+      other.id !== lunch.id &&
+      sameVeganGroup(lunch, other) &&
+      !excludedSet.has(pairKey(lunch.id, other.id))
+    )
+  )
+  const availableAnchors = anchorPool.length > 0 ? anchorPool : fallbackAnchorPool
+  if (availableAnchors.length === 0) return null
+
+  const anchor = weightedByRd(availableAnchors)
   const sameGroup = lunches.filter((lunch) => sameVeganGroup(anchor, lunch))
   if (sameGroup.length < 2) return null
 
   const nonRecentOpponentPool = sameGroup.filter((lunch) =>
-    lunch.id !== anchor.id && !recentSet.has(pairKey(anchor.id, lunch.id))
+    lunch.id !== anchor.id &&
+    !excludedSet.has(pairKey(anchor.id, lunch.id)) &&
+    !recentSet.has(pairKey(anchor.id, lunch.id))
   )
   const opponentPool = nonRecentOpponentPool.length > 0
     ? nonRecentOpponentPool
-    : sameGroup.filter((lunch) => lunch.id !== anchor.id)
+    : sameGroup.filter((lunch) =>
+      lunch.id !== anchor.id && !excludedSet.has(pairKey(anchor.id, lunch.id))
+    )
+  if (opponentPool.length === 0) return null
+
   const opponent = closestRated(anchor, opponentPool)
   const pair: [T, T] = [anchor, opponent]
 

@@ -24,6 +24,8 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0003_add_vegan.
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0004_admin_sessions.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0005_glicko.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0006_glicko_defaults.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0007_session_roles.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0009_matchup_sessions.sql
 ```
 
 ## Automated Deployment (GitHub Actions)

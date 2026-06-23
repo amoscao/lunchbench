@@ -100,15 +100,32 @@ describe('selectMatchup', () => {
     expect(result.map((lunch) => lunch.id)).toEqual([1, 3])
   })
 
-  it('returns null when the selected anchor has no same-group opponent', () => {
+  it('skips anchors with no same-group opponent', () => {
     const lunches = [
       { id: 1, name: 'Only vegan', is_vegan: 1, rating: 1500, glicko_rd: 100 },
       { id: 2, name: 'Non-vegan 1', is_vegan: 0, rating: 1510, glicko_rd: 100 },
       { id: 3, name: 'Non-vegan 2', is_vegan: 0, rating: 1520, glicko_rd: 100 },
     ]
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0)
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.75)
 
-    expect(selectMatchup(lunches, [])).toBeNull()
+    expect(selectMatchup(lunches, [])!.map((lunch) => lunch.id)).toEqual([2, 3])
+  })
+
+  it('never returns hard-excluded pairs', () => {
+    const lunches = makeLunches(3)
+
+    for (let i = 0; i < 50; i++) {
+      const result = selectMatchup(lunches, [], [[1, 2], [1, 3]])!
+      expect(result.map((lunch) => lunch.id).sort()).toEqual([2, 3])
+    }
+  })
+
+  it('returns null when all same-group pairs are hard-excluded', () => {
+    const lunches = makeLunches(2)
+
+    expect(selectMatchup(lunches, [], [[1, 2]])).toBeNull()
   })
 
   it('randomly swaps left and right sides', () => {

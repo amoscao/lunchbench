@@ -109,18 +109,24 @@ Returns non-vegan lunches sorted by `conservative_rating` descending, then `name
 ### GET /api/matchup
 Returns two selected lunches for voting.
 
+**Headers:**
+- `X-Lunchbench-Session: <uuid>` — optional browser-local session ticker. When present and valid, the server excludes pairs already acknowledged through `POST /api/matchup/seen` for the same session and vegan mode. Malformed values are ignored.
+
 **Query params:**
 - `?vegan=true` — return a vegan-only matchup (`is_vegan = 1`)
 - (no param or any other value) — return a non-vegan matchup (`is_vegan = 0`)
 
 Both lunches in the pair always share the same `is_vegan` value.
-Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
-If the requested group has fewer than 2 lunches, the endpoint returns 204.
+Selection weights the anchor lunch by `glicko_rd`, excludes session-seen pairs, avoids recent voted pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
+If the requested group has fewer than 2 lunches, the endpoint returns 204. If the requested session and vegan mode has seen every available pair, the endpoint returns 200 with `{ "status": "exhausted" }`.
 Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.
+`matchup_token` is an opaque token for the served pair. The client sends it to `POST /api/matchup/seen` only after the matchup renders; prefetching a matchup does not mark it seen.
 
 **Response 200:**
 ```json
 {
+  "status": "ok",
+  "matchup_token": "550e8400-e29b-41d4-a716-446655440000",
   "left": { "rank": 1, /* full Lunch object, including conservative_rating */ },
   "right": { "rank": 2, /* full Lunch object, including conservative_rating */ },
   "projected": {
@@ -142,7 +148,33 @@ Each lunch includes `rank`, its leaderboard position among lunches of the same v
 
 `projected` contains read-only projected rating, conservative rating, and rank outcomes for each possible vote result.
 
+**Response 200 exhausted:**
+```json
+{ "status": "exhausted" }
+```
+
 **Response 204:** (fewer than 2 lunches exist — no body)
+
+---
+
+### POST /api/matchup/seen
+Records that a rendered matchup was presented to the user.
+
+**Request body:**
+```json
+{ "token": "550e8400-e29b-41d4-a716-446655440000" }
+```
+
+The token must come from a prior successful `GET /api/matchup` response. Duplicate acknowledgements for the same token are treated as success.
+
+**Response 200:**
+```json
+{ "ok": true }
+```
+
+**Errors:**
+- `400 BAD_REQUEST` — invalid, missing, or unknown token
+- `429 RATE_LIMITED` — exceeded 2000 seen acknowledgements/hour/IP
 
 ---
 
@@ -272,6 +304,7 @@ Cache-Control: public, max-age=31536000, immutable
 |-------|-------|--------|-----|
 | GET /api/lunches | 120 | 1 hour | IP |
 | GET /api/matchup | 2000 | 1 hour | IP |
+| POST /api/matchup/seen | 2000 | 1 hour | IP |
 | GET /api/lunches/leaderboard | 60 | 1 hour | IP |
 | POST /api/vote | 30 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |

@@ -39,6 +39,8 @@ function makeLunchJson(l: FakeLunch) {
 function makeMatchupJson(left: FakeLunch, right: FakeLunch) {
   const r = { rating: 1500, conservative_rating: 1350, rank: 1 }
   return {
+    status: 'ok',
+    matchup_token: `${left.id}-${right.id}`,
     left: makeLunchJson(left),
     right: makeLunchJson(right),
     projected: {
@@ -52,20 +54,32 @@ function makeMatchupJson(left: FakeLunch, right: FakeLunch) {
 test.describe('Exhausted matchups', () => {
   test('shows exhausted message after all pairs have been voted on', async ({ page }) => {
     const shownPairs: Array<{ left: string; right: string }> = []
-    let matchupCallCount = 0
+    const seenTokens = new Set<string>()
 
-    // Clear seen-pairs from localStorage before page JS runs
-    await page.addInitScript(() => {
-      localStorage.removeItem('lb_seen_pairs')
-    })
-
-    // Serve pairs in a fixed cyclic order.
-    // The prefetch IIFE in home.ts checks hasSeen() on each result.
-    // After all 3 unique pairs are shown to the user, 3 consecutive
-    // prefetch calls all return seen pairs → exhaustion is declared.
     await page.route('**/api/matchup**', async (route) => {
-      const idx = matchupCallCount % FAKE_PAIRS.length
-      matchupCallCount++
+      const request = route.request()
+      const url = new URL(request.url())
+      if (url.pathname === '/api/matchup/seen') {
+        const body = request.postDataJSON() as { token?: string }
+        if (body.token) seenTokens.add(body.token)
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        })
+        return
+      }
+
+      if (seenTokens.size >= FAKE_PAIRS.length) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'exhausted' }),
+        })
+        return
+      }
+
+      const idx = seenTokens.size
       const [left, right] = FAKE_PAIRS[idx]
       await route.fulfill({
         status: 200,
@@ -124,8 +138,6 @@ test.describe('Exhausted matchups', () => {
       }
     }
 
-    // After the last vote, the prefetch IIFE will have tried 3 calls and found
-    // all pairs seen → sets exhausted flag → load(null) renders exhausted state.
     await expect(page.locator('.state-title')).toHaveText("You've seen them all!", {
       timeout: 8000,
     })
@@ -154,20 +166,20 @@ test.describe('Exhausted matchups', () => {
   })
 
   test('shows exhausted message immediately on page load when all pairs already seen', async ({ page }) => {
-    // Pre-populate localStorage with all 3 pair keys before the page JS runs.
-    // Simulates a refresh after exhaustion has already been reached.
-    await page.addInitScript(() => {
-      const allPairs = ['9001-9002', '9001-9003', '9002-9003']
-      localStorage.setItem('lb_seen_pairs', JSON.stringify(allPairs))
-    })
-
-    // Always return a seen pair — no unseen pairs available
     await page.route('**/api/matchup**', async (route) => {
-      const [left, right] = FAKE_PAIRS[0]
+      if (new URL(route.request().url()).pathname === '/api/matchup/seen') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        })
+        return
+      }
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(makeMatchupJson(left, right)),
+        body: JSON.stringify({ status: 'exhausted' }),
       })
     })
 

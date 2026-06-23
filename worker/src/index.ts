@@ -14,7 +14,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 const corsOptions = {
   origin: allowedCorsOrigin,
   allowMethods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Authorization', 'Content-Type'],
+  allowHeaders: ['Authorization', 'Content-Type', 'X-Lunchbench-Session'],
   maxAge: 600,
 }
 

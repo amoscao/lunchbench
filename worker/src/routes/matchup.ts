@@ -276,6 +276,16 @@ matchup.get('/', async (c) => {
 })
 
 matchup.post('/seen', async (c) => {
+  const ip = getClientIp(c.req.raw)
+  const rl = await checkRateLimit(c.env.DB, ip, 'matchup_seen', 2000, 3600)
+  if (!rl.allowed) {
+    return c.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
+      429,
+      { 'Retry-After': String(rl.retryAfter ?? 3600) }
+    )
+  }
+
   let body: { token?: unknown }
   try {
     body = await c.req.json()

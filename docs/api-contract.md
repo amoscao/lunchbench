@@ -174,6 +174,7 @@ The token must come from a prior successful `GET /api/matchup` response. Duplica
 
 **Errors:**
 - `400 BAD_REQUEST` — invalid, missing, or unknown token
+- `429 RATE_LIMITED` — exceeded 2000 seen acknowledgements/hour/IP
 
 ---
 
@@ -303,6 +304,7 @@ Cache-Control: public, max-age=31536000, immutable
 |-------|-------|--------|-----|
 | GET /api/lunches | 120 | 1 hour | IP |
 | GET /api/matchup | 2000 | 1 hour | IP |
+| POST /api/matchup/seen | 2000 | 1 hour | IP |
 | GET /api/lunches/leaderboard | 60 | 1 hour | IP |
 | POST /api/vote | 30 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |

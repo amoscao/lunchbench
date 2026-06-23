@@ -40,7 +40,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy Frontend to Pages
-        run: pnpm --filter lunchbench-api exec wrangler pages deploy frontend/dist --project-name=lunchbench --branch=main
+        working-directory: frontend
+        run: ../worker/node_modules/.bin/wrangler pages deploy dist --project-name=lunchbench --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

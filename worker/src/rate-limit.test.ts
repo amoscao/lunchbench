@@ -54,6 +54,18 @@ function fakeDb(): D1Database {
           })
         },
         async first() {
+          if (sql.includes('RETURNING count, window_start')) {
+            const [key, action, windowStart] = bound as [string, string, string]
+            const rowKey = `${key}:${action}`
+            const existing = rows.get(rowKey)
+            const row = {
+              count: existing?.window_start === windowStart ? existing.count + 1 : 1,
+              window_start: windowStart,
+            }
+            rows.set(rowKey, row)
+            return row
+          }
+
           if (sql.includes('RETURNING window_start')) {
             return this.applyCooldownInsert()
           }

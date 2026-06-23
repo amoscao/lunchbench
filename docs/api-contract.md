@@ -108,13 +108,25 @@ Returns non-vegan lunches sorted by `conservative_rating` descending, then `name
 
 ### GET /api/matchup
 Returns two selected lunches for voting.
-Selection weights the anchor lunch by `glicko_rd`, avoids recent pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
-The opponent pool is limited to lunches with the same `is_vegan` value as the selected anchor lunch; if that group has fewer than 2 lunches, the endpoint returns 204.
-Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_rating`.
+
+**Headers:**
+- `X-Lunchbench-Session: <uuid>` — optional browser-local session ticker. When present and valid, the server excludes pairs already acknowledged through `POST /api/matchup/seen` for the same session and vegan mode. Malformed values are ignored.
+
+**Query params:**
+- `?vegan=true` — return a vegan-only matchup (`is_vegan = 1`)
+- (no param or any other value) — return a non-vegan matchup (`is_vegan = 0`)
+
+Both lunches in the pair always share the same `is_vegan` value.
+Selection weights the anchor lunch by `glicko_rd`, excludes session-seen pairs, avoids recent voted pairs when possible, prefers the closest raw Glicko rating opponent, and randomly assigns left/right sides.
+If the requested group has fewer than 2 lunches, the endpoint returns 204. If the requested session and vegan mode has seen every available pair, the endpoint returns 200 with `{ "status": "exhausted" }`.
+Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.
+`matchup_token` is an opaque token for the served pair. The client sends it to `POST /api/matchup/seen` only after the matchup renders; prefetching a matchup does not mark it seen.
 
 **Response 200:**
 ```json
 {
+  "status": "ok",
+  "matchup_token": "550e8400-e29b-41d4-a716-446655440000",
   "left": { "rank": 1, /* full Lunch object, including conservative_rating */ },
   "right": { "rank": 2, /* full Lunch object, including conservative_rating */ },
   "projected": {
@@ -136,7 +148,33 @@ Each lunch includes `rank`, its pre-vote leaderboard position by `conservative_r
 
 `projected` contains read-only projected rating, conservative rating, and rank outcomes for each possible vote result.
 
+**Response 200 exhausted:**
+```json
+{ "status": "exhausted" }
+```
+
 **Response 204:** (fewer than 2 lunches exist — no body)
+
+---
+
+### POST /api/matchup/seen
+Records that a rendered matchup was presented to the user.
+
+**Request body:**
+```json
+{ "token": "550e8400-e29b-41d4-a716-446655440000" }
+```
+
+The token must come from a prior successful `GET /api/matchup` response. Duplicate acknowledgements for the same token are treated as success.
+
+**Response 200:**
+```json
+{ "ok": true }
+```
+
+**Errors:**
+- `400 BAD_REQUEST` — invalid, missing, or unknown token
+- `429 RATE_LIMITED` — exceeded 2000 seen acknowledgements/hour/IP
 
 ---
 
@@ -153,7 +191,7 @@ Submit a vote for a matchup.
 ```
 
 `result` must be one of: `"left_win"`, `"right_win"`, `"tie"`
-`left_lunch_id` and `right_lunch_id` must be different.
+`left_lunch_id` and `right_lunch_id` must be different and must share the same `is_vegan` value. A vote between a vegan and non-vegan lunch returns 400 `BAD_REQUEST`.
 
 **Response 200:**
 ```json
@@ -168,17 +206,12 @@ Submit a vote for a matchup.
     "rating": 1480,
     "conservative_rating": 1280,
     "rank": 3
-  },
-  "next": {
-    "left": { /* Lunch object */ },
-    "right": { /* Lunch object */ }
   }
 }
 ```
 
 `left_result` and `right_result` contain the post-vote ratings and current rank for each lunch.
-`next` is `null` if fewer than 2 lunches are available for the next matchup.
-When present, each `next` lunch includes `rank`, its pre-vote leaderboard position for that next vote.
+The frontend prefetches the next full matchup with `GET /api/matchup`; the vote response does not include next matchup data.
 
 **Errors:**
 - `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides
@@ -271,6 +304,7 @@ Cache-Control: public, max-age=31536000, immutable
 |-------|-------|--------|-----|
 | GET /api/lunches | 120 | 1 hour | IP |
 | GET /api/matchup | 2000 | 1 hour | IP |
+| POST /api/matchup/seen | 2000 | 1 hour | IP |
 | GET /api/lunches/leaderboard | 60 | 1 hour | IP |
 | POST /api/vote | 30 | 1 hour | IP |
 | POST /api/lunches/:id/image | 5 | 24 hours | IP |

@@ -1,3 +1,5 @@
+import { getSessionId } from './utils/session-id'
+
 export type Lunch = {
   id: number
   name: string
@@ -63,10 +65,18 @@ export type ProjectedOutcomes = {
 }
 
 export type Matchup = {
+  status: 'ok'
+  matchup_token: string
   left: Lunch
   right: Lunch
   projected: ProjectedOutcomes
 }
+
+export type MatchupExhausted = {
+  status: 'exhausted'
+}
+
+export type MatchupResult = Matchup | MatchupExhausted | null
 
 const BASE = '/api'
 
@@ -82,17 +92,29 @@ function normalizeLunch<T extends { image_url: string | null }>(lunch: T): T {
   }
 }
 
-export async function getMatchup(veganOnly = false): Promise<Matchup | null> {
-  const res = await fetch(`${BASE}/matchup${veganOnly ? '?vegan=true' : ''}`)
+export async function getMatchup(veganOnly = false): Promise<MatchupResult> {
+  const res = await fetch(`${BASE}/matchup${veganOnly ? '?vegan=true' : ''}`, {
+    headers: { 'X-Lunchbench-Session': getSessionId() },
+  })
   if (res.status === 204) return null
   if (res.status === 429) throw new Error('rate_limited')
   if (!res.ok) throw new Error(`Matchup fetch failed: ${res.status}`)
-  const data = await res.json() as Matchup
+  const data = await res.json() as Matchup | MatchupExhausted
+  if (data.status === 'exhausted') return data
   return {
     ...data,
     left: normalizeLunch(data.left),
     right: normalizeLunch(data.right),
   }
+}
+
+export async function acknowledgeMatchupSeen(token: string): Promise<void> {
+  const res = await fetch(`${BASE}/matchup/seen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) throw new Error(`Matchup seen ack failed: ${res.status}`)
 }
 
 export async function submitVote(
@@ -101,7 +123,6 @@ export async function submitVote(
   result: 'left_win' | 'right_win' | 'tie'
 ): Promise<{
   vote_id: number
-  next: { left: Lunch; right: Lunch } | null
   left_result: VoteResult
   right_result: VoteResult
 }> {
@@ -117,19 +138,10 @@ export async function submitVote(
   }
   const data = await res.json() as {
     vote_id: number
-    next: { left: Lunch; right: Lunch } | null
     left_result: VoteResult
     right_result: VoteResult
   }
-  return {
-    ...data,
-    next: data.next
-      ? {
-          left: normalizeLunch(data.next.left),
-          right: normalizeLunch(data.next.right),
-        }
-      : null,
-  }
+  return data
 }
 
 export async function getLeaderboard(veganOnly = false): Promise<LeaderboardPage> {

@@ -1,7 +1,15 @@
 import * as Sentry from '@sentry/browser'
-import { getMatchup, submitVote, type Lunch, type Matchup, type VoteResult } from '../api'
+import {
+  acknowledgeMatchupSeen,
+  getMatchup,
+  submitVote,
+  type Lunch,
+  type Matchup,
+  type MatchupResult,
+  type VoteResult,
+} from '../api'
 import { isVeganMode } from '../vegan-mode'
-import { hasSeen, markSeen } from '../utils/seen-pairs'
+import { markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
 
@@ -137,6 +145,22 @@ function renderRateLimit(retry: () => void): HTMLElement {
   return div
 }
 
+function renderExhausted(navigate: (p: string) => void): HTMLElement {
+  const div = document.createElement('div')
+  div.className = 'state-center'
+  div.innerHTML = `
+    <div class="state-icon">🎉</div>
+    <div class="state-title">You've seen them all!</div>
+    <div class="state-desc">New matchups may appear as lunches are added. Check back later.</div>
+  `
+  const btn = document.createElement('button')
+  btn.className = 'btn btn-secondary'
+  btn.textContent = 'See the leaderboard'
+  btn.addEventListener('click', () => navigate('/leaderboard'))
+  div.appendChild(btn)
+  return div
+}
+
 function showVoteOverlay(
   card: HTMLElement,
   lunch: Lunch,
@@ -257,9 +281,17 @@ export function renderHome(
   let leftLunch: Lunch | null = null
   let rightLunch: Lunch | null = null
   let currentMatchup: Matchup | null = null
-  let nextMatchupPromise: Promise<Matchup | null> | null = null
+  let nextMatchupPromise: Promise<MatchupResult> | null = null
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
+
+  function acknowledgeRenderedMatchup(matchup: Matchup): Promise<void> {
+    return acknowledgeMatchupSeen(matchup.matchup_token).catch((error: unknown) => {
+      Sentry.captureException(error, {
+        extra: { leftId: matchup.left.id, rightId: matchup.right.id },
+      })
+    })
+  }
 
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
     if (isSubmitting || !leftLunch || !rightLunch || !currentMatchup) return
@@ -298,20 +330,26 @@ export function renderHome(
     if (rightCard) showVoteOverlay(rightCard, votedRight, projected.right)
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
+    const isRateLimited = (err: unknown): boolean =>
+      err instanceof Error && err.message === 'rate_limited'
     const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async (firstErr: unknown) => {
+      if (isRateLimited(firstErr)) return
       try {
         await submitVote(votedLeft.id, votedRight.id, result)
       } catch (secondErr: unknown) {
-        Sentry.captureException(secondErr ?? firstErr, {
-          extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
-        })
+        const err = secondErr ?? firstErr
+        if (!isRateLimited(err)) {
+          Sentry.captureException(err, {
+            extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
+          })
+        }
       }
     })
 
     try {
       await Promise.all([delay, votePromise])
 
-      let next: Matchup | null
+      let next: MatchupResult
       try {
         next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
       } catch {
@@ -337,7 +375,7 @@ export function renderHome(
     if (bar) bar.classList.add('loading')
 
     try {
-      let next: Matchup | null
+      let next: MatchupResult
       try {
         next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
       } catch {
@@ -382,7 +420,7 @@ export function renderHome(
     }
   }
 
-  async function load(matchup?: Matchup | null): Promise<void> {
+  async function load(matchup?: MatchupResult): Promise<void> {
     if (matchup === undefined) {
       // Initial load - show skeleton.
       container.innerHTML = ''
@@ -415,24 +453,19 @@ export function renderHome(
       return
     }
 
-    let displayMatchup: Matchup | null = matchup
-    let retries = 0
-    while (displayMatchup && hasSeen(displayMatchup.left.id, displayMatchup.right.id) && retries < 10) {
-      displayMatchup = await getMatchup(isVeganMode())
-      retries++
-    }
-    if (!displayMatchup) {
+    if (matchup.status === 'exhausted') {
       currentMatchup = null
       nextMatchupPromise = null
-      content.appendChild(renderEmpty(navigate, isVeganMode()))
+      content.appendChild(renderExhausted(navigate))
       container.replaceChildren(content)
       return
     }
-    markSeen(displayMatchup.left.id, displayMatchup.right.id)
 
-    currentMatchup = displayMatchup
-    leftLunch = displayMatchup.left
-    rightLunch = displayMatchup.right
+    markSeen(matchup.left.id, matchup.right.id)
+
+    currentMatchup = matchup
+    leftLunch = matchup.left
+    rightLunch = matchup.right
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
@@ -480,7 +513,9 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
-    nextMatchupPromise = getMatchup(isVeganMode()).catch(() => null)
+    nextMatchupPromise = acknowledgeRenderedMatchup(matchup)
+      .then(() => getMatchup(isVeganMode()))
+      .catch(() => null)
   }
 
   load(undefined)

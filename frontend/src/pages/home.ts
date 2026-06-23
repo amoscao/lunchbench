@@ -513,9 +513,8 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
-    nextMatchupPromise = acknowledgeRenderedMatchup(matchup)
-      .then(() => getMatchup(isVeganMode()))
-      .catch(() => null)
+    acknowledgeRenderedMatchup(matchup).catch(() => {})
+    nextMatchupPromise = getMatchup(isVeganMode())
   }
 
   load(undefined)

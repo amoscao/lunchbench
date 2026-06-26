@@ -202,12 +202,12 @@ img {
 }
 
 .logo-lunch {
-  color: #fff;
+  color: #000;
   background: none;
 }
 
 [data-theme="dark"] .logo-lunch {
-  color: #000;
+  color: #fff;
 }
 
 .logo-bench {

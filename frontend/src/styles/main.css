@@ -206,6 +206,10 @@ img {
   background: none;
 }
 
+[data-theme="dark"] .logo-lunch {
+  color: #000;
+}
+
 .logo-bench {
   background: linear-gradient(90deg, hsl(168, 88%, 52%) 0%, hsl(282, 82%, 68%) 100%);
   -webkit-background-clip: text;

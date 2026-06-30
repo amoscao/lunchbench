@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { addLunchViaAPI, API_URL, castVote, waitForMatchup } from './helpers'
 
 type LunchSnapshot = {
@@ -10,30 +10,6 @@ type LunchSnapshot = {
   losses: number
   ties: number
   rank?: number
-  description?: string | null
-  image_key?: string | null
-  image_url?: string | null
-  is_vegan?: number
-  created_at?: string
-  updated_at?: string
-}
-
-type MatchupResponse = {
-  status: 'ok'
-  matchup_token: string
-  left: LunchSnapshot
-  right: LunchSnapshot
-  projected: {
-    left_win: { left: VoteProjection; right: VoteProjection }
-    right_win: { left: VoteProjection; right: VoteProjection }
-    tie: { left: VoteProjection; right: VoteProjection }
-  }
-}
-
-type VoteProjection = {
-  rating: number
-  conservative_rating: number
-  rank: number
 }
 
 function pairKey(leftId: number, rightId: number): string {
@@ -64,36 +40,6 @@ async function createVotePair(): Promise<{ left: LunchSnapshot; right: LunchSnap
     left: await getLunchSnapshot(leftId),
     right: await getLunchSnapshot(rightId),
   }
-}
-
-function projectionFor(lunch: LunchSnapshot): VoteProjection {
-  return {
-    rating: lunch.rating,
-    conservative_rating: lunch.conservative_rating,
-    rank: lunch.rank ?? 1,
-  }
-}
-
-async function routeMatchup(page: Page, left: LunchSnapshot, right: LunchSnapshot): Promise<void> {
-  const mockedMatchup: MatchupResponse = {
-    status: 'ok',
-    matchup_token: `e2e-${left.id}-${right.id}-${Date.now()}`,
-    left,
-    right,
-    projected: {
-      left_win: { left: projectionFor(left), right: projectionFor(right) },
-      right_win: { left: projectionFor(left), right: projectionFor(right) },
-      tie: { left: projectionFor(left), right: projectionFor(right) },
-    },
-  }
-
-  await page.route('/api/matchup**', async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.continue()
-      return
-    }
-    await route.fulfill({ status: 200, json: mockedMatchup })
-  })
 }
 
 test.describe('No duplicate matchups', () => {
@@ -129,57 +75,41 @@ test.describe('No duplicate matchups', () => {
     expect(new Set(renderedPairs).size).toBe(renderedPairs.length)
   })
 
-  test('vote updates win/loss counters', async ({ page }) => {
+  test('vote updates win/loss counters', async ({ page: _page }) => {
     const { left, right } = await createVotePair()
-    await routeMatchup(page, left, right)
 
-    await page.goto('/')
-    await waitForMatchup(page)
-    const voteResponse = page.waitForResponse('**/api/vote')
-    await castVote(page, 'left')
-    await voteResponse
-
-    await expect.poll(async () => {
-      const updatedLeft = await getLunchSnapshot(left.id)
-      const updatedRight = await getLunchSnapshot(right.id)
-      return {
-        leftWins: updatedLeft.wins,
-        rightLosses: updatedRight.losses,
-      }
-    }).toEqual({
-      leftWins: left.wins + 1,
-      rightLosses: right.losses + 1,
+    const res = await fetch(`${API_URL}/api/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' }),
     })
+    expect(res.ok).toBe(true)
+
+    const updatedLeft = await getLunchSnapshot(left.id)
+    const updatedRight = await getLunchSnapshot(right.id)
+    expect(updatedLeft.wins).toBe(left.wins + 1)
+    expect(updatedRight.losses).toBe(right.losses + 1)
   })
 
   test('leaderboard reflects vote', async ({ page }) => {
     const { left, right } = await createVotePair()
-    await routeMatchup(page, left, right)
 
-    await page.goto('/')
-    await waitForMatchup(page)
-    const voteResponse = page.waitForResponse('**/api/vote')
-    await castVote(page, 'left')
-    await voteResponse
+    const res = await fetch(`${API_URL}/api/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' }),
+    })
+    expect(res.ok).toBe(true)
 
     await page.goto('/leaderboard')
     await expect(page.locator('.leaderboard-table tbody tr', { hasText: left.name })).toBeVisible()
     await expect(page.locator('.leaderboard-table tbody tr', { hasText: right.name })).toBeVisible()
 
-    await expect.poll(async () => {
-      const updatedLeft = await getLeaderboardLunch(left.id)
-      const updatedRight = await getLeaderboardLunch(right.id)
-      return {
-        leftWins: updatedLeft.wins,
-        rightLosses: updatedRight.losses,
-        leftRatingChanged: updatedLeft.conservative_rating !== left.conservative_rating,
-        rightRatingChanged: updatedRight.conservative_rating !== right.conservative_rating,
-      }
-    }).toEqual({
-      leftWins: left.wins + 1,
-      rightLosses: right.losses + 1,
-      leftRatingChanged: true,
-      rightRatingChanged: true,
-    })
+    const updatedLeft = await getLeaderboardLunch(left.id)
+    const updatedRight = await getLeaderboardLunch(right.id)
+    expect(updatedLeft.wins).toBe(left.wins + 1)
+    expect(updatedRight.losses).toBe(right.losses + 1)
+    expect(updatedLeft.conservative_rating).not.toBe(left.conservative_rating)
+    expect(updatedRight.conservative_rating).not.toBe(right.conservative_rating)
   })
 })

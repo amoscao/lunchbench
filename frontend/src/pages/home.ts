@@ -281,6 +281,7 @@ export function renderHome(
   let leftLunch: Lunch | null = null
   let rightLunch: Lunch | null = null
   let currentMatchup: Matchup | null = null
+  let currentContent: HTMLElement | null = null
   let nextMatchupPromise: Promise<MatchupResult> | null = null
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
@@ -341,22 +342,42 @@ export function renderHome(
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
     const isRateLimited = (err: unknown): boolean =>
       err instanceof Error && err.message === 'rate_limited'
+    let wasRateLimited = false
     const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async (firstErr: unknown) => {
-      if (isRateLimited(firstErr)) return
+      if (isRateLimited(firstErr)) {
+        wasRateLimited = true
+        return
+      }
       try {
         await submitVote(votedLeft.id, votedRight.id, result)
       } catch (secondErr: unknown) {
-        const err = secondErr ?? firstErr
-        if (!isRateLimited(err)) {
-          Sentry.captureException(err, {
-            extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
+        if (isRateLimited(secondErr)) {
+          Sentry.captureException(firstErr, {
+            extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 1 },
           })
+          wasRateLimited = true
+          return
         }
+        const err = secondErr ?? firstErr
+        Sentry.captureException(err, {
+          extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
+        })
       }
     })
 
     try {
       await Promise.all([delay, votePromise])
+      if (wasRateLimited) {
+        const content = currentContent
+        if (content) {
+          content.querySelector('.vote-notice')?.remove()
+          const notice = document.createElement('div')
+          notice.className = 'vote-notice'
+          notice.textContent = "Your vote wasn't recorded — a rate limit was reached."
+          content.appendChild(notice)
+        }
+        await new Promise<void>((r) => setTimeout(r, 900))
+      }
 
       let next: MatchupResult
       try {
@@ -435,6 +456,7 @@ export function renderHome(
       container.innerHTML = ''
       const content = document.createElement('div')
       content.className = 'page-content'
+      currentContent = content
       container.appendChild(content)
       content.appendChild(renderSkeleton())
       try {
@@ -447,15 +469,18 @@ export function renderHome(
         } else {
           content.appendChild(renderError(() => load(undefined)))
         }
+        currentContent = null
       }
       return
     }
 
     const content = document.createElement('div')
     content.className = 'page-content'
+    currentContent = content
 
     if (!matchup) {
       currentMatchup = null
+      currentContent = null
       nextMatchupPromise = null
       content.appendChild(renderEmpty(navigate, isVeganMode()))
       container.replaceChildren(content)
@@ -464,6 +489,7 @@ export function renderHome(
 
     if (matchup.status === 'exhausted') {
       currentMatchup = null
+      currentContent = null
       nextMatchupPromise = null
       content.appendChild(renderExhausted(navigate))
       container.replaceChildren(content)
@@ -532,6 +558,7 @@ export function renderHome(
   addKeyboardShortcuts()
 
   return () => {
+    currentContent = null
     cleanupKeyboard?.()
   }
 }

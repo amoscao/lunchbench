@@ -652,6 +652,14 @@ img {
   animation: bar-fill 1.5s linear forwards;
 }
 
+.vote-notice {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+}
+
 .vote-buttons {
   display: flex;
   flex-wrap: wrap;

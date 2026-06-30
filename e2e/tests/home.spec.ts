@@ -11,6 +11,11 @@ type LunchSnapshot = {
   ties: number
 }
 
+function pairKey(leftId: number, rightId: number): string {
+  const [low, high] = [leftId, rightId].sort((a, b) => a - b)
+  return `${low}-${high}`
+}
+
 async function getLunchSnapshot(id: number): Promise<LunchSnapshot> {
   const res = await fetch(`${API_URL}/api/lunches/${id}`)
   if (!res.ok) throw new Error(`Failed to fetch lunch ${id}: ${res.status}`)
@@ -134,6 +139,37 @@ test.describe('Home / Voting', () => {
     expect(voteRequested).toBe(false)
     expect(await getLunchSnapshot(beforeLeft.id)).toEqual(beforeLeft)
     expect(await getLunchSnapshot(beforeRight.id)).toEqual(beforeRight)
+  })
+
+  test('skip does not repeat the skipped pair', async ({ page }) => {
+    const pairs: string[] = []
+
+    await page.route('/api/matchup**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue()
+        return
+      }
+      const response = await route.fetch()
+      if (response.status() === 200) {
+        const body = await response.json()
+        if (body.status === 'ok') {
+          pairs.push(pairKey(body.left.id, body.right.id))
+        }
+        await route.fulfill({ response, json: body })
+        return
+      }
+      await route.fulfill({ response })
+    })
+
+    await page.goto('/')
+    await waitForMatchup(page)
+    await page.locator('.vote-buttons .btn').nth(3).click()
+    await waitForMatchup(page)
+    await page.locator('.vote-buttons .btn').nth(3).click()
+    await waitForMatchup(page)
+
+    expect(pairs.length).toBeGreaterThanOrEqual(2)
+    expect(pairs[1]).not.toBe(pairs[0])
   })
 
   test('casting a left vote loads a new matchup', async ({ page }) => {

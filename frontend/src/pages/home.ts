@@ -9,7 +9,7 @@ import {
   type VoteResult,
 } from '../api'
 import { isVeganMode } from '../vegan-mode'
-import { markSeen } from '../utils/seen-pairs'
+import { hasSeen, markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
 
@@ -293,6 +293,14 @@ export function renderHome(
     })
   }
 
+  async function getUnseenMatchup(veganOnly: boolean): Promise<MatchupResult> {
+    const matchup = await getMatchup(veganOnly)
+    if (matchup?.status === 'ok' && hasSeen(matchup.left.id, matchup.right.id)) {
+      return getMatchup(veganOnly)
+    }
+    return matchup
+  }
+
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
     if (isSubmitting || !leftLunch || !rightLunch || !currentMatchup) return
 
@@ -351,9 +359,9 @@ export function renderHome(
 
       let next: MatchupResult
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? getUnseenMatchup(isVeganMode()))
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await getUnseenMatchup(isVeganMode())
       }
       await load(next)
     } catch {
@@ -377,9 +385,9 @@ export function renderHome(
     try {
       let next: MatchupResult
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? getUnseenMatchup(isVeganMode()))
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await getUnseenMatchup(isVeganMode())
       }
       await load(next)
     } catch {
@@ -429,7 +437,7 @@ export function renderHome(
       container.appendChild(content)
       content.appendChild(renderSkeleton())
       try {
-        const data = await getMatchup(isVeganMode())
+        const data = await getUnseenMatchup(isVeganMode())
         await load(data)
       } catch (error) {
         content.innerHTML = ''
@@ -513,8 +521,10 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
-    acknowledgeRenderedMatchup(matchup).catch(() => {})
-    nextMatchupPromise = getMatchup(isVeganMode())
+    const veganOnly = isVeganMode()
+    nextMatchupPromise = acknowledgeRenderedMatchup(matchup)
+      .then(() => getUnseenMatchup(veganOnly))
+      .catch(() => getUnseenMatchup(veganOnly))
   }
 
   load(undefined)

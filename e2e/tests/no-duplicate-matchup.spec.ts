@@ -32,16 +32,6 @@ async function getLeaderboardLunch(id: number): Promise<LunchSnapshot> {
   return lunch
 }
 
-async function createVotePair(): Promise<{ left: LunchSnapshot; right: LunchSnapshot }> {
-  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  const leftId = await addLunchViaAPI(`Vote Flow A ${suffix}`)
-  const rightId = await addLunchViaAPI(`Vote Flow B ${suffix}`)
-  return {
-    left: await getLunchSnapshot(leftId),
-    right: await getLunchSnapshot(rightId),
-  }
-}
-
 test.describe('No duplicate matchups', () => {
   test('no duplicate pair in sequential voting', async ({ page }) => {
     const pairs: string[] = []
@@ -74,45 +64,55 @@ test.describe('No duplicate matchups', () => {
     expect(renderedPairs).toHaveLength(5)
     expect(new Set(renderedPairs).size).toBe(renderedPairs.length)
   })
+})
 
-  test('vote updates win/loss counters', async ({ page: _page }) => {
-    const { left, right } = await createVotePair()
+// Vote counter and leaderboard tests share one lunch pair to stay under the
+// lunch_create rate limit (10 per day per IP across the whole E2E suite).
+test.describe('Vote correctness', () => {
+  let leftId: number
+  let rightId: number
+  let leftName: string
+  let rightName: string
+  let beforeLeft: LunchSnapshot
+  let beforeRight: LunchSnapshot
+
+  test.beforeAll(async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    leftName = `Vote Flow A ${suffix}`
+    rightName = `Vote Flow B ${suffix}`
+    leftId = await addLunchViaAPI(leftName)
+    rightId = await addLunchViaAPI(rightName)
+    beforeLeft = await getLunchSnapshot(leftId)
+    beforeRight = await getLunchSnapshot(rightId)
 
     const res = await fetch(`${API_URL}/api/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' }),
-    })
-    expect(res.ok).toBe(true)
-
-    const updatedLeft = await getLunchSnapshot(left.id)
-    const updatedRight = await getLunchSnapshot(right.id)
-    expect(updatedLeft.wins).toBe(left.wins + 1)
-    expect(updatedRight.losses).toBe(right.losses + 1)
-  })
-
-  test('leaderboard reflects vote', async ({ page }) => {
-    const { left, right } = await createVotePair()
-
-    const res = await fetch(`${API_URL}/api/vote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' }),
+      body: JSON.stringify({ left_lunch_id: leftId, right_lunch_id: rightId, result: 'left_win' }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      throw new Error(`Vote failed: HTTP ${res.status} — ${JSON.stringify(body)}`)
+      throw new Error(`Vote setup failed: HTTP ${res.status} — ${JSON.stringify(body)}`)
     }
+  })
 
+  test('vote updates win/loss counters', async () => {
+    const updatedLeft = await getLunchSnapshot(leftId)
+    const updatedRight = await getLunchSnapshot(rightId)
+    expect(updatedLeft.wins).toBe(beforeLeft.wins + 1)
+    expect(updatedRight.losses).toBe(beforeRight.losses + 1)
+  })
+
+  test('leaderboard reflects vote', async ({ page }) => {
     await page.goto('/leaderboard')
-    await expect(page.locator('.leaderboard-table tbody tr', { hasText: left.name })).toBeVisible({ timeout: 15000 })
-    await expect(page.locator('.leaderboard-table tbody tr', { hasText: right.name })).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.leaderboard-table tbody tr', { hasText: leftName })).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.leaderboard-table tbody tr', { hasText: rightName })).toBeVisible({ timeout: 15000 })
 
-    const updatedLeft = await getLeaderboardLunch(left.id)
-    const updatedRight = await getLeaderboardLunch(right.id)
-    expect(updatedLeft.wins).toBe(left.wins + 1)
-    expect(updatedRight.losses).toBe(right.losses + 1)
-    expect(updatedLeft.conservative_rating).not.toBe(left.conservative_rating)
-    expect(updatedRight.conservative_rating).not.toBe(right.conservative_rating)
+    const updatedLeft = await getLeaderboardLunch(leftId)
+    const updatedRight = await getLeaderboardLunch(rightId)
+    expect(updatedLeft.wins).toBe(beforeLeft.wins + 1)
+    expect(updatedRight.losses).toBe(beforeRight.losses + 1)
+    expect(updatedLeft.conservative_rating).not.toBe(beforeLeft.conservative_rating)
+    expect(updatedRight.conservative_rating).not.toBe(beforeRight.conservative_rating)
   })
 })

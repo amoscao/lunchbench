@@ -136,6 +136,7 @@ test.describe('No duplicate matchups', () => {
     await page.goto('/')
     await waitForMatchup(page)
     await castVote(page, 'left')
+    await waitForMatchup(page)
 
     await expect.poll(async () => {
       const updatedLeft = await getLunchSnapshot(left.id)
@@ -157,6 +158,7 @@ test.describe('No duplicate matchups', () => {
     await page.goto('/')
     await waitForMatchup(page)
     await castVote(page, 'left')
+    await waitForMatchup(page)
 
     await page.goto('/leaderboard')
     await expect(page.locator('.leaderboard-table tbody tr', { hasText: left.name })).toBeVisible()

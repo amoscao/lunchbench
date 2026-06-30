@@ -105,8 +105,7 @@ matchup.get('/', async (c) => {
       ? c.env.DB.prepare(
         `SELECT low_lunch_id, high_lunch_id
          FROM matchup_presentations
-         WHERE session_key = ? AND vegan_only = ?
-         LIMIT 500`
+         WHERE session_key = ? AND vegan_only = ?`
       ).bind(sessionKey, veganFlag).all<PresentedPairRow>()
       : Promise.resolve({ results: [] as PresentedPairRow[] }),
   ])

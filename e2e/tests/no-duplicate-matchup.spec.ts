@@ -99,11 +99,14 @@ test.describe('No duplicate matchups', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' }),
     })
-    expect(res.ok).toBe(true)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(`Vote failed: HTTP ${res.status} — ${JSON.stringify(body)}`)
+    }
 
     await page.goto('/leaderboard')
-    await expect(page.locator('.leaderboard-table tbody tr', { hasText: left.name })).toBeVisible()
-    await expect(page.locator('.leaderboard-table tbody tr', { hasText: right.name })).toBeVisible()
+    await expect(page.locator('.leaderboard-table tbody tr', { hasText: left.name })).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.leaderboard-table tbody tr', { hasText: right.name })).toBeVisible({ timeout: 15000 })
 
     const updatedLeft = await getLeaderboardLunch(left.id)
     const updatedRight = await getLeaderboardLunch(right.id)

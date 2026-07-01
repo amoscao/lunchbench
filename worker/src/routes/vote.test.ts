@@ -139,7 +139,7 @@ describe('POST /api/vote vegan category enforcement', () => {
     expect(res.status).toBe(404)
   })
 
-  test('rate limits repeated votes with missing lunch IDs', async () => {
+  test('allows the full shared-NAT hourly quota before rate limiting', async () => {
     const env = testEnv()
 
     for (let i = 0; i < VOTE_RATE_LIMIT_PER_HOUR; i++) {

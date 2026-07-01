@@ -27,7 +27,7 @@ const ROWS: LunchRow[] = [
   lunchRow(3, 1),
 ]
 
-function fakeDb(rows: LunchRow[] = ROWS): D1Database {
+function fakeDb(rows: LunchRow[] = ROWS, stats?: { writeBatches: number }): D1Database {
   const rateLimits = new Map<string, { count: number; window_start: string }>()
 
   return {
@@ -95,14 +95,15 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
           return { results: row ? [row] : [] }
         })
       }
+      if (stats) stats.writeBatches += 1
       return []
     },
   } as unknown as D1Database
 }
 
-function testEnv(rows: LunchRow[] = ROWS): Bindings {
+function testEnv(rows: LunchRow[] = ROWS, db: D1Database = fakeDb(rows)): Bindings {
   return {
-    DB: fakeDb(rows),
+    DB: db,
     IMAGES: undefined,
     VOTE_PASSWORD: 'test-vote-token',
     ADMIN_MANAGER_PASSWORD: 'test-admin-password',
@@ -151,5 +152,19 @@ describe('POST /api/vote vegan category enforcement', () => {
     expect(res.status).toBe(429)
     const data = await res.json() as { code: string }
     expect(data.code).toBe('RATE_LIMITED')
+  })
+
+  test('does not attempt a vote write after the hourly quota is exceeded', async () => {
+    const stats = { writeBatches: 0 }
+    const env = testEnv(ROWS, fakeDb(ROWS, stats))
+
+    for (let i = 0; i < VOTE_RATE_LIMIT_PER_HOUR; i++) {
+      const res = await voteRouter.request('/', voteBody(99, 1), env)
+      expect(res.status).toBe(404)
+    }
+
+    const res = await voteRouter.request('/', voteBody(1, 2), env)
+    expect(res.status).toBe(429)
+    expect(stats.writeBatches).toBe(0)
   })
 })

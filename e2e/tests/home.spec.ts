@@ -208,6 +208,24 @@ test.describe('Home / Voting', () => {
     await expect(leftBtn).toBeDisabled()
   })
 
+  test('rate-limited vote does not show projected rating changes', async ({ page }) => {
+    await waitForMatchup(page)
+
+    await page.route('/api/vote', async (route) => {
+      await route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Rate limit exceeded', code: 'RATE_LIMITED' }),
+      })
+    })
+
+    await page.locator('.vote-buttons .btn').nth(0).click()
+
+    await expect(page.locator('.vote-result-overlay')).toHaveCount(0)
+    await expect(page.locator('.vote-stat-line')).toHaveCount(0)
+    await expect(page.locator('.vote-notice')).toHaveText("Your vote wasn't recorded — a rate limit was reached.")
+  })
+
   test('multiple votes work in sequence', async ({ page }) => {
     await waitForMatchup(page)
 

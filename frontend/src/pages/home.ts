@@ -309,7 +309,6 @@ export function renderHome(
     isSubmitting = true
     const votedLeft = leftLunch
     const votedRight = rightLunch
-    const projected = currentMatchup.projected[result]
 
     const buttons = document.querySelectorAll<HTMLButtonElement>('.vote-buttons .btn')
     buttons.forEach((b) => (b.disabled = true))
@@ -336,8 +335,6 @@ export function renderHome(
 
     const leftCard = cards[0]
     const rightCard = cards[1]
-    if (leftCard) showVoteOverlay(leftCard, votedLeft, projected.left)
-    if (rightCard) showVoteOverlay(rightCard, votedRight, projected.right)
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
     const isRateLimited = (err: unknown): boolean =>
@@ -349,7 +346,7 @@ export function renderHome(
         return
       }
       try {
-        await submitVote(votedLeft.id, votedRight.id, result)
+        return await submitVote(votedLeft.id, votedRight.id, result)
       } catch (secondErr: unknown) {
         if (isRateLimited(secondErr)) {
           Sentry.captureException(firstErr, {
@@ -363,6 +360,10 @@ export function renderHome(
           extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
         })
       }
+    }).then((voteResponse) => {
+      if (!voteResponse) return
+      if (leftCard) showVoteOverlay(leftCard, votedLeft, voteResponse.left_result)
+      if (rightCard) showVoteOverlay(rightCard, votedRight, voteResponse.right_result)
     })
 
     try {

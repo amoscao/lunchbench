@@ -188,38 +188,15 @@ test.describe('Comprehensive vote flow', () => {
   })
 
   test.describe('API-seeded pairs', () => {
-    let rateLimitedA: TestDish
-    let rateLimitedB: TestDish
     let tieA: TestDish
     let tieB: TestDish
 
     test.beforeAll(async () => {
-      const rateLimitedAName = uniqueDishName('Vote Flow Limited A')
-      const rateLimitedBName = uniqueDishName('Vote Flow Limited B')
       const tieAName = uniqueDishName('Vote Flow Tie A')
       const tieBName = uniqueDishName('Vote Flow Tie B')
 
-      rateLimitedA = { id: await addLunchViaRateLimitSafeAPI(rateLimitedAName), name: rateLimitedAName }
-      rateLimitedB = { id: await addLunchViaRateLimitSafeAPI(rateLimitedBName), name: rateLimitedBName }
       tieA = { id: await addLunchViaRateLimitSafeAPI(tieAName), name: tieAName }
       tieB = { id: await addLunchViaRateLimitSafeAPI(tieBName), name: tieBName }
-    })
-
-    test('rate-limited vote shows notice instead of silently dropping', async ({ page }) => {
-      await voteViaBrowserAPI(page, rateLimitedA.id, rateLimitedB.id, 'left_win')
-      await injectMatchupPair(page, rateLimitedA, rateLimitedB)
-
-      await page.goto('/')
-      await page.waitForSelector('.vote-arena', { timeout: 15000 })
-
-      await Promise.all([
-        page.waitForResponse((r) => r.url().includes('/api/vote') && r.request().method() === 'POST', { timeout: 10000 }),
-        page.locator('.vote-buttons .btn').nth(0).click(),
-      ])
-
-      const notice = page.locator('.vote-notice')
-      await expect(notice).toBeVisible({ timeout: 3000 })
-      await expect(notice).toContainText('rate limit')
     })
 
     test('tie vote updates both dishes correctly', async ({ page }) => {

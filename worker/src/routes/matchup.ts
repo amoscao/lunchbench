@@ -95,7 +95,7 @@ matchup.get('/', async (c) => {
     ? 'SELECT * FROM lunches WHERE is_vegan = 1'
     : 'SELECT * FROM lunches WHERE is_vegan = 0'
   const [rl, allLunches, recentVotes, seenPairsResult] = await Promise.all([
-    checkRateLimit(c.env.DB, ip, 'matchup', 20000, 3600),
+    checkRateLimit(c.env.DB, ip, 'matchup', 1_000_000, 3600),
     c.env.DB.prepare(query).all<LunchRow>(),
     c.env.DB.prepare(
       // id DESC makes same-second D1 timestamps deterministic.
@@ -296,7 +296,7 @@ matchup.get('/', async (c) => {
 
 matchup.post('/seen', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'matchup_seen', 20000, 3600)
+  const rl = await checkRateLimit(c.env.DB, ip, 'matchup_seen', 1_000_000, 3600)
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },

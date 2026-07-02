@@ -6,7 +6,7 @@ import type { LunchRow } from '../types'
 
 const vote = new Hono<{ Bindings: Bindings }>()
 export const MAX_VOTE_WRITE_ATTEMPTS = 10
-export const VOTE_RATE_LIMIT_PER_HOUR = 3000
+export const VOTE_RATE_LIMIT_PER_HOUR = 1_000_000
 export const VOTE_PAIR_COOLDOWN_SECONDS = 24 * 60 * 60
 
 type VoteResult = 'left_win' | 'right_win' | 'tie'

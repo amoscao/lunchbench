@@ -18,6 +18,12 @@ Before code changes, read the docs relevant to the task:
 - Environment config: `docs/13-environment-and-deployment-config.md`
 - Communication style: `docs/15-caveman-compression-spec.md`
 
+## Cloudflare Credentials
+
+The Cloudflare API token and account ID are in `/home/amos/lunchbench/.env.local`.
+Use these for `wrangler deploy`, `wrangler d1 execute --remote`, and any other Cloudflare CLI operations.
+Do not commit this file.
+
 ## Hard Rules
 
 - Work in a git worktree.

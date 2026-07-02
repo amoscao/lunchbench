@@ -9,7 +9,7 @@ import {
   type VoteResult,
 } from '../api'
 import { isVeganMode } from '../vegan-mode'
-import { markSeen } from '../utils/seen-pairs'
+import { hasSeen, markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
 
@@ -281,6 +281,7 @@ export function renderHome(
   let leftLunch: Lunch | null = null
   let rightLunch: Lunch | null = null
   let currentMatchup: Matchup | null = null
+  let currentContent: HTMLElement | null = null
   let nextMatchupPromise: Promise<MatchupResult> | null = null
   let cleanupKeyboard: (() => void) | null = null
   let isSubmitting = false
@@ -293,13 +294,21 @@ export function renderHome(
     })
   }
 
+  async function getUnseenMatchup(veganOnly: boolean): Promise<MatchupResult> {
+    for (let i = 0; i < 3; i++) {
+      const matchup = await getMatchup(veganOnly)
+      if (!matchup || matchup.status !== 'ok') return matchup
+      if (!hasSeen(matchup.left.id, matchup.right.id)) return matchup
+    }
+    return getMatchup(veganOnly)
+  }
+
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {
     if (isSubmitting || !leftLunch || !rightLunch || !currentMatchup) return
 
     isSubmitting = true
     const votedLeft = leftLunch
     const votedRight = rightLunch
-    const projected = currentMatchup.projected[result]
 
     const buttons = document.querySelectorAll<HTMLButtonElement>('.vote-buttons .btn')
     buttons.forEach((b) => (b.disabled = true))
@@ -326,34 +335,56 @@ export function renderHome(
 
     const leftCard = cards[0]
     const rightCard = cards[1]
-    if (leftCard) showVoteOverlay(leftCard, votedLeft, projected.left)
-    if (rightCard) showVoteOverlay(rightCard, votedRight, projected.right)
 
     const delay = new Promise<void>((r) => setTimeout(r, 1500))
     const isRateLimited = (err: unknown): boolean =>
       err instanceof Error && err.message === 'rate_limited'
+    let wasRateLimited = false
     const votePromise = submitVote(votedLeft.id, votedRight.id, result).catch(async (firstErr: unknown) => {
-      if (isRateLimited(firstErr)) return
-      try {
-        await submitVote(votedLeft.id, votedRight.id, result)
-      } catch (secondErr: unknown) {
-        const err = secondErr ?? firstErr
-        if (!isRateLimited(err)) {
-          Sentry.captureException(err, {
-            extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
-          })
-        }
+      if (isRateLimited(firstErr)) {
+        wasRateLimited = true
+        return
       }
+      try {
+        return await submitVote(votedLeft.id, votedRight.id, result)
+      } catch (secondErr: unknown) {
+        if (isRateLimited(secondErr)) {
+          Sentry.captureException(firstErr, {
+            extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 1 },
+          })
+          wasRateLimited = true
+          return
+        }
+        const err = secondErr ?? firstErr
+        Sentry.captureException(err, {
+          extra: { leftId: votedLeft.id, rightId: votedRight.id, result, attempt: 2 },
+        })
+      }
+    }).then((voteResponse) => {
+      if (!voteResponse) return
+      if (leftCard) showVoteOverlay(leftCard, votedLeft, voteResponse.left_result)
+      if (rightCard) showVoteOverlay(rightCard, votedRight, voteResponse.right_result)
     })
 
     try {
       await Promise.all([delay, votePromise])
+      if (wasRateLimited) {
+        const content = currentContent
+        if (content) {
+          content.querySelector('.vote-notice')?.remove()
+          const notice = document.createElement('div')
+          notice.className = 'vote-notice'
+          notice.textContent = "Your vote wasn't recorded — a rate limit was reached."
+          content.appendChild(notice)
+        }
+        await new Promise<void>((r) => setTimeout(r, 900))
+      }
 
       let next: MatchupResult
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? getUnseenMatchup(isVeganMode()))
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await getUnseenMatchup(isVeganMode())
       }
       await load(next)
     } catch {
@@ -377,9 +408,9 @@ export function renderHome(
     try {
       let next: MatchupResult
       try {
-        next = await (nextMatchupPromise ?? getMatchup(isVeganMode()))
+        next = await (nextMatchupPromise ?? getUnseenMatchup(isVeganMode()))
       } catch {
-        next = await getMatchup(isVeganMode())
+        next = await getUnseenMatchup(isVeganMode())
       }
       await load(next)
     } catch {
@@ -426,10 +457,11 @@ export function renderHome(
       container.innerHTML = ''
       const content = document.createElement('div')
       content.className = 'page-content'
+      currentContent = content
       container.appendChild(content)
       content.appendChild(renderSkeleton())
       try {
-        const data = await getMatchup(isVeganMode())
+        const data = await getUnseenMatchup(isVeganMode())
         await load(data)
       } catch (error) {
         content.innerHTML = ''
@@ -438,15 +470,18 @@ export function renderHome(
         } else {
           content.appendChild(renderError(() => load(undefined)))
         }
+        currentContent = null
       }
       return
     }
 
     const content = document.createElement('div')
     content.className = 'page-content'
+    currentContent = content
 
     if (!matchup) {
       currentMatchup = null
+      currentContent = null
       nextMatchupPromise = null
       content.appendChild(renderEmpty(navigate, isVeganMode()))
       container.replaceChildren(content)
@@ -455,6 +490,7 @@ export function renderHome(
 
     if (matchup.status === 'exhausted') {
       currentMatchup = null
+      currentContent = null
       nextMatchupPromise = null
       content.appendChild(renderExhausted(navigate))
       container.replaceChildren(content)
@@ -513,14 +549,17 @@ export function renderHome(
     if (!reducedMotionFadeIn) arena.classList.add('fading-in')
 
     addKeyboardShortcuts()
-    acknowledgeRenderedMatchup(matchup).catch(() => {})
-    nextMatchupPromise = getMatchup(isVeganMode())
+    const veganOnly = isVeganMode()
+    nextMatchupPromise = acknowledgeRenderedMatchup(matchup)
+      .then(() => getUnseenMatchup(veganOnly))
+      .catch(() => getUnseenMatchup(veganOnly))
   }
 
   load(undefined)
   addKeyboardShortcuts()
 
   return () => {
+    currentContent = null
     cleanupKeyboard?.()
   }
 }

@@ -11,6 +11,11 @@ type LunchSnapshot = {
   ties: number
 }
 
+function pairKey(leftId: number, rightId: number): string {
+  const [low, high] = [leftId, rightId].sort((a, b) => a - b)
+  return `${low}-${high}`
+}
+
 async function getLunchSnapshot(id: number): Promise<LunchSnapshot> {
   const res = await fetch(`${API_URL}/api/lunches/${id}`)
   if (!res.ok) throw new Error(`Failed to fetch lunch ${id}: ${res.status}`)
@@ -136,6 +141,37 @@ test.describe('Home / Voting', () => {
     expect(await getLunchSnapshot(beforeRight.id)).toEqual(beforeRight)
   })
 
+  test('skip does not repeat the skipped pair', async ({ page }) => {
+    const pairs: string[] = []
+
+    await page.route('/api/matchup**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue()
+        return
+      }
+      const response = await route.fetch()
+      if (response.status() === 200) {
+        const body = await response.json()
+        if (body.status === 'ok') {
+          pairs.push(pairKey(body.left.id, body.right.id))
+        }
+        await route.fulfill({ response, json: body })
+        return
+      }
+      await route.fulfill({ response })
+    })
+
+    await page.goto('/')
+    await waitForMatchup(page)
+    await page.locator('.vote-buttons .btn').nth(3).click()
+    await waitForMatchup(page)
+    await page.locator('.vote-buttons .btn').nth(3).click()
+    await waitForMatchup(page)
+
+    expect(pairs.length).toBeGreaterThanOrEqual(2)
+    expect(pairs[1]).not.toBe(pairs[0])
+  })
+
   test('casting a left vote loads a new matchup', async ({ page }) => {
     await waitForMatchup(page)
     await castVote(page, 'left')
@@ -170,6 +206,24 @@ test.describe('Home / Voting', () => {
     await leftBtn.click()
 
     await expect(leftBtn).toBeDisabled()
+  })
+
+  test('rate-limited vote does not show projected rating changes', async ({ page }) => {
+    await waitForMatchup(page)
+
+    await page.route('/api/vote', async (route) => {
+      await route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Rate limit exceeded', code: 'RATE_LIMITED' }),
+      })
+    })
+
+    await page.locator('.vote-buttons .btn').nth(0).click()
+
+    await expect(page.locator('.vote-result-overlay')).toHaveCount(0)
+    await expect(page.locator('.vote-stat-line')).toHaveCount(0)
+    await expect(page.locator('.vote-notice')).toHaveText("Your vote wasn't recorded — a rate limit was reached.")
   })
 
   test('multiple votes work in sequence', async ({ page }) => {

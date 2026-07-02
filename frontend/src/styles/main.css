@@ -202,8 +202,12 @@ img {
 }
 
 .logo-lunch {
-  color: #fff;
+  color: #000;
   background: none;
+}
+
+[data-theme="dark"] .logo-lunch {
+  color: #fff;
 }
 
 .logo-bench {
@@ -646,6 +650,14 @@ img {
 .vote-gradient-bar.loading::after {
   opacity: 1;
   animation: bar-fill 1.5s linear forwards;
+}
+
+.vote-notice {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
 }
 
 .vote-buttons {

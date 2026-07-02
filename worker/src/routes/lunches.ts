@@ -1,23 +1,12 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { lunchFromRow, validateAdminSession } from '../helpers'
-import { checkRateLimit, getClientIp } from '../rate-limit'
 import { computeConsistency, confidenceFromRd, consistencyBand, GLICKO_DEFAULTS } from '../elo'
 import type { LunchRow } from '../types'
 
 const lunches = new Hono<{ Bindings: Bindings }>()
 
 lunches.get('/', async (c) => {
-  const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_list', 1_000_000, 3600)
-  if (!rl.allowed) {
-    return c.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      429,
-      { 'Retry-After': String(rl.retryAfter ?? 3600) }
-    )
-  }
-
   const missingImage = c.req.query('missing_image') === 'true'
   const query = missingImage
     ? 'SELECT * FROM lunches WHERE image_key IS NULL ORDER BY name ASC'
@@ -57,16 +46,6 @@ lunches.get('/:id{[0-9]+}', async (c) => {
 })
 
 lunches.get('/leaderboard', async (c) => {
-  const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_leaderboard', 1_000_000, 3600)
-  if (!rl.allowed) {
-    return c.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      429,
-      { 'Retry-After': String(rl.retryAfter ?? 3600) }
-    )
-  }
-
   const veganOnly = c.req.query('vegan') === 'true'
 
   const dataQuery = veganOnly
@@ -92,16 +71,6 @@ lunches.get('/leaderboard', async (c) => {
 lunches.post('/', async (c) => {
   if (!(await validateAdminSession(c.req.raw, c.env.DB, 'lunch'))) {
     return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401)
-  }
-
-  const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'lunch_create', 1_000_000, 86400)
-  if (!rl.allowed) {
-    return c.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      429,
-      { 'Retry-After': String(rl.retryAfter ?? 3600) }
-    )
   }
 
   const body: { name?: string; description?: unknown; is_vegan?: unknown } = await c.req

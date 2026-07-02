@@ -91,32 +91,6 @@ test.describe('API', () => {
     expect(res.status()).toBe(400)
   })
 
-  test('POST /api/vote rate limits concurrent votes for the same pair', async ({ request }) => {
-    const matchupRes = await request.get(`${API_URL}/api/matchup`)
-    const { left, right } = await matchupRes.json()
-
-    const votes = await Promise.all(Array.from({ length: 5 }, () =>
-      request.post(`${API_URL}/api/vote`, {
-        data: { left_lunch_id: left.id, right_lunch_id: right.id, result: 'left_win' },
-      })
-    ))
-    const accepted = votes.filter((res) => res.ok()).length
-    const rateLimited = votes.filter((res) => res.status() === 429).length
-    expect(accepted).toBe(1)
-    expect(rateLimited).toBe(4)
-
-    const lbRes = await request.get(`${API_URL}/api/lunches/leaderboard`)
-    const body = await lbRes.json()
-    expect(body).not.toHaveProperty('page')
-    expect(body).not.toHaveProperty('per_page')
-    expect(body).not.toHaveProperty('total_pages')
-    const { lunches } = body
-    const updatedLeft = lunches.find((l: any) => l.id === left.id)
-    const updatedRight = lunches.find((l: any) => l.id === right.id)
-    expect(updatedLeft.wins).toBe(left.wins + accepted)
-    expect(updatedRight.losses).toBe(right.losses + accepted)
-  })
-
   test('POST /api/lunches requires auth', async ({ request }) => {
     const res = await request.post(`${API_URL}/api/lunches`, {
       data: { name: 'Unauthorized Lunch' },

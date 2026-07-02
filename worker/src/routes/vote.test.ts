@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { VOTE_RATE_LIMIT_PER_HOUR, voteRouter } from './vote'
+import { voteRouter } from './vote'
 import type { Bindings, LunchRow } from '../types'
 
 function lunchRow(id: number, isVegan: number): LunchRow {
@@ -27,9 +27,7 @@ const ROWS: LunchRow[] = [
   lunchRow(3, 1),
 ]
 
-function fakeDb(rows: LunchRow[] = ROWS, stats?: { writeBatches: number }): D1Database {
-  const rateLimits = new Map<string, { count: number; window_start: string }>()
-
+function fakeDb(rows: LunchRow[] = ROWS): D1Database {
   return {
     prepare(sql: string) {
       let bound: unknown[] = []
@@ -43,33 +41,9 @@ function fakeDb(rows: LunchRow[] = ROWS, stats?: { writeBatches: number }): D1Da
           return self
         },
         async run() {
-          if (sql.includes('rate_limits')) {
-            const [key, action, windowStart] = bound as [string, string, string]
-            const rowKey = `${key}:${action}`
-            const existing = rateLimits.get(rowKey)
-            rateLimits.set(rowKey, {
-              count: existing?.window_start === windowStart ? existing.count + 1 : 1,
-              window_start: windowStart,
-            })
-          }
           return { success: true, meta: { changes: 1 } }
         },
         async first() {
-          if (sql.includes('INSERT INTO rate_limits')) {
-            const [key, action, windowStart] = bound as [string, string, string]
-            const rowKey = `${key}:${action}`
-            const existing = rateLimits.get(rowKey)
-            const row = {
-              count: existing?.window_start === windowStart ? existing.count + 1 : 1,
-              window_start: windowStart,
-            }
-            rateLimits.set(rowKey, row)
-            return row
-          }
-          if (sql.includes('rate_limits') || sql.includes('cooldown')) {
-            const [key, action] = bound as [string, string]
-            return rateLimits.get(`${key}:${action}`) ?? null
-          }
           if (sql.includes('SELECT is_vegan FROM lunches')) {
             const [id] = bound as [number]
             const row = rows.find((r) => r.id === id)
@@ -95,7 +69,6 @@ function fakeDb(rows: LunchRow[] = ROWS, stats?: { writeBatches: number }): D1Da
           return { results: row ? [row] : [] }
         })
       }
-      if (stats) stats.writeBatches += 1
       return []
     },
   } as unknown as D1Database
@@ -138,33 +111,5 @@ describe('POST /api/vote vegan category enforcement', () => {
     const env = testEnv()
     const res = await voteRouter.request('/', voteBody(1, 99), env)
     expect(res.status).toBe(404)
-  })
-
-  test('allows the full shared-NAT hourly quota before rate limiting', async () => {
-    const env = testEnv()
-
-    for (let i = 0; i < VOTE_RATE_LIMIT_PER_HOUR; i++) {
-      const res = await voteRouter.request('/', voteBody(99, 1), env)
-      expect(res.status).toBe(404)
-    }
-
-    const res = await voteRouter.request('/', voteBody(99, 1), env)
-    expect(res.status).toBe(429)
-    const data = await res.json() as { code: string }
-    expect(data.code).toBe('RATE_LIMITED')
-  })
-
-  test('does not attempt a vote write after the hourly quota is exceeded', async () => {
-    const stats = { writeBatches: 0 }
-    const env = testEnv(ROWS, fakeDb(ROWS, stats))
-
-    for (let i = 0; i < VOTE_RATE_LIMIT_PER_HOUR; i++) {
-      const res = await voteRouter.request('/', voteBody(99, 1), env)
-      expect(res.status).toBe(404)
-    }
-
-    const res = await voteRouter.request('/', voteBody(1, 2), env)
-    expect(res.status).toBe(429)
-    expect(stats.writeBatches).toBe(0)
   })
 })

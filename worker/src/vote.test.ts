@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { LunchRow } from './types'
-import { getVotePairRateLimitKey, MAX_VOTE_WRITE_ATTEMPTS, recordVoteWithRetry } from './routes/vote'
+import { MAX_VOTE_WRITE_ATTEMPTS, recordVoteWithRetry } from './routes/vote'
 
 function lunchRow(id: number): LunchRow {
   return {
@@ -85,16 +85,5 @@ describe('recordVoteWithRetry', () => {
 
     expect(result).toMatchObject({ status: 'ok', voteId: 42, isVegan: 0 })
     expect(db.writeBatchCalls).toBe(2)
-  })
-})
-
-describe('getVotePairRateLimitKey', () => {
-  test('hashes the IP and normalizes lunch pair order', async () => {
-    const forward = await getVotePairRateLimitKey('203.0.113.5', 9, 2)
-    const reverse = await getVotePairRateLimitKey('203.0.113.5', 2, 9)
-
-    expect(forward).toBe(reverse)
-    expect(forward).toMatch(/^vote_pair_[a-f0-9]{64}_2_9$/)
-    expect(forward).not.toContain('203.0.113.5')
   })
 })

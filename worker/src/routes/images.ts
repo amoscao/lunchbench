@@ -92,7 +92,7 @@ export async function handleImageUpload(
   }
 
   const ip = (request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'unknown')
-  const rl = await checkRateLimit(db, ip, 'upload', 5, 86400)
+  const rl = await checkRateLimit(db, ip, 'upload', 50, 86400)
   if (!rl.allowed) {
     return Response.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },

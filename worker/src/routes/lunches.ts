@@ -9,7 +9,7 @@ const lunches = new Hono<{ Bindings: Bindings }>()
 
 lunches.get('/', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_list', 120, 3600)
+  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_list', 1_000_000, 3600)
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
@@ -58,7 +58,7 @@ lunches.get('/:id{[0-9]+}', async (c) => {
 
 lunches.get('/leaderboard', async (c) => {
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_leaderboard', 60, 3600)
+  const rl = await checkRateLimit(c.env.DB, ip, 'lunches_leaderboard', 1_000_000, 3600)
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
@@ -95,7 +95,7 @@ lunches.post('/', async (c) => {
   }
 
   const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'lunch_create', 10, 86400)
+  const rl = await checkRateLimit(c.env.DB, ip, 'lunch_create', 1_000_000, 86400)
   if (!rl.allowed) {
     return c.json(
       { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },

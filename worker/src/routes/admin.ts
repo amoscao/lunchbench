@@ -189,7 +189,6 @@ admin.post('/reset-scores', requireAdminSession, async (c) => {
         updated_at          = ?
     `).bind(new Date().toISOString()),
     c.env.DB.prepare('DELETE FROM votes'),
-    c.env.DB.prepare("DELETE FROM rate_limits WHERE action IN ('vote', 'vote_pair')"),
   ])
   return c.json({ reset: true })
 })

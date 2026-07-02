@@ -4,7 +4,6 @@ import { lunchFromRow } from '../helpers'
 import { selectMatchup } from '../matchup'
 import type { LunchRow } from '../types'
 import { conservativeScore, updateRatingPair } from '../elo'
-import { checkRateLimit, getClientIp } from '../rate-limit'
 
 const matchup = new Hono<{ Bindings: Bindings }>()
 
@@ -85,7 +84,6 @@ function rankWithHeadToHead(rankRow: RankRow | null, score: number, otherScore: 
 }
 
 matchup.get('/', async (c) => {
-  const ip = getClientIp(c.req.raw)
   const veganOnly = c.req.query('vegan') === 'true'
   const veganFlag = veganOnly ? 1 : 0
   const sessionKey = parseSessionKey(c.req.header('X-Lunchbench-Session') ?? null)
@@ -94,8 +92,7 @@ matchup.get('/', async (c) => {
   const query = veganOnly
     ? 'SELECT * FROM lunches WHERE is_vegan = 1'
     : 'SELECT * FROM lunches WHERE is_vegan = 0'
-  const [rl, allLunches, recentVotes, seenPairsResult] = await Promise.all([
-    checkRateLimit(c.env.DB, ip, 'matchup', 1_000_000, 3600),
+  const [allLunches, recentVotes, seenPairsResult] = await Promise.all([
     c.env.DB.prepare(query).all<LunchRow>(),
     c.env.DB.prepare(
       // id DESC makes same-second D1 timestamps deterministic.
@@ -109,13 +106,6 @@ matchup.get('/', async (c) => {
       ).bind(sessionKey, veganFlag).all<PresentedPairRow>()
       : Promise.resolve({ results: [] as PresentedPairRow[] }),
   ])
-  if (!rl.allowed) {
-    return c.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      429,
-      { 'Retry-After': String(rl.retryAfter ?? 3600) }
-    )
-  }
 
   const recentPairs: [number, number][] = recentVotes.results.map(
     (v) => [v.left_lunch_id, v.right_lunch_id]
@@ -295,16 +285,6 @@ matchup.get('/', async (c) => {
 })
 
 matchup.post('/seen', async (c) => {
-  const ip = getClientIp(c.req.raw)
-  const rl = await checkRateLimit(c.env.DB, ip, 'matchup_seen', 1_000_000, 3600)
-  if (!rl.allowed) {
-    return c.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      429,
-      { 'Retry-After': String(rl.retryAfter ?? 3600) }
-    )
-  }
-
   let body: { token?: unknown }
   try {
     body = await c.req.json()

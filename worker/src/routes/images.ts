@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
-import { checkRateLimit } from '../rate-limit'
 import { MAX_IMAGE_SIZE_BYTES, validateImageBuffer } from '../image-validator'
 import { resizeImage } from '../image-resize'
 import { isAllowedOrigin } from '../middleware'
@@ -89,15 +88,6 @@ export async function handleImageUpload(
 
   if (!bucket) {
     return Response.json({ error: 'Image storage not configured', code: 'NOT_CONFIGURED' }, { status: 503 })
-  }
-
-  const ip = (request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ?? 'unknown')
-  const rl = await checkRateLimit(db, ip, 'upload', 1_000_000, 86400)
-  if (!rl.allowed) {
-    return Response.json(
-      { error: 'Rate limit exceeded', code: 'RATE_LIMITED' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter ?? 86400) } }
-    )
   }
 
   const lunch = await db.prepare('SELECT id FROM lunches WHERE id = ?').bind(lunchId).first()

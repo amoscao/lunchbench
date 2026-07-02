@@ -174,7 +174,6 @@ The token must come from a prior successful `GET /api/matchup` response. Duplica
 
 **Errors:**
 - `400 BAD_REQUEST` — invalid, missing, or unknown token
-- `429 RATE_LIMITED` — exceeded 20000 seen acknowledgements/hour/IP
 
 ---
 
@@ -217,16 +216,8 @@ The frontend prefetches the next full matchup with `GET /api/matchup`; the vote 
 - `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides
 - `404 NOT_FOUND` — lunch id(s) not found
 - `409 CONFLICT` — concurrent vote conflict after retries
-- `429 RATE_LIMITED` — exceeded 1000000 votes/hour/IP, or voted on the same unordered lunch pair from the same IP within 24 hours
 
 Vote writes retry from a fresh rating snapshot when another vote updates either lunch first. Counters are incremented in SQL so concurrent vote requests do not overwrite W/L/T totals.
-Vote pair cooldowns use the same unordered lunch pair regardless of left/right side.
-
-**Rate limit response:**
-```json
-{ "error": "Rate limit exceeded", "code": "RATE_LIMITED" }
-```
-Headers: `Retry-After: <seconds>`
 
 ---
 
@@ -249,7 +240,6 @@ Tokens expire 8 hours after issuance.
 **Errors:**
 - `400 BAD_REQUEST` — name missing or exceeds 100 chars
 - `401 UNAUTHORIZED` — missing or invalid token
-- `429 RATE_LIMITED` — exceeded 10 lunch creations/day/IP
 
 ---
 
@@ -279,7 +269,6 @@ Use a current admin or lunch session token from `POST /api/admin/verify` in the 
 - `404 NOT_FOUND` — lunch not found
 - `413 PAYLOAD_TOO_LARGE` — file exceeds 5MB
 - `415 UNSUPPORTED_MEDIA_TYPE` — invalid file type, invalid signature, or invalid image structure
-- `429 RATE_LIMITED` — exceeded 5 uploads/day/IP
 
 ---
 
@@ -295,22 +284,6 @@ Cache-Control: public, max-age=31536000, immutable
 ```
 
 **Response 404:** Image not found.
-
----
-
-## Rate Limits Summary
-
-| Route | Limit | Window | Key |
-|-------|-------|--------|-----|
-| GET /api/lunches | 1000000 | 1 hour | IP |
-| GET /api/matchup | 1000000 | 1 hour | IP |
-| POST /api/matchup/seen | 1000000 | 1 hour | IP |
-| GET /api/lunches/leaderboard | 1000000 | 1 hour | IP |
-| POST /api/vote | 1000000 | 1 hour | IP |
-| POST /api/lunches/:id/image | 1000000 | 24 hours | IP |
-| POST /api/lunches | 1000000 | 24 hours | IP |
-
-IP is read from `CF-Connecting-IP` header, falling back to `X-Forwarded-For`.
 
 ---
 
@@ -375,7 +348,7 @@ Returns full stats for one lunch.
 
 Requires admin session token.
 
-Resets all dishes to baseline Glicko-2 values. Keeps name, description, and image unchanged. Deletes all votes and vote rate limits.
+Resets all dishes to baseline Glicko-2 values. Keeps name, description, and image unchanged. Deletes all votes.
 
 **Response 200:**
 ```json

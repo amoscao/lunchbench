@@ -1,3 +1,5 @@
+import { detectContainerFormat } from './utils/image-convert'
+
 const MAX_SIZE = 5 * 1024 * 1024
 
 export async function validateImageFile(
@@ -7,12 +9,7 @@ export async function validateImageFile(
     return { valid: false, error: 'File must be 5MB or smaller.' }
   }
 
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp']
-  if (!allowedMimes.includes(file.type)) {
-    return { valid: false, error: 'Only JPEG, PNG, and WebP images are allowed.' }
-  }
-
-  const buf = await file.slice(0, 12).arrayBuffer()
+  const buf = await file.slice(0, 128).arrayBuffer()
   const bytes = new Uint8Array(buf)
 
   // JPEG
@@ -34,6 +31,10 @@ export async function validateImageFile(
     bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
     bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
   ) {
+    return { valid: true }
+  }
+
+  if (detectContainerFormat(bytes)) {
     return { valid: true }
   }
 

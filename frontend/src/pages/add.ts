@@ -2,6 +2,7 @@ import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lun
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 import { openCropModal } from '../utils/crop-modal'
+import { canDecodeImage, convertHeicToJpeg, detectFileContainerFormat } from '../utils/image-convert'
 
 type Mode = 'new' | 'add-image'
 
@@ -26,6 +27,26 @@ export function renderAdd(container: HTMLElement): void {
     if (type === 'success') {
       setTimeout(() => { alertEl.style.display = 'none' }, 3000)
     }
+  }
+
+  async function prepareImageForCrop(file: File): Promise<File | null> {
+    const format = await detectFileContainerFormat(file)
+
+    if (format === 'heic') {
+      try {
+        return await convertHeicToJpeg(file)
+      } catch {
+        showAlert('Could not convert this HEIC/HEIF image. Try a different photo or save it as JPEG first.', 'error')
+        return null
+      }
+    }
+
+    if (format === 'avif' && !(await canDecodeImage(file))) {
+      showAlert('This AVIF image can\'t be opened by your browser. Try a different photo or save it as JPEG first.', 'error')
+      return null
+    }
+
+    return file
   }
 
   const modeSelector = document.createElement('div')
@@ -119,11 +140,11 @@ export function renderAdd(container: HTMLElement): void {
 
       const uploadArea = document.createElement('div')
       uploadArea.className = 'upload-area'
-      uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP · max 5MB</p>`
+      uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP, HEIC/HEIF, AVIF · max 5MB</p>`
 
       const fileInput = document.createElement('input')
       fileInput.type = 'file'
-      fileInput.accept = 'image/jpeg,image/png,image/webp'
+      fileInput.accept = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif'
       fileInput.style.display = 'none'
       uploadArea.appendChild(fileInput)
 
@@ -137,9 +158,11 @@ export function renderAdd(container: HTMLElement): void {
         const file = fileInput.files?.[0]
         if (!file) return
         fileInput.value = ''
-        const validation = await validateImageFile(file)
+        const imageFile = await prepareImageForCrop(file)
+        if (!imageFile) return
+        const validation = await validateImageFile(imageFile)
         if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-        const cropped = await openCropModal(file)
+        const cropped = await openCropModal(imageFile)
         if (!cropped) return
         selectedFile = cropped
         imagePreview.src = URL.createObjectURL(cropped)
@@ -287,11 +310,11 @@ export function renderAdd(container: HTMLElement): void {
 
     const uploadArea = document.createElement('div')
     uploadArea.className = 'upload-area'
-    uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP · max 5MB</p>`
+    uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP, HEIC/HEIF, AVIF · max 5MB</p>`
 
     const fileInput = document.createElement('input')
     fileInput.type = 'file'
-    fileInput.accept = 'image/jpeg,image/png,image/webp'
+    fileInput.accept = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif'
     fileInput.style.display = 'none'
     uploadArea.appendChild(fileInput)
 
@@ -305,9 +328,11 @@ export function renderAdd(container: HTMLElement): void {
       const file = fileInput.files?.[0]
       if (!file) return
       fileInput.value = ''
-      const validation = await validateImageFile(file)
+      const imageFile = await prepareImageForCrop(file)
+      if (!imageFile) return
+      const validation = await validateImageFile(imageFile)
       if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-      const cropped = await openCropModal(file)
+      const cropped = await openCropModal(imageFile)
       if (!cropped) return
       selectedFile = cropped
       imagePreview.src = URL.createObjectURL(cropped)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { validateImageBuffer } from './image-validator'
+import { MAX_IMAGE_SIZE_BYTES, validateImageBuffer } from './image-validator'
 
 function jpegBuffer(length = 100): ArrayBuffer {
   const bytes = new Uint8Array(length)
@@ -27,6 +27,16 @@ function webpBuffer(length = 100): ArrayBuffer {
 }
 
 describe('validateImageBuffer', () => {
+  test('rejects files over the server-side upload ceiling', () => {
+    const declaredSize = MAX_IMAGE_SIZE_BYTES + 1
+
+    expect(validateImageBuffer(jpegBuffer(), declaredSize)).toEqual({
+      valid: false,
+      error: 'File exceeds upload size limit',
+      status: 413,
+    })
+  })
+
   test('rejects files smaller than 100 bytes', () => {
     const buf = jpegBuffer(99)
 

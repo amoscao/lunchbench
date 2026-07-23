@@ -1,5 +1,7 @@
 export type ContainerImageFormat = 'heic' | 'avif' | null
 
+export const PRE_CROP_MAX_IMAGE_DIMENSION = 2000
+const PRE_CROP_JPEG_QUALITY = 0.85
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1'])
 const AVIF_BRANDS = new Set(['avif', 'avis'])
 const FTYP_SNIFF_BYTES = 128
@@ -65,4 +67,58 @@ export async function convertHeicToJpeg(file: File): Promise<File> {
     type: 'image/jpeg',
     lastModified: file.lastModified,
   })
+}
+
+export function fitImageDimensions(
+  width: number,
+  height: number,
+  maxDimension = PRE_CROP_MAX_IMAGE_DIMENSION
+): { width: number; height: number; resized: boolean } {
+  const longestSide = Math.max(width, height)
+  if (longestSide <= maxDimension) {
+    return { width, height, resized: false }
+  }
+
+  const scale = maxDimension / longestSide
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+    resized: true,
+  }
+}
+
+export async function resizeImageForCrop(file: File): Promise<File> {
+  if (typeof createImageBitmap !== 'function') return file
+
+  const bitmap = await createImageBitmap(file)
+  try {
+    const dimensions = fitImageDimensions(bitmap.width, bitmap.height)
+    if (!dimensions.resized) return file
+
+    const canvas = document.createElement('canvas')
+    canvas.width = dimensions.width
+    canvas.height = dimensions.height
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Could not resize image.')
+
+    ctx.drawImage(bitmap, 0, 0, dimensions.width, dimensions.height)
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((resizedBlob) => {
+        if (!resizedBlob) {
+          reject(new Error('Could not resize image.'))
+          return
+        }
+        resolve(resizedBlob)
+      }, 'image/jpeg', PRE_CROP_JPEG_QUALITY)
+    })
+
+    const basename = file.name.replace(/\.[^.]+$/, '') || 'image'
+    return new File([blob], `${basename}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: file.lastModified,
+    })
+  } finally {
+    bitmap.close()
+  }
 }

@@ -115,7 +115,7 @@ describe('image upload', () => {
 
     expect(response.status).toBe(413)
     await expect(response.json()).resolves.toEqual({
-      error: 'File exceeds 5MB limit',
+      error: 'File exceeds upload size limit',
       code: 'PAYLOAD_TOO_LARGE',
     })
   })

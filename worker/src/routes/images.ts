@@ -99,7 +99,7 @@ export async function handleImageUpload(
   try {
     const rawBody = await readBodyWithinLimit(request.body, MAX_MULTIPART_BODY_BYTES)
     if (rawBody === null) {
-      return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+      return Response.json({ error: 'File exceeds upload size limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
     }
 
     const checkedRequest = new Request(request.url, {
@@ -119,7 +119,7 @@ export async function handleImageUpload(
 
   const imageFile = file as File
   if (imageFile.size > MAX_IMAGE_SIZE_BYTES) {
-    return Response.json({ error: 'File exceeds 5MB limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
+    return Response.json({ error: 'File exceeds upload size limit', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 })
   }
 
   const buf = await imageFile.arrayBuffer()

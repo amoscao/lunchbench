@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest'
-import { detectContainerFormat } from './image-convert'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { detectContainerFormat, fitImageDimensions, resizeImageForCrop } from './image-convert'
 
 function bytesOf(str: string): number[] {
   return str.split('').map((char) => char.charCodeAt(0))
@@ -46,5 +46,83 @@ describe('detectContainerFormat', () => {
 
   test('rejects when neither major nor compatible brands match', () => {
     expect(detectContainerFormat(bmff('isom', ['miaf', 'mp42']))).toBeNull()
+  })
+})
+
+describe('fitImageDimensions', () => {
+  test('keeps images within the max dimension unchanged', () => {
+    expect(fitImageDimensions(1600, 1200, 2000)).toEqual({
+      width: 1600,
+      height: 1200,
+      resized: false,
+    })
+  })
+
+  test('scales landscape images to the max dimension', () => {
+    expect(fitImageDimensions(4000, 3000, 2000)).toEqual({
+      width: 2000,
+      height: 1500,
+      resized: true,
+    })
+  })
+
+  test('scales portrait images to the max dimension', () => {
+    expect(fitImageDimensions(3000, 4000, 2000)).toEqual({
+      width: 1500,
+      height: 2000,
+      resized: true,
+    })
+  })
+})
+
+describe('resizeImageForCrop', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('returns the original file when no browser decoder is available', async () => {
+    vi.stubGlobal('createImageBitmap', undefined)
+    const file = new File(['image'], 'lunch.jpg', { type: 'image/jpeg' })
+
+    await expect(resizeImageForCrop(file)).resolves.toBe(file)
+  })
+
+  test('returns the original file when the bitmap is already within the cap', async () => {
+    const close = vi.fn()
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 1200, height: 900, close }))
+    const file = new File(['image'], 'lunch.jpg', { type: 'image/jpeg' })
+
+    await expect(resizeImageForCrop(file)).resolves.toBe(file)
+    expect(close).toHaveBeenCalled()
+  })
+
+  test('re-encodes oversized images as capped JPEGs', async () => {
+    const close = vi.fn()
+    const drawImage = vi.fn()
+    const toBlob = vi.fn((callback: BlobCallback, type: string, quality: number) => {
+      callback(new Blob(['resized'], { type }))
+      expect(quality).toBe(0.85)
+    })
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ drawImage })),
+      toBlob,
+    }
+
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 4000, height: 3000, close }))
+    vi.stubGlobal('document', { createElement: vi.fn(() => canvas) })
+
+    const file = new File(['image'], 'lunch.png', { type: 'image/png', lastModified: 123 })
+    const resized = await resizeImageForCrop(file)
+
+    expect(resized).not.toBe(file)
+    expect(resized.name).toBe('lunch.jpg')
+    expect(resized.type).toBe('image/jpeg')
+    expect(resized.lastModified).toBe(123)
+    expect(canvas.width).toBe(2000)
+    expect(canvas.height).toBe(1500)
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 2000, 1500)
+    expect(close).toHaveBeenCalled()
   })
 })

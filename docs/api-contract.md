@@ -252,12 +252,12 @@ Use a current admin or lunch session token from `POST /api/admin/verify` in the 
 **Form field:** `image` (file)
 
 **Constraints:**
-- Max size: 5MB
+- Server upload ceiling: 25MB multipart body/file size
 - Min size: 100 bytes
 - Allowed types: `image/jpeg`, `image/png`, `image/webp`
 - Validated server-side by file signature and basic format structure
 
-The frontend also accepts HEIC/HEIF and AVIF selections. HEIC/HEIF images are converted to JPEG in the browser before upload; AVIF images are decoded by the browser crop pipeline and uploaded as cropped JPEG output.
+The frontend also accepts HEIC/HEIF and AVIF selections. HEIC/HEIF images are converted to JPEG in the browser before validation. Large selected images are downscaled in the browser to a maximum 2000px longest side before the crop UI opens, then the cropped upload is emitted as an 800px JPEG.
 
 **Response 200:**
 ```json
@@ -270,7 +270,7 @@ The frontend also accepts HEIC/HEIF and AVIF selections. HEIC/HEIF images are co
 **Errors:**
 - `401 UNAUTHORIZED`
 - `404 NOT_FOUND` — lunch not found
-- `413 PAYLOAD_TOO_LARGE` — file exceeds 5MB
+- `413 PAYLOAD_TOO_LARGE` — upload exceeds the server-side upload ceiling
 - `415 UNSUPPORTED_MEDIA_TYPE` — invalid file type, invalid signature, or invalid image structure
 
 ---

@@ -1,14 +1,8 @@
 import { detectContainerFormat } from './utils/image-convert'
 
-const MAX_SIZE = 5 * 1024 * 1024
-
 export async function validateImageFile(
   file: File
 ): Promise<{ valid: boolean; error?: string }> {
-  if (file.size > MAX_SIZE) {
-    return { valid: false, error: 'File must be 5MB or smaller.' }
-  }
-
   const buf = await file.slice(0, 128).arrayBuffer()
   const bytes = new Uint8Array(buf)
 

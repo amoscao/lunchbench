@@ -41,7 +41,7 @@ Never commit `.dev.vars` or `.env*` files.
 
 Used by admin authentication:
 
-- `POST /api/admin/verify` mints a 8-hour admin session token.
+- `POST /api/admin/verify` mints a 1-year admin session token.
 - `POST /api/lunches` and `POST /api/lunches/:id/image` require that session token in the `Authorization` header.
 
 Local value lives in `worker/.dev.vars`.

@@ -1,6 +1,7 @@
-import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch, verifyAdminToken } from '../api'
+import { ApiError, createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch, verifyAdminToken } from '../api'
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
+import { clearStoredSessionToken, getStoredSessionToken, setStoredSessionToken } from '../utils/auth-storage'
 import { openCropModal } from '../utils/crop-modal'
 import { canDecodeImage, convertHeicToJpeg, detectFileContainerFormat } from '../utils/image-convert'
 
@@ -16,6 +17,7 @@ export function renderAdd(container: HTMLElement): void {
 
   let currentMode: Mode = 'new'
   let selectedFile: File | null = null
+  let storedSessionToken = getStoredSessionToken()
 
   const alertEl = document.createElement('div')
   alertEl.style.display = 'none'
@@ -76,6 +78,31 @@ export function renderAdd(container: HTMLElement): void {
 
   const formContainer = document.createElement('div')
   content.appendChild(formContainer)
+
+  async function getSessionToken(tokenGroup: HTMLElement | null): Promise<string> {
+    if (storedSessionToken) return storedSessionToken
+
+    const passwordInput = tokenGroup?.querySelector('input') as HTMLInputElement | null
+    const password = passwordInput?.value.trim() ?? ''
+    if (!password) throw new Error('Password is required.')
+
+    const sessionToken = await verifyAdminToken(password)
+    storedSessionToken = sessionToken
+    setStoredSessionToken(sessionToken)
+    return sessionToken
+  }
+
+  function handleSubmitError(e: unknown, fallbackMessage: string): void {
+    if (e instanceof ApiError && e.status === 401) {
+      clearStoredSessionToken()
+      storedSessionToken = null
+      void renderForm()
+      showAlert('Session expired. Enter the password again.', 'error')
+      return
+    }
+
+    showAlert((e as Error).message ?? fallbackMessage, 'error')
+  }
 
   async function renderForm(): Promise<void> {
     formContainer.innerHTML = ''
@@ -184,14 +211,11 @@ export function renderAdd(container: HTMLElement): void {
       formContainer.appendChild(descriptionGroup)
       formContainer.appendChild(veganGroup)
       formContainer.appendChild(uploadGroup)
-      formContainer.appendChild(tokenGroup)
+      if (!storedSessionToken) formContainer.appendChild(tokenGroup)
       formContainer.appendChild(submitBtn)
       formContainer.appendChild(alertEl)
 
       submitBtn.addEventListener('click', async () => {
-        const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
-        if (!token) { showAlert('Password is required.', 'error'); return }
-
         const name = nameInput.value.trim()
         if (!name) { showAlert('Lunch name is required.', 'error'); return }
 
@@ -208,7 +232,7 @@ export function renderAdd(container: HTMLElement): void {
         const isVegan = (veganGroup.querySelector('input') as HTMLInputElement).checked
 
         try {
-          const sessionToken = await verifyAdminToken(token)
+          const sessionToken = await getSessionToken(tokenGroup)
           const lunch = await createLunch(name, sessionToken, description || null, isVegan)
           const hadImage = !!selectedFile
           if (selectedFile) {
@@ -222,7 +246,7 @@ export function renderAdd(container: HTMLElement): void {
           uploadArea.querySelector('p')!.textContent = 'Drop image here or click to select'
           showAlert(hadImage ? 'Lunch added with image!' : 'Lunch added!', 'success')
         } catch (e: unknown) {
-          showAlert((e as Error).message ?? 'Failed to add lunch.', 'error')
+          handleSubmitError(e, 'Failed to add lunch.')
         } finally {
           submitBtn.disabled = false
           submitBtn.textContent = 'Add Lunch'
@@ -351,19 +375,17 @@ export function renderAdd(container: HTMLElement): void {
 
     formContainer.appendChild(selectGroup)
     formContainer.appendChild(uploadGroup)
-    formContainer.appendChild(tokenGroup)
+    if (!storedSessionToken) formContainer.appendChild(tokenGroup)
     formContainer.appendChild(submitBtn)
     formContainer.appendChild(alertEl)
 
     submitBtn.addEventListener('click', async () => {
-      const token = (tokenGroup.querySelector('input') as HTMLInputElement).value.trim()
-      if (!token) { showAlert('Password is required.', 'error'); return }
       if (!selectedExistingId) { showAlert('Select a lunch from the dropdown.', 'error'); return }
       if (!selectedFile) { showAlert('Please select an image.', 'error'); return }
       submitBtn.disabled = true
       submitBtn.textContent = 'Uploading…'
       try {
-        const sessionToken = await verifyAdminToken(token)
+        const sessionToken = await getSessionToken(tokenGroup)
         const upload = await uploadImage(selectedExistingId, selectedFile, sessionToken)
         imagelessLunches = imagelessLunches.filter((lunch) => lunch.id !== selectedExistingId)
         selectedExistingId = null
@@ -375,7 +397,7 @@ export function renderAdd(container: HTMLElement): void {
         renderDropdown('')
         showAlert('Image uploaded!', 'success')
       } catch (e: unknown) {
-        showAlert((e as Error).message ?? 'Upload failed.', 'error')
+        handleSubmitError(e, 'Upload failed.')
       } finally {
         submitBtn.disabled = false
         submitBtn.textContent = 'Upload Image'

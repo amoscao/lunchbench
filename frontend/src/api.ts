@@ -80,6 +80,13 @@ export type MatchupResult = Matchup | MatchupExhausted | null
 
 const BASE = '/api'
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 function resolveImageUrl(imageUrl: string | null): string | null {
   if (!imageUrl) return null
   return new URL(imageUrl, window.location.origin).toString()
@@ -187,7 +194,7 @@ export async function createLunch(
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error((err as any).error ?? `Create failed: ${res.status}`)
+    throw new ApiError((err as any).error ?? `Create failed: ${res.status}`, res.status)
   }
   const data = await res.json()
   return normalizeLunch(data.lunch)
@@ -203,7 +210,7 @@ export async function uploadImage(lunchId: number, file: File, token: string): P
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error((err as any).error ?? `Upload failed: ${res.status}`)
+    throw new ApiError((err as any).error ?? `Upload failed: ${res.status}`, res.status)
   }
   const data = await res.json() as ImageUploadResult
   return {

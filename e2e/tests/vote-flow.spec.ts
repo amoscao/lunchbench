@@ -21,7 +21,10 @@ function uniqueDishName(prefix: string): string {
 async function addLunchViaUI(page: Page, name: string): Promise<number> {
   await page.goto('/add')
   await page.fill('input[type="text"]', name)
-  await page.fill('input[type="password"]', ADMIN_TOKEN)
+  const passwordField = page.locator('input[type="password"]')
+  if (await passwordField.isVisible()) {
+    await passwordField.fill(ADMIN_TOKEN)
+  }
 
   const [response] = await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/lunches') && r.request().method() === 'POST'),

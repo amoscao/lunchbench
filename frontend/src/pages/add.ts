@@ -3,7 +3,7 @@ import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 import { clearStoredSessionToken, getStoredSessionToken, setStoredSessionToken } from '../utils/auth-storage'
 import { openCropModal } from '../utils/crop-modal'
-import { canDecodeImage, convertHeicToJpeg, detectFileContainerFormat } from '../utils/image-convert'
+import { canDecodeImage, convertHeicToJpeg, detectFileContainerFormat, resizeImageForCrop } from '../utils/image-convert'
 
 type Mode = 'new' | 'add-image'
 
@@ -49,6 +49,15 @@ export function renderAdd(container: HTMLElement): void {
     }
 
     return file
+  }
+
+  async function resizeValidatedImageForCrop(file: File): Promise<File | null> {
+    try {
+      return await resizeImageForCrop(file)
+    } catch {
+      showAlert('Could not resize this image. Try a different photo or save it as JPEG first.', 'error')
+      return null
+    }
   }
 
   const modeSelector = document.createElement('div')
@@ -167,7 +176,7 @@ export function renderAdd(container: HTMLElement): void {
 
       const uploadArea = document.createElement('div')
       uploadArea.className = 'upload-area'
-      uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP, HEIC/HEIF, AVIF · max 5MB</p>`
+      uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP, HEIC/HEIF, AVIF · large photos resized automatically</p>`
 
       const fileInput = document.createElement('input')
       fileInput.type = 'file'
@@ -189,7 +198,9 @@ export function renderAdd(container: HTMLElement): void {
         if (!imageFile) return
         const validation = await validateImageFile(imageFile)
         if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-        const cropped = await openCropModal(imageFile)
+        const resizedImageFile = await resizeValidatedImageForCrop(imageFile)
+        if (!resizedImageFile) return
+        const cropped = await openCropModal(resizedImageFile)
         if (!cropped) return
         selectedFile = cropped
         imagePreview.src = URL.createObjectURL(cropped)
@@ -334,7 +345,7 @@ export function renderAdd(container: HTMLElement): void {
 
     const uploadArea = document.createElement('div')
     uploadArea.className = 'upload-area'
-    uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP, HEIC/HEIF, AVIF · max 5MB</p>`
+    uploadArea.innerHTML = `<p>Drop image here or click to select</p><p style="margin-top:4px;font-size:11px;">JPEG, PNG, WebP, HEIC/HEIF, AVIF · large photos resized automatically</p>`
 
     const fileInput = document.createElement('input')
     fileInput.type = 'file'
@@ -356,7 +367,9 @@ export function renderAdd(container: HTMLElement): void {
       if (!imageFile) return
       const validation = await validateImageFile(imageFile)
       if (!validation.valid) { showAlert(validation.error ?? 'Invalid file.', 'error'); return }
-      const cropped = await openCropModal(imageFile)
+      const resizedImageFile = await resizeValidatedImageForCrop(imageFile)
+      if (!resizedImageFile) return
+      const cropped = await openCropModal(resizedImageFile)
       if (!cropped) return
       selectedFile = cropped
       imagePreview.src = URL.createObjectURL(cropped)

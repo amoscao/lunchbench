@@ -2,7 +2,7 @@ export type ImageValidationResult =
   | { valid: true; ext: string; contentType: string }
   | { valid: false; error: string; status: 413 | 415 }
 
-export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
+export const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024
 const MIN_IMAGE_SIZE_BYTES = 100 // app-level policy floor; not a strict PNG/JPEG/WebP validity requirement
 
 export function validateImageBuffer(
@@ -10,11 +10,11 @@ export function validateImageBuffer(
   declaredSize: number
 ): ImageValidationResult {
   if (declaredSize > MAX_IMAGE_SIZE_BYTES) {
-    return { valid: false, error: 'File exceeds 5MB limit', status: 413 }
+    return { valid: false, error: 'File exceeds upload size limit', status: 413 }
   }
 
   if (buf.byteLength > MAX_IMAGE_SIZE_BYTES) {
-    return { valid: false, error: 'File exceeds 5MB limit', status: 413 }
+    return { valid: false, error: 'File exceeds upload size limit', status: 413 }
   }
 
   if (declaredSize < MIN_IMAGE_SIZE_BYTES || buf.byteLength < MIN_IMAGE_SIZE_BYTES) {

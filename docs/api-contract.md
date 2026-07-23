@@ -16,6 +16,7 @@ Authorization: Bearer <SESSION_TOKEN>
 ```
 
 Create a session with `POST /api/admin/verify`.
+Sessions expire 1 year after issuance.
 
 Two session roles exist:
 - `admin` — password from `ADMIN_MANAGER_PASSWORD`. Can access every protected route.
@@ -225,7 +226,7 @@ Vote writes retry from a fresh rating snapshot when another vote updates either 
 Create a new lunch. **Requires lunch auth.**
 
 Use `POST /api/admin/verify` with the admin or lunch password to obtain a session token, then send that token in `Authorization` for this request.
-Tokens expire 8 hours after issuance.
+Tokens expire 1 year after issuance.
 
 **Request body:**
 ```json
@@ -246,7 +247,7 @@ Tokens expire 8 hours after issuance.
 ### POST /api/lunches/:id/image
 Upload an image for a lunch. **Requires lunch auth.** Multipart form.
 
-Use a current admin or lunch session token from `POST /api/admin/verify` in the `Authorization` header. Tokens expire 8 hours after issuance.
+Use a current admin or lunch session token from `POST /api/admin/verify` in the `Authorization` header. Tokens expire 1 year after issuance.
 
 **Form field:** `image` (file)
 

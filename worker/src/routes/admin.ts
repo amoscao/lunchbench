@@ -11,6 +11,7 @@ import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
 
 type AdminEnv = { Bindings: Bindings }
 type SessionRole = 'admin' | 'lunch'
+const ADMIN_SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
 
 const admin = new Hono<{ Bindings: Bindings }>()
 
@@ -51,7 +52,7 @@ admin.post('/verify', async (c) => {
   }
 
   const token = crypto.randomUUID()
-  const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_MS).toISOString()
   await c.env.DB.prepare(
     'INSERT OR REPLACE INTO admin_sessions (token, expires_at, role) VALUES (?, ?, ?)'
   ).bind(token, expiresAt, role).run()

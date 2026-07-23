@@ -256,6 +256,8 @@ Use a current admin or lunch session token from `POST /api/admin/verify` in the 
 - Allowed types: `image/jpeg`, `image/png`, `image/webp`
 - Validated server-side by file signature and basic format structure
 
+The frontend also accepts HEIC/HEIF and AVIF selections. HEIC/HEIF images are converted to JPEG in the browser before upload; AVIF images are decoded by the browser crop pipeline and uploaded as cropped JPEG output.
+
 **Response 200:**
 ```json
 {

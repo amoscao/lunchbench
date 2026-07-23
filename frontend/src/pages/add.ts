@@ -2,7 +2,7 @@ import { createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lun
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 import { openCropModal } from '../utils/crop-modal'
-import { convertHeicToJpeg, detectFileContainerFormat } from '../utils/image-convert'
+import { canDecodeImage, convertHeicToJpeg, detectFileContainerFormat } from '../utils/image-convert'
 
 type Mode = 'new' | 'add-image'
 
@@ -30,16 +30,23 @@ export function renderAdd(container: HTMLElement): void {
   }
 
   async function prepareImageForCrop(file: File): Promise<File | null> {
-    if (await detectFileContainerFormat(file) !== 'heic') {
-      return file
+    const format = await detectFileContainerFormat(file)
+
+    if (format === 'heic') {
+      try {
+        return await convertHeicToJpeg(file)
+      } catch {
+        showAlert('Could not convert this HEIC/HEIF image. Try a different photo or save it as JPEG first.', 'error')
+        return null
+      }
     }
 
-    try {
-      return await convertHeicToJpeg(file)
-    } catch {
-      showAlert('Could not convert this HEIC/HEIF image. Try a different photo or save it as JPEG first.', 'error')
+    if (format === 'avif' && !(await canDecodeImage(file))) {
+      showAlert('This AVIF image can\'t be opened by your browser. Try a different photo or save it as JPEG first.', 'error')
       return null
     }
+
+    return file
   }
 
   const modeSelector = document.createElement('div')

@@ -9,7 +9,7 @@ export async function validateImageFile(
     return { valid: false, error: 'File must be 5MB or smaller.' }
   }
 
-  const buf = await file.slice(0, 12).arrayBuffer()
+  const buf = await file.slice(0, 128).arrayBuffer()
   const bytes = new Uint8Array(buf)
 
   // JPEG

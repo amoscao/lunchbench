@@ -95,12 +95,14 @@ export function openCropModal(file: File): Promise<File | null> {
       applyBox()
     }
 
-    const enableConfirm = () => setTimeout(() => {
+    img.onload = () => setTimeout(() => {
       initCrop()
       confirmBtn.disabled = false
     }, 30)
-    img.onload = enableConfirm
-    img.onerror = enableConfirm
+    img.onerror = () => {
+      cleanup()
+      resolve(null)
+    }
 
     // --- Drag ---
     type Handle = 'nw' | 'ne' | 'sw' | 'se' | 'move'

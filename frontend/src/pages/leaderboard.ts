@@ -1,6 +1,7 @@
 import { getLeaderboard, type LeaderboardLunch } from '../api'
 import { isVeganMode } from '../vegan-mode'
 import { animateCountUp } from '../utils/count-up'
+import { isNewLunch } from '../utils/new-lunch'
 
 function rankBadgeClass(rank: number): string {
   if (rank === 1) return 'gold'
@@ -89,7 +90,7 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
         nameTd.innerHTML = `
           <div class="name-cell">
             <div>
-              <div class="lunch-name-row"><span>${escapedName}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}${lunch.is_legacy === 1 ? '<span class="legacy-badge">Legacy</span>' : ''}</div>
+              <div class="lunch-name-row"><span>${escapedName}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}${lunch.is_legacy === 1 ? '<span class="legacy-badge">Legacy</span>' : ''}${isNewLunch(lunch) ? '<span class="new-badge">New</span>' : ''}</div>
               ${lunch.description ? `<div class="leaderboard-subtitle">${escapedDescription}</div>` : ''}
             </div>
           </div>

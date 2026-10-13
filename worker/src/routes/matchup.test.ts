@@ -16,6 +16,7 @@ function lunchRow(
     description: null,
     image_key: null,
     is_vegan: isVegan,
+    is_legacy: 0,
     rating,
     glicko_rd: 100,
     glicko_volatility: 0.06,

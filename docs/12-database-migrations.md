@@ -29,9 +29,12 @@ Current files include:
 - `0007_session_roles.sql`
 - `0008_vegan_leaderboard_index.sql`
 - `0009_matchup_sessions.sql`
+- `0010_legacy_lunches.sql`
 - `seed.sql`
 
 `0006_glicko_defaults.sql` repairs the schema defaults for new lunches, resets invalid-only self-match histories to the unrated Glicko baseline, drops copied self-match votes, and shifts obvious valid old-default `1000` starts onto the `1500` scale. It does not replay mixed historical Glicko games. Exact historical replay requires an explicitly approved repair command because the Glicko update is application logic, not SQL.
+
+`0010_legacy_lunches.sql` adds `lunches.is_legacy` and sets it to `1` on every row present when it runs. Those are the Paula Legacy Lunch dishes from the previous caterer. Lunches created later default to `0`. `seed.sql` marks its sample lunches as legacy so local data matches prod.
 
 Migration files should be append-only once merged. If a migration has shipped, create a new migration instead of editing history.
 

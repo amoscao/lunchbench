@@ -308,6 +308,8 @@ type Lunch = {
   wins: number
   losses: number
   ties: number
+  is_vegan: number           // 1 or 0
+  is_legacy: number          // 1 = Paula Legacy Lunch (existed before the caterer change), 0 = added later
   created_at: string         // ISO 8601
   updated_at: string
 }
@@ -336,6 +338,7 @@ Returns full stats for one lunch.
   "ties": 1,
   "momentum": 0,
   "is_vegan": 0,
+  "is_legacy": 1,
   "created_at": "2024-09-23T12:00:00Z",
   "updated_at": "2024-09-23T14:00:00Z"
 }

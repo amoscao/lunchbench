@@ -31,7 +31,9 @@ npx wrangler d1 execute lunchbench --local --file=../migrations/0004_admin_sessi
 npx wrangler d1 execute lunchbench --local --file=../migrations/0005_glicko.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0006_glicko_defaults.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0007_session_roles.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0008_vegan_leaderboard_index.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0009_matchup_sessions.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0010_legacy_lunches.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/seed.sql
 ```
 

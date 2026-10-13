@@ -89,7 +89,7 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
         nameTd.innerHTML = `
           <div class="name-cell">
             <div>
-              <div class="lunch-name-row"><span>${escapedName}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}</div>
+              <div class="lunch-name-row"><span>${escapedName}</span>${lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''}${lunch.is_legacy === 1 ? '<span class="legacy-badge">Legacy</span>' : ''}</div>
               ${lunch.description ? `<div class="leaderboard-subtitle">${escapedDescription}</div>` : ''}
             </div>
           </div>

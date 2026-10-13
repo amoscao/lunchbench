@@ -1,4 +1,14 @@
+export function isVeganToggleDisabled(): boolean {
+  return import.meta.env.VITE_DISABLE_VEGAN_TOGGLE === 'true'
+}
+
 export function initVeganMode(onToggle: (isVegan: boolean) => void): void {
+  if (isVeganToggleDisabled()) {
+    localStorage.removeItem('vegan-mode')
+    applyVeganMode(false)
+    return
+  }
+
   const saved = localStorage.getItem('vegan-mode')
   const isVegan = saved === 'true'
   applyVeganMode(isVegan)

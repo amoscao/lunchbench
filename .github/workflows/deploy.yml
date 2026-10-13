@@ -32,6 +32,7 @@ jobs:
         run: pnpm --filter lunchbench-frontend build
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_DISABLE_VEGAN_TOGGLE: 'true'
 
       - name: Deploy Worker
         run: pnpm --filter lunchbench-api exec wrangler deploy

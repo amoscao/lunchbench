@@ -3,6 +3,7 @@ export type LunchForMatchup = {
   rating: number
   glicko_rd: number
   is_vegan?: number
+  is_legacy?: number
   presentation_count?: number
   [key: string]: unknown
 }
@@ -17,6 +18,7 @@ const JITTER_WEIGHT = 0.05
  * Selects two distinct lunches for a voting matchup.
  * Weights anchor selection by uncertainty, then samples an opponent by pair score.
  * Tries to avoid pairs that appeared in recentPairs, falling back only when needed.
+ * Never pairs two legacy lunches.
  */
 export function selectMatchup<T extends LunchForMatchup>(
   lunches: T[],
@@ -30,7 +32,7 @@ export function selectMatchup<T extends LunchForMatchup>(
   const anchorPool = lunches.filter((lunch) =>
     lunches.some((other) =>
       other.id !== lunch.id &&
-      sameVeganGroup(lunch, other) &&
+      canPair(lunch, other) &&
       !excludedSet.has(pairKey(lunch.id, other.id)) &&
       !recentSet.has(pairKey(lunch.id, other.id))
     )
@@ -38,7 +40,7 @@ export function selectMatchup<T extends LunchForMatchup>(
   const fallbackAnchorPool = lunches.filter((lunch) =>
     lunches.some((other) =>
       other.id !== lunch.id &&
-      sameVeganGroup(lunch, other) &&
+      canPair(lunch, other) &&
       !excludedSet.has(pairKey(lunch.id, other.id))
     )
   )
@@ -46,19 +48,15 @@ export function selectMatchup<T extends LunchForMatchup>(
   if (availableAnchors.length === 0) return null
 
   const anchor = weightedByRd(availableAnchors)
-  const sameGroup = lunches.filter((lunch) => sameVeganGroup(anchor, lunch))
-  if (sameGroup.length < 2) return null
+  const pairable = lunches.filter((lunch) => lunch.id !== anchor.id && canPair(anchor, lunch))
 
-  const nonRecentOpponentPool = sameGroup.filter((lunch) =>
-    lunch.id !== anchor.id &&
+  const nonRecentOpponentPool = pairable.filter((lunch) =>
     !excludedSet.has(pairKey(anchor.id, lunch.id)) &&
     !recentSet.has(pairKey(anchor.id, lunch.id))
   )
   const opponentPool = nonRecentOpponentPool.length > 0
     ? nonRecentOpponentPool
-    : sameGroup.filter((lunch) =>
-      lunch.id !== anchor.id && !excludedSet.has(pairKey(anchor.id, lunch.id))
-    )
+    : pairable.filter((lunch) => !excludedSet.has(pairKey(anchor.id, lunch.id)))
   if (opponentPool.length === 0) return null
 
   const opponent = weightedByOpponentScore(anchor, opponentPool)
@@ -119,6 +117,10 @@ function clamp01(value: number): number {
 function pairKey(a: number, b: number): string {
   const [lo, hi] = a < b ? [a, b] : [b, a]
   return `${lo}:${hi}`
+}
+
+function canPair(a: LunchForMatchup, b: LunchForMatchup): boolean {
+  return sameVeganGroup(a, b) && !(a.is_legacy === 1 && b.is_legacy === 1)
 }
 
 function sameVeganGroup(a: LunchForMatchup, b: LunchForMatchup): boolean {

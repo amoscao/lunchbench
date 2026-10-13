@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { waitForMatchup } from './helpers'
 
 // 3 fake non-vegan lunches → 3 unique pairs covers all combinations

@@ -24,6 +24,12 @@ docker compose -p <project> down -v --remove-orphans
 
 The script does not delete Docker images.
 
+### Route interception
+
+Specs that use `page.route` must import `test` and `expect` from `./fixtures`, not `@playwright/test`.
+The `./fixtures` `page` fixture calls `page.unrouteAll({ behavior: 'ignoreErrors' })` after each test.
+Without it, a `route.fetch()` handler still in flight at teardown (e.g. the next-matchup prefetch) fails the test with `Response has been disposed` (#261).
+
 ## Running Tests
 
 ### Git hook (automatic — runs on every `git push`)

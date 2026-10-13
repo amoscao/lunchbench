@@ -376,7 +376,7 @@ After `Promise.all` settles, the code does `next = await (nextMatchupPromise ?? 
 
 ---
 
-## 13. Implementation Notes for Codex
+## 13. Implementation Notes
 
 - Use a single `frontend/src/styles/main.css` file for all global CSS variables, resets, and base styles
 - Use `data-theme="dark"` on `<html>` for dark mode (not a class)

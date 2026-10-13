@@ -2,6 +2,10 @@ import { describe, expect, test } from 'vitest'
 import { isNewLunch, NEW_LUNCH_WINDOW_MS, parseUtcTimestamp } from './new-lunch'
 
 describe('parseUtcTimestamp', () => {
+  test('runs in a non-UTC zone so local-time parsing would be caught', () => {
+    expect(new Date(Date.UTC(2026, 9, 5)).getTimezoneOffset()).not.toBe(0)
+  })
+
   test('reads D1 datetime format as UTC', () => {
     expect(parseUtcTimestamp('2026-10-05 12:00:00')).toBe(Date.UTC(2026, 9, 5, 12, 0, 0))
   })

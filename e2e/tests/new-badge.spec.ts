@@ -30,6 +30,8 @@ test.describe('New food badge', () => {
     const { lunches } = await res.json() as { lunches: LeaderboardLunch[] }
     const seeded = lunches.find((l) => l.name === 'Margherita Pizza')
     if (!seeded) throw new Error('Seeded lunch Margherita Pizza not on leaderboard')
+    // seed.sql backdates created_at; a fresh datetime('now') would make it look new.
+    expect(seeded.created_at.startsWith('2024-')).toBe(true)
 
     await page.goto('/leaderboard')
     await page.waitForSelector('.leaderboard-table tbody .lunch-name-row', { timeout: 15000 })

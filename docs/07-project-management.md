@@ -52,7 +52,7 @@ Use human-owned issues for external account, billing, dashboard, DNS, or secret-
 Use short branch names:
 
 ```bash
-codex/<short-description>
+<type>/<short-description>   # e.g. feat/, fix/, chore/
 ```
 
 PR descriptions should cover:

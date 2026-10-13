@@ -15,7 +15,7 @@ The goals are:
 
 1. Read the relevant docs for the task.
 2. Check repo status in the original checkout and note starting point.
-3. Create or use a dedicated worktree and branch (`codex/<short-description>`).
+3. Create or use a dedicated worktree and branch (`<type>/<short-description>`, e.g. `feat/`, `fix/`, `chore/`).
 4. Branch from current `main` and implement the smallest scoped change.
 5. Update docs when behavior, schema, API, deployment, or validation changes.
 6. Run required validation for the type of change (code vs docs).
@@ -52,7 +52,7 @@ Use local checks for repo truth.
 Use worktrees for branch work:
 
 ```bash
-git worktree add -b codex/<short-description> ../lunchbench-<short-description> main
+git worktree add -b <type>/<short-description> ../lunchbench-<short-description> main
 ```
 
 If `main` has local commits that should be included, branch from the current local `main`. If it has unrelated uncommitted files, leave them behind.

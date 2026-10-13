@@ -64,7 +64,7 @@ test.describe('New food badge', () => {
     await waitForMatchup(page)
     const names = page.locator('.lunch-card-name')
     await expect(names.nth(0).locator('.new-badge')).toHaveText('New food!')
-    await expect(names.nth(0).locator('.legacy-badge')).toHaveText('Paula Legacy Lunch')
+    await expect(page.locator('.lunch-card-info').nth(0).locator('.legacy-badge-row .legacy-badge')).toHaveText('Paula Legacy Lunch')
     await expect(names.nth(1).locator('.new-badge')).toHaveCount(0)
   })
 })

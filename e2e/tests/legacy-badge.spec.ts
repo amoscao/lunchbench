@@ -97,5 +97,6 @@ test.describe('Paula Legacy Lunch badge', () => {
     await page.goto(`/lunch/${id}`)
     await page.waitForSelector('.detail-name', { timeout: 15000 })
     await expect(page.locator('.legacy-badge')).toHaveCount(0)
+    await expect(page.locator('.legacy-badge-row')).toHaveCount(0)
   })
 })

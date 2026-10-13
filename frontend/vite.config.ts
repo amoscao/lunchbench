@@ -1,6 +1,11 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  test: {
+    // Non-UTC zone so tests catch timestamps parsed as local time.
+    env: { TZ: 'America/New_York' },
+  },
   build: {
     outDir: 'dist',
   },

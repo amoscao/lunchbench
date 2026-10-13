@@ -310,7 +310,7 @@ type Lunch = {
   ties: number
   is_vegan: number           // 1 or 0
   is_legacy: number          // 1 = Paula Legacy Lunch (existed before the caterer change), 0 = added later
-  created_at: string         // ISO 8601
+  created_at: string         // D1 datetime('now'): "YYYY-MM-DD HH:MM:SS" in UTC, no zone suffix. The frontend shows a "New" badge when it is under 7 days old.
   updated_at: string
 }
 ```

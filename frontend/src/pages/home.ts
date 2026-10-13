@@ -12,6 +12,7 @@ import { isVeganMode } from '../vegan-mode'
 import { hasSeen, markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
+import { isNewLunch } from '../utils/new-lunch'
 
 function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
@@ -25,6 +26,7 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
        </div>`
   const veganBadge = lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''
   const legacyBadge = lunch.is_legacy === 1 ? '<span class="legacy-badge">Paula Legacy Lunch</span>' : ''
+  const newBadge = isNewLunch(lunch) ? '<span class="new-badge">New food!</span>' : ''
   const description = lunch.description
     ? `<div class="lunch-card-description">${escapeHtml(lunch.description)}</div>`
     : ''
@@ -34,7 +36,7 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
     <div class="vote-card-label" data-short="${shortLabel}">${label}</div>
     ${mediaArea}
     <div class="lunch-card-info">
-      <div class="lunch-card-name">${escapeHtml(lunch.name)}${veganBadge}${legacyBadge}</div>
+      <div class="lunch-card-name">${escapeHtml(lunch.name)}${veganBadge}${legacyBadge}${newBadge}</div>
       ${description}
     </div>
   `

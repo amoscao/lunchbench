@@ -11,7 +11,7 @@ npx wrangler deploy
 ### Deploy Frontend
 ```bash
 cd frontend
-pnpm build
+VITE_DISABLE_VEGAN_TOGGLE=true pnpm build
 npx wrangler pages deploy dist --project-name=lunchbench --branch=main
 ```
 

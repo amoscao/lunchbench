@@ -119,6 +119,17 @@ Production uses Cloudflare Pages and the Pages Function proxy in:
 frontend/functions/api/[[path]].ts
 ```
 
+### `VITE_DISABLE_VEGAN_TOGGLE`
+
+Build-time flag. When set to `true`:
+
+- the nav omits the vegan mode toggle
+- app start clears the saved `vegan-mode` localStorage key and the `data-vegan` attribute
+
+Production sets it to `true` in the frontend build step of `.github/workflows/deploy.yml`.
+Manual Pages deploys must build with `VITE_DISABLE_VEGAN_TOGGLE=true pnpm build` (see `docs/deployment.md`).
+Local dev, CI, and E2E leave it unset, so the toggle stays visible there.
+
 ## API CORS
 
 The Worker only emits browser CORS allow headers for known frontend origins.

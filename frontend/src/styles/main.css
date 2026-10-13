@@ -525,6 +525,14 @@ img {
   vertical-align: middle;
 }
 
+.legacy-badge-row {
+  margin-top: var(--space-1);
+}
+
+.legacy-badge-row .legacy-badge {
+  margin-left: 0;
+}
+
 .new-badge {
   display: inline-block;
   margin-left: 6px;

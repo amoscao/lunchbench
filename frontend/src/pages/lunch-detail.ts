@@ -131,10 +131,11 @@ function renderDetail(content: HTMLElement, lunch: LunchDetail, navigate: (p: st
     ? `<img class="detail-image" src="${escapeHtml(lunch.image_url)}" alt="${escapeHtml(lunch.name)}" />`
     : `<div class="detail-image-placeholder"><span>?</span></div>`
   const veganBadge = lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿 Vegan</span>' : ''
+  const legacyBadge = lunch.is_legacy === 1 ? '<span class="legacy-badge">Paula Legacy Lunch</span>' : ''
   hero.innerHTML = `
     ${img}
     <div class="detail-hero-info">
-      <h1 class="detail-name">${escapeHtml(lunch.name)}${veganBadge}</h1>
+      <h1 class="detail-name">${escapeHtml(lunch.name)}${veganBadge}${legacyBadge}</h1>
       ${lunch.description ? `<p class="detail-description">${escapeHtml(lunch.description)}</p>` : ''}
     </div>
   `

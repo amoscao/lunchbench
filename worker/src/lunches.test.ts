@@ -9,6 +9,7 @@ function lunchRow(id: number, name: string, isVegan: number, conservativeRating:
     description: null,
     image_key: null,
     is_vegan: isVegan,
+    is_legacy: 0,
     rating: 1500,
     glicko_rd: 100,
     glicko_volatility: 0.06,

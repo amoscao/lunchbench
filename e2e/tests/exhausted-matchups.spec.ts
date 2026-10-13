@@ -25,6 +25,7 @@ function makeLunchJson(l: FakeLunch) {
     image_key: null,
     image_url: null,
     is_vegan: 0,
+    is_legacy: 0,
     rank: 1,
     rating: 1500,
     conservative_rating: 1350,

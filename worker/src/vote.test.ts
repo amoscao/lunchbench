@@ -9,6 +9,7 @@ function lunchRow(id: number): LunchRow {
     description: null,
     image_key: null,
     is_vegan: 0,
+    is_legacy: 0,
     rating: 1500,
     glicko_rd: 350,
     glicko_volatility: 0.06,

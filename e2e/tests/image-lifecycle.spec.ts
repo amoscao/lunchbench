@@ -8,6 +8,7 @@ type Lunch = {
   image_key: string | null
   image_url: string | null
   is_vegan: number
+  is_legacy: number
   rank: number
   rating: number
   conservative_rating: number

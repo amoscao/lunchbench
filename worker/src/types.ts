@@ -13,6 +13,7 @@ export type Lunch = {
   image_key: string | null
   image_url: string | null
   is_vegan: number
+  is_legacy: number
   rank?: number
   rating: number
   glicko_rd: number
@@ -31,6 +32,7 @@ export type LunchRow = {
   description: string | null
   image_key: string | null
   is_vegan: number
+  is_legacy: number
   rating: number
   glicko_rd: number
   glicko_volatility: number

@@ -44,5 +44,8 @@ test.describe('Arena image preload', () => {
     await page.locator('.vote-buttons .btn').nth(3).click()
     await expect(page.locator('.lunch-card-image img').first()).not.toHaveAttribute('src', firstPair ?? '')
     expect(await arenaImagesDecoded(page)).toEqual([true, true])
+
+    // The background prefetch may still be in a route handler; detach so teardown does not race it.
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
   })
 })

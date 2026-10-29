@@ -113,11 +113,11 @@ function fakeDb(rows: LunchRow[] = ALL_ROWS): D1Database & {
           return null
         },
         async all() {
-          if (sql.includes('FROM lunches WHERE is_vegan = 1')) {
-            return { results: rows.filter((row) => row.is_vegan === 1) }
+          if (sql.includes('FROM lunches WHERE is_vegan = 1 AND is_legacy = 0')) {
+            return { results: rows.filter((row) => row.is_vegan === 1 && row.is_legacy === 0) }
           }
-          if (sql.includes('FROM lunches WHERE is_vegan = 0')) {
-            return { results: rows.filter((row) => row.is_vegan === 0) }
+          if (sql.includes('FROM lunches WHERE is_vegan = 0 AND is_legacy = 0')) {
+            return { results: rows.filter((row) => row.is_vegan === 0 && row.is_legacy === 0) }
           }
           if (sql.includes('FROM votes')) return { results: [] }
           if (sql.includes('FROM matchup_presentations')) {
@@ -188,6 +188,25 @@ describe('GET /api/matchup vegan filtering', () => {
       lunchRow(3, 1, 'Only Vegan', 1600),
     ])
     const res = await matchupRouter.request('/?vegan=true', { method: 'GET' }, env(singleVeganDb))
+    expect(res.status).toBe(204)
+  })
+})
+
+describe('GET /api/matchup legacy filtering', () => {
+  test('never serves legacy lunches', async () => {
+    const legacy = (id: number) => ({ ...lunchRow(id, 0, `Legacy ${id}`), is_legacy: 1 })
+    const db = fakeDb([legacy(1), legacy(2), legacy(3), lunchRow(4, 0), lunchRow(5, 0)])
+    for (let i = 0; i < 10; i++) {
+      const res = await matchupRouter.request('/', { method: 'GET' }, env(db))
+      expect(res.status).toBe(200)
+      const data = await res.json() as { left: LunchRow; right: LunchRow }
+      expect([data.left.id, data.right.id].sort()).toEqual([4, 5])
+    }
+  })
+
+  test('returns 204 when fewer than 2 non-legacy lunches remain', async () => {
+    const db = fakeDb([{ ...lunchRow(1, 0), is_legacy: 1 }, { ...lunchRow(2, 0), is_legacy: 1 }, lunchRow(3, 0)])
+    const res = await matchupRouter.request('/', { method: 'GET' }, env(db))
     expect(res.status).toBe(204)
   })
 })

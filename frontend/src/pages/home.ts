@@ -25,9 +25,6 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
         <span class="placeholder-text">no picture yet</span>
        </div>`
   const veganBadge = lunch.is_vegan === 1 ? '<span class="vegan-badge">🌿</span>' : ''
-  const legacyBadge = lunch.is_legacy === 1
-    ? '<div class="legacy-badge-row"><span class="legacy-badge">Paula Legacy Lunch</span></div>'
-    : ''
   const newBadge = isNewLunch(lunch) ? '<span class="new-badge">New food!</span>' : ''
   const description = lunch.description
     ? `<div class="lunch-card-description">${escapeHtml(lunch.description)}</div>`
@@ -39,7 +36,6 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
     ${mediaArea}
     <div class="lunch-card-info">
       <div class="lunch-card-name">${escapeHtml(lunch.name)}${veganBadge}${newBadge}</div>
-      ${legacyBadge}
       ${description}
     </div>
   `

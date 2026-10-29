@@ -3,7 +3,6 @@ export type LunchForMatchup = {
   rating: number
   glicko_rd: number
   is_vegan?: number
-  is_legacy?: number
   presentation_count?: number
   [key: string]: unknown
 }
@@ -18,7 +17,6 @@ const JITTER_WEIGHT = 0.05
  * Selects two distinct lunches for a voting matchup.
  * Weights anchor selection by uncertainty, then samples an opponent by pair score.
  * Tries to avoid pairs that appeared in recentPairs, falling back only when needed.
- * Never pairs two legacy lunches.
  */
 export function selectMatchup<T extends LunchForMatchup>(
   lunches: T[],
@@ -120,7 +118,7 @@ function pairKey(a: number, b: number): string {
 }
 
 function canPair(a: LunchForMatchup, b: LunchForMatchup): boolean {
-  return sameVeganGroup(a, b) && !(a.is_legacy === 1 && b.is_legacy === 1)
+  return sameVeganGroup(a, b)
 }
 
 function sameVeganGroup(a: LunchForMatchup, b: LunchForMatchup): boolean {

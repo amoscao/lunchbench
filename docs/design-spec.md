@@ -366,7 +366,7 @@ The loading bar animation is exactly **1.5 s** (`bar-fill 1.5s linear forwards` 
 
 This requires two conditions to be true simultaneously:
 
-1. **Prefetch resolves before the bar fills.** As soon as a matchup renders, `home.ts` fires `nextMatchupPromise = getMatchup(isVeganMode())` in the background. The user has at least their full matchup-viewing time plus up to 1.5 s of vote time for this fetch to complete. `GET /api/matchup` must return in well under 1.5 s.
+1. **Prefetch resolves before the bar fills.** As soon as a matchup renders, `home.ts` fires `nextMatchupPromise = getMatchup(isVeganMode())` in the background. The user has at least their full matchup-viewing time plus up to 1.5 s of vote time for this fetch to complete. `GET /api/matchup` must return in well under 1.5 s. The prefetch also loads and decodes both card images (`preloadMatchupImages`, capped at 3 s), and `renderCard` moves those decoded `<img>` elements into the cards. A pair never renders with blank images unless the 3 s cap is hit. Initial load waits on the same preload behind the skeleton.
 
 2. **`votePromise` resolves before the bar fills.** `castVote` runs `Promise.all([delay, votePromise])`. `delay` is the 1.5 s timer; `votePromise` is the `POST /api/vote` response. If the POST outlasts the timer, the JS transition is blocked even though the CSS bar is already full. `POST /api/vote` must complete in well under 1.5 s.
 

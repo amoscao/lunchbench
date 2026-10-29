@@ -14,12 +14,36 @@ import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
 import { isNewLunch } from '../utils/new-lunch'
 
+const IMAGE_PRELOAD_TIMEOUT_MS = 3000
+
+// Decoded <img> elements for the next pair, keyed by URL. renderCard moves them into the card
+// so the image shows on first paint without relying on the HTTP cache.
+const preloadedImages = new Map<string, HTMLImageElement>()
+
+// Loads and decodes both images before the pair renders, so cards never appear without them.
+// Capped so a slow image cannot stall the arena.
+function preloadMatchupImages(matchup: MatchupResult): Promise<void> {
+  preloadedImages.clear()
+  if (!matchup || matchup.status !== 'ok') return Promise.resolve()
+  const loads = [matchup.left.image_url, matchup.right.image_url]
+    .filter((url): url is string => url !== null)
+    .map((url) => {
+      const img = new Image()
+      img.src = url
+      preloadedImages.set(url, img)
+      return img.decode().catch(() => undefined)
+    })
+  const timeout = new Promise<void>((r) => setTimeout(r, IMAGE_PRELOAD_TIMEOUT_MS))
+  return Promise.race([Promise.all(loads).then(() => undefined), timeout])
+}
+
 function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
   const card = document.createElement('div')
   card.className = 'lunch-card'
 
+  const preloaded = lunch.image_url ? preloadedImages.get(lunch.image_url) : undefined
   const mediaArea = lunch.image_url
-    ? `<div class="lunch-card-image"><img src="${escapeHtml(lunch.image_url)}" alt="${escapeHtml(lunch.name)}" loading="lazy" /></div>`
+    ? `<div class="lunch-card-image">${preloaded ? '' : `<img src="${escapeHtml(lunch.image_url)}" alt="${escapeHtml(lunch.name)}" />`}</div>`
     : `<div class="lunch-card-placeholder">
         <div class="placeholder-question">?</div>
         <span class="placeholder-text">no picture yet</span>
@@ -39,6 +63,11 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
       ${description}
     </div>
   `
+  if (preloaded && lunch.image_url) {
+    preloadedImages.delete(lunch.image_url)
+    preloaded.alt = lunch.name
+    card.querySelector('.lunch-card-image')?.appendChild(preloaded)
+  }
   return card
 }
 
@@ -297,6 +326,12 @@ export function renderHome(
   }
 
   async function getUnseenMatchup(veganOnly: boolean): Promise<MatchupResult> {
+    const matchup = await fetchUnseenMatchup(veganOnly)
+    await preloadMatchupImages(matchup)
+    return matchup
+  }
+
+  async function fetchUnseenMatchup(veganOnly: boolean): Promise<MatchupResult> {
     for (let i = 0; i < 3; i++) {
       const matchup = await getMatchup(veganOnly)
       if (!matchup || matchup.status !== 'ok') return matchup

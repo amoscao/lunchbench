@@ -16,32 +16,38 @@ import { isNewLunch } from '../utils/new-lunch'
 
 const IMAGE_PRELOAD_TIMEOUT_MS = 3000
 
-// Decoded <img> elements for the next pair, keyed by URL. renderCard moves them into the card
+// Decoded <img> elements per matchup, keyed by URL. renderCard moves them into the card
 // so the image shows on first paint without relying on the HTTP cache.
-const preloadedImages = new Map<string, HTMLImageElement>()
+// Keyed by matchup object so a stale page instance cannot clobber another pair's images.
+const preloadedImages = new WeakMap<Matchup, Map<string, HTMLImageElement>>()
 
 // Loads and decodes both images before the pair renders, so cards never appear without them.
 // Capped so a slow image cannot stall the arena.
 function preloadMatchupImages(matchup: MatchupResult): Promise<void> {
-  preloadedImages.clear()
   if (!matchup || matchup.status !== 'ok') return Promise.resolve()
+  const images = new Map<string, HTMLImageElement>()
+  preloadedImages.set(matchup, images)
   const loads = [matchup.left.image_url, matchup.right.image_url]
     .filter((url): url is string => url !== null)
     .map((url) => {
       const img = new Image()
       img.src = url
-      preloadedImages.set(url, img)
+      images.set(url, img)
       return img.decode().catch(() => undefined)
     })
   const timeout = new Promise<void>((r) => setTimeout(r, IMAGE_PRELOAD_TIMEOUT_MS))
   return Promise.race([Promise.all(loads).then(() => undefined), timeout])
 }
 
-function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
+function renderCard(
+  lunch: Lunch,
+  label: 'DISH A' | 'DISH B',
+  images?: Map<string, HTMLImageElement>
+): HTMLElement {
   const card = document.createElement('div')
   card.className = 'lunch-card'
 
-  const preloaded = lunch.image_url ? preloadedImages.get(lunch.image_url) : undefined
+  const preloaded = lunch.image_url ? images?.get(lunch.image_url) : undefined
   const mediaArea = lunch.image_url
     ? `<div class="lunch-card-image">${preloaded ? '' : `<img src="${escapeHtml(lunch.image_url)}" alt="${escapeHtml(lunch.name)}" />`}</div>`
     : `<div class="lunch-card-placeholder">
@@ -64,7 +70,7 @@ function renderCard(lunch: Lunch, label: 'DISH A' | 'DISH B'): HTMLElement {
     </div>
   `
   if (preloaded && lunch.image_url) {
-    preloadedImages.delete(lunch.image_url)
+    images?.delete(lunch.image_url)
     preloaded.alt = lunch.name
     card.querySelector('.lunch-card-image')?.appendChild(preloaded)
   }
@@ -542,12 +548,13 @@ export function renderHome(
 
     const arena = document.createElement('div')
     arena.className = 'vote-arena'
-    arena.appendChild(renderCard(leftLunch, 'DISH A'))
+    const images = preloadedImages.get(matchup)
+    arena.appendChild(renderCard(leftLunch, 'DISH A', images))
     const vs = document.createElement('div')
     vs.className = 'vote-vs'
     vs.textContent = 'VS'
     arena.appendChild(vs)
-    arena.appendChild(renderCard(rightLunch, 'DISH B'))
+    arena.appendChild(renderCard(rightLunch, 'DISH B', images))
     const reducedMotionFadeIn = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     content.appendChild(arena)
 

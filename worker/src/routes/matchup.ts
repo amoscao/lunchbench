@@ -90,8 +90,8 @@ matchup.get('/', async (c) => {
   if (sessionKey) await upsertMatchupSession(c.env.DB, sessionKey)
 
   const query = veganOnly
-    ? 'SELECT * FROM lunches WHERE is_vegan = 1'
-    : 'SELECT * FROM lunches WHERE is_vegan = 0'
+    ? 'SELECT * FROM lunches WHERE is_vegan = 1 AND is_legacy = 0'
+    : 'SELECT * FROM lunches WHERE is_vegan = 0 AND is_legacy = 0'
   const [allLunches, recentVotes, seenPairsResult] = await Promise.all([
     c.env.DB.prepare(query).all<LunchRow>(),
     c.env.DB.prepare(

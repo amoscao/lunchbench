@@ -118,7 +118,7 @@ Returns two selected lunches for voting.
 - (no param or any other value) — return a non-vegan matchup (`is_vegan = 0`)
 
 Both lunches in the pair always share the same `is_vegan` value.
-A pair never has two legacy lunches (`is_legacy = 1`). Allowed pairs are non-legacy vs non-legacy and non-legacy vs legacy. If only legacy pairs remain, the endpoint returns `{ "status": "exhausted" }`.
+Legacy lunches (`is_legacy = 1`, Paula Legacy Lunch) are never served. Only non-legacy lunches enter the matchup pool. They still appear on the leaderboard and count toward `rank`.
 Selection weights the anchor lunch by `glicko_rd`, excludes session-seen pairs, avoids recent voted pairs when possible, then samples an opponent with a score based on rating proximity, opponent uncertainty, session presentation freshness, and small random jitter. Left/right sides are assigned randomly.
 If the requested group has fewer than 2 lunches, the endpoint returns 204. If the requested session and vegan mode has seen every available pair, the endpoint returns 200 with `{ "status": "exhausted" }`.
 Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.

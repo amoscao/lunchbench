@@ -131,7 +131,11 @@ async function exportLeaderboardPDF(token: string | null): Promise<void> {
 
   const res = await fetch('/api/lunches/leaderboard')
   if (!res.ok) throw new Error('Failed to load leaderboard')
-  const { lunches }: LeaderboardPage = await res.json()
+  const page: LeaderboardPage = await res.json()
+  // Paula legacy lunches are left out; ranks are renumbered over what remains.
+  const lunches = page.lunches
+    .filter((lunch) => lunch.is_legacy !== 1)
+    .map((lunch, i) => ({ ...lunch, rank: i + 1 }))
 
   const dateString = new Date().toLocaleDateString('en-US', {
     year: 'numeric',

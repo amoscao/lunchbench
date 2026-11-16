@@ -35,7 +35,7 @@ Sodabench ranks canned sodas and seltzers. It shares the Worker, D1 database, an
 
 Code:
 
-- `worker/src/soda-score.ts`: Beta-posterior scoring (pure).
+- `worker/src/soda-score.ts`: Beta-posterior scoring with a hierarchical brand prior (pure). See the Scoring section of `docs/api-contract.md`.
 - `worker/src/soda-order.ts`: weekly order list selection, seeded Thompson sampling for trials (pure).
 - `worker/src/soda-deck.ts`: per-voter deck order (pure).
 - `worker/src/soda-data.ts`: D1 aggregation and snapshot writes.

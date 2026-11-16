@@ -416,9 +416,14 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 
 - `R` / `L`: voters whose latest swipe is right / left.
 - `likes` / `hates`: voters whose report is like / hate (one report row per voter per drink). `n` = distinct reporters.
-- Posterior on θ (chance a drinker is glad it was bought): prior Beta(1, 1). Each like adds 1 to α, each hate adds 1 to β.
-- Right swipes: κ = min(3, 0.2·R) · 3/(3+n). Add 0.75κ to α and 0.25κ to β. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
-- Left swipes are not negative evidence ("not a like" includes "haven't had it"). They only lower the tiebreak `appeal = (R+1)/(R+L+2)`.
+- θ is the chance a drinker is glad the drink was bought. Some brands are just worse, so each drink's prior comes from its brand.
+- Own evidence `(a_i, b_i)`, no prior: each like adds 1 to `a`, each hate adds 1 to `b`. Right swipes: κ = min(3, 0.2·R) · 3/(3+n), add 0.75κ to `a` and 0.25κ to `b`. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
+- Left swipes are not evidence ("not a like" includes "haven't had it"). They only lower the tiebreak `appeal = (R+1)/(R+L+2)`.
+- Type mean: `m_type = (Σ_type a + c·0.5) / (Σ_type (a+b) + c)`.
+- Brand mean, leaving drink i out so its evidence is not counted twice: `m_B(−i) = (Σ_{j∈B, j≠i} a_j + c·m_type) / (Σ_{j∈B, j≠i} (a_j+b_j) + c)`. A single-drink brand gets exactly `m_type`. Brands are keyed by the catalog `brand` string as-is.
+- Prior `α0 = k·m_B(−i)`, `β0 = k·(1 − m_B(−i))`. Posterior `α = α0 + a_i`, `β = β0 + b_i`. With no data anywhere this is Beta(1, 1).
+- Constants: `c = 4` (`SODA_MEAN_SHRINK`), `k = 2` (`SODA_BRAND_PRIOR_STRENGTH`). Each weekly snapshot records them in `params_json`.
+- The ranking key, the Thompson trial draws and the favorites rule all use this posterior.
 - Rank key: posterior mean α/(α+β) desc, then appeal desc. The public leaderboard breaks remaining ties by name, then id. The weekly order list breaks them with a shuffle seeded by `week_start`, so a fresh catalog (all tied) does not buy alphabetically.
 
 ### GET /api/soda/catalog
@@ -507,7 +512,7 @@ The list is, in order:
 3. 3 trials (`slot: "trial"`): Thompson-sampled from drinks with fewer than 3 reporters that are not favorites, seeded by `week_start`, avoiding trials from the previous 2 weeks when possible;
 4. backups (`slot: "backup"`): the next 2 sodas and 2 seltzers, in rank order.
 
-Favorites (top and backup) prefer drinks with some evidence (`R + n > 0`) whose score is at least the prior mean, then fill by score. Exact score ties use the week-seeded shuffle.
+Favorites (top and backup) prefer drinks with some evidence (`R + n > 0`) whose posterior mean is at least their type mean `m_type`, then fill by score. The bar is the type mean, not the drink's own brand prior: a favorite should beat an average soda (or seltzer), and a strong brand should not hold its own good drinks to a higher bar. Exact score ties use the week-seeded shuffle.
 Fewer rows come back when the catalog is too small to fill every slot.
 There is no inventory or purchase tracking.
 

@@ -1,4 +1,4 @@
-import { compareDrinks, hasData, posterior, rankDrinks, SODA_SCORE_PARAMS, sodaScore, type DrinkStats, type SodaType } from './soda-score'
+import { compareByScore, hasData, posterior, SODA_SCORE_PARAMS, sodaScore, type DrinkStats, type SodaType } from './soda-score'
 
 export type OrderSlot = 'top' | 'trial' | 'backup'
 
@@ -104,6 +104,24 @@ function pickFavorites(ranked: DrinkStats[], type: SodaType, count: number): Dri
   return [...ofType.filter(isBacked), ...ofType.filter((drink) => !isBacked(drink))].slice(0, count)
 }
 
+function seededShuffle<T>(items: T[], rng: () => number): T[] {
+  const out = [...items]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
+/**
+ * Ranks by score and appeal. Exact ties are broken by a week-seeded shuffle, not by name,
+ * so a fresh catalog (everything tied at the prior) does not always buy the same alphabetical drinks.
+ */
+export function rankForWeek(drinks: DrinkStats[], seed: string): DrinkStats[] {
+  const byId = [...drinks].sort((a, b) => a.id - b.id)
+  return seededShuffle(byId, seededRandom(`${seed}:ties`)).sort(compareByScore)
+}
+
 /** Thompson-samples θ̃ for each candidate and returns them ordered by draw, best first. */
 function thompsonOrder(candidates: DrinkStats[], rng: () => number): DrinkStats[] {
   return [...candidates]
@@ -123,7 +141,8 @@ function thompsonOrder(candidates: DrinkStats[], rng: () => number): DrinkStats[
  */
 export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): OrderItem[] {
   const p = ORDER_PARAMS
-  const ranked = rankDrinks(drinks)
+  const ranked = rankForWeek(drinks, options.seed)
+  const position = new Map(ranked.map((drink, index) => [drink.id, index]))
   const favoritesPerType = p.topPerType + p.backupsPerType
   const sodas = pickFavorites(ranked, 'soda', favoritesPerType)
   const seltzers = pickFavorites(ranked, 'seltzer', favoritesPerType)
@@ -141,7 +160,7 @@ export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): Ord
   const backups = [
     ...sodas.slice(p.topPerType),
     ...seltzers.slice(p.topPerType),
-  ].sort(compareDrinks)
+  ].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0))
 
   const slots: Array<[OrderSlot, DrinkStats]> = [
     ...sodas.slice(0, p.topPerType).map((drink): [OrderSlot, DrinkStats] => ['top', drink]),
@@ -166,7 +185,7 @@ export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): Ord
 
 export function orderParams(seed: string, recentTrialIds: number[]): Record<string, unknown> {
   return {
-    model: 'beta-posterior-v1',
+    model: 'beta-posterior-v2',
     seed,
     score: SODA_SCORE_PARAMS,
     order: ORDER_PARAMS,

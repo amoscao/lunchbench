@@ -2,12 +2,13 @@ import { describe, expect, test } from 'vitest'
 import {
   addDays,
   buildOrderList,
+  rankForWeek,
   sampleBeta,
   seededRandom,
   weekStartFor,
   type OrderItem,
 } from './soda-order'
-import type { DrinkStats, SodaType } from './soda-score'
+import { rankDrinks, type DrinkStats, type SodaType } from './soda-score'
 
 function drink(id: number, type: SodaType, overrides: Partial<DrinkStats> = {}): DrinkStats {
   return {
@@ -149,7 +150,9 @@ describe('buildOrderList', () => {
       drink(5, 'soda', { right_swipes: 2 }),
     ]
     const items = buildOrderList(drinks, { seed: '2026-11-16' })
-    expect(items.filter((item) => item.slot === 'top').map((item) => item.soda_id)).toEqual([5, 2, 3])
+    const top = items.filter((item) => item.slot === 'top').map((item) => item.soda_id)
+    expect(top[0]).toBe(5)
+    expect(top).not.toContain(1)
   })
 
   test('fills favorites by score when a type lacks evidence', () => {
@@ -161,8 +164,9 @@ describe('buildOrderList', () => {
       drink(5, 'seltzer'),
     ]
     const items = buildOrderList(drinks, { seed: '2026-11-16' })
-    expect(items.filter((item) => item.slot === 'top' && item.type === 'soda').map((item) => item.soda_id))
-      .toEqual([1, 2, 3])
+    const topSodas = items.filter((item) => item.slot === 'top' && item.type === 'soda').map((item) => item.soda_id)
+    expect(topSodas[0]).toBe(1)
+    expect([...topSodas].sort()).toEqual([1, 2, 3])
     expect(items.filter((item) => item.slot === 'top' && item.type === 'seltzer')).toHaveLength(2)
     expect(ids(items, 'trial')).toEqual([])
   })
@@ -212,5 +216,46 @@ describe('weekStartFor', () => {
 
   test('addDays shifts calendar days', () => {
     expect(addDays('2026-11-16', -14)).toBe('2026-11-02')
+  })
+})
+
+describe('fresh catalog (no data)', () => {
+  // 30 sodas and 30 seltzers, ids and names in alphabetical order, all tied at the prior.
+  const fresh = (): DrinkStats[] => [
+    ...Array.from({ length: 30 }, (_, i) => drink(i + 1, 'soda')),
+    ...Array.from({ length: 30 }, (_, i) => drink(i + 31, 'seltzer')),
+  ]
+  const favorites = (items: OrderItem[]) =>
+    items.filter((item) => item.slot !== 'trial').map((item) => item.soda_id)
+
+  test('tied favorites are not picked alphabetically', () => {
+    const items = buildOrderList(fresh(), { seed: '2026-11-16' })
+    const alphabetical = [1, 2, 3, 31, 32, 33, 4, 5, 34, 35]
+    expect(favorites(items)).not.toEqual(alphabetical)
+    expect(new Set(favorites(items))).not.toEqual(new Set(alphabetical))
+  })
+
+  test('tied favorites are reproducible for the same week', () => {
+    const a = buildOrderList(fresh(), { seed: '2026-11-16' })
+    const b = buildOrderList([...fresh()].reverse(), { seed: '2026-11-16' })
+    expect(favorites(b)).toEqual(favorites(a))
+  })
+
+  test('tied favorites change from week to week', () => {
+    const weeks = new Set<string>()
+    for (let week = 0; week < 4; week++) {
+      weeks.add(favorites(buildOrderList(fresh(), { seed: addDays('2026-11-16', week * 7) })).join(','))
+    }
+    expect(weeks.size).toBe(4)
+  })
+
+  test('the public leaderboard order still breaks ties by name', () => {
+    const ranked = rankDrinks([drink(2, 'soda', { flavor: 'B' }), drink(1, 'soda', { flavor: 'C' }), drink(3, 'soda', { flavor: 'A' })])
+    expect(ranked.map((d) => d.id)).toEqual([3, 2, 1])
+  })
+
+  test('rankForWeek keeps score order above the seeded tiebreak', () => {
+    const drinks = [...fresh(), drink(99, 'soda', { likes: 1, reporters: 1 })]
+    expect(rankForWeek(drinks, '2026-11-16')[0].id).toBe(99)
   })
 })

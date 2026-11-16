@@ -72,10 +72,14 @@ export function sodaName(drink: Pick<DrinkStats, 'brand' | 'flavor'>): string {
   return `${drink.brand} ${drink.flavor}`
 }
 
-/** Ranking order: score desc, appeal desc, then name and id for a stable result. */
+/** Score desc, then appeal desc. 0 when both tie; callers pick the final tiebreak. */
+export function compareByScore(a: DrinkStats, b: DrinkStats): number {
+  return (sodaScore(b) - sodaScore(a)) || (sodaAppeal(b) - sodaAppeal(a))
+}
+
+/** Public leaderboard order: score, appeal, then name and id for a stable result. */
 export function compareDrinks(a: DrinkStats, b: DrinkStats): number {
-  return (sodaScore(b) - sodaScore(a))
-    || (sodaAppeal(b) - sodaAppeal(a))
+  return compareByScore(a, b)
     || sodaName(a).localeCompare(sodaName(b))
     || a.id - b.id
 }

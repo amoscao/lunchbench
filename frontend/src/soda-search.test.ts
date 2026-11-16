@@ -321,6 +321,32 @@ describe('aliases', () => {
   })
 })
 
+describe('every catalog drink is findable by its name', () => {
+  test('exact name, lowercase name, and flavor-then-brand each list the drink first', () => {
+    const misses: string[] = []
+    for (const drink of catalog) {
+      for (const query of [drink.name, drink.name.toLowerCase(), `${drink.flavor} ${drink.brand}`]) {
+        const top = searchSodas(query, catalog)[0]
+        if (top?.id !== drink.id) misses.push(`${query} -> ${top ? `${top.brand} ${top.flavor}` : 'nothing'}`)
+      }
+    }
+    expect(misses).toEqual([])
+  })
+
+  test.each([
+    ['mountain dew dirty dew', 'Mountain Dew Dirty Dew Cream Soda'],
+    ['mtn dew dirty dew', 'Mountain Dew Dirty Dew Cream Soda'],
+    ['dirty dew zero', 'Mountain Dew Dirty Dew Cream Soda Zero Sugar'],
+  ])('a word repeated in brand and flavor can match twice: %s -> %s', (query, top) => {
+    expect(first(query)).toBe(top)
+  })
+
+  test('a bare leading "s" still lets later words find their drink', () => {
+    expect(all('s sc')).toContain('Schweppes Ginger Ale Caffeine-Free')
+    expect(all('s sp')).toEqual(expect.arrayContaining(['Sprite Original', 'Sprite Zero Sugar']))
+  })
+})
+
 describe('limits and non-matches', () => {
   test('returns nothing for an empty query or a non-match', () => {
     expect(names('')).toEqual([])
@@ -335,7 +361,14 @@ describe('limits and non-matches', () => {
   })
 
   test('long repeated queries stay fast (no exponential backtracking)', () => {
-    for (const query of [Array(16).fill('seltzer').join(' '), Array(16).fill('soda').join(' '), Array(30).fill('s').join(' ')]) {
+    for (const query of [
+      Array(16).fill('seltzer').join(' '),
+      Array(16).fill('soda').join(' '),
+      Array(30).fill('s').join(' '),
+      'S S S S S S S xyz',
+      'dew dew dew dew dew dew dew dew',
+      's sc s sp s sc s sp',
+    ]) {
       const start = performance.now()
       searchSodas(query, catalog)
       expect(performance.now() - start, query.slice(0, 20)).toBeLessThan(50)

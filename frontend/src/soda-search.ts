@@ -139,7 +139,9 @@ type Indexed<T> = {
 function indexSoda<T extends SearchableSoda>(soda: T, order: number): Indexed<T> {
   const brand = words(soda.brand)
   const flavor = words(soda.flavor)
-  const plain = [...new Set([...brand, ...flavor])]
+  // Repeated words stay separate entries ("Mountain Dew Dirty Dew" has two "dew"s), so a query
+  // can give each typed "dew" its own catalog word. Only the compact forms are deduped.
+  const plain = [...brand, ...flavor]
   const compacts = [brand.join(''), flavor.join('')].filter((word) => word && !plain.includes(word))
   return {
     soda,
@@ -300,7 +302,12 @@ type Slot = { tokens: string[]; literal: boolean; cap: number; termIndex: number
  * query words: "coka cola" must not match "Zevia Cola" twice). The type word ("soda"/"seltzer")
  * is a last resort that any number of words may share, and it ranks below brand/flavor matches.
  */
-function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (token: string) => boolean): Score | null {
+function scoreTerms(
+  terms: Term[],
+  entry: Indexed<SearchableSoda>,
+  allowTypo: (token: string) => boolean,
+  freeFallback: boolean
+): Score | null {
   let best: Score | null = null
   const used = new Set<number>()
   const literalHit = new Array<boolean>(terms.length).fill(false)
@@ -355,16 +362,28 @@ function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (t
       })
       used.delete(option.word)
     }
-    // The type word: "s" or "selt" can still match, but ranks below any brand/flavor match, so it
-    // is only worth trying when no unused brand/flavor word fits. That also keeps the search linear
-    // for queries like "seltzer seltzer seltzer…".
-    if (!triedWord && entry.typeWord.startsWith(token)) {
+    // The type word: "s" or "selt" can still match, but ranks below any brand/flavor match. The
+    // strict pass only tries it when no unused brand/flavor word fits, which keeps the search linear
+    // for queries like "seltzer seltzer seltzer…". If that pass cannot place every word (a bare "s"
+    // took the only s-word that "sc" needed), the caller retries with the type word always allowed.
+    if ((freeFallback || !triedWord) && entry.typeWord.startsWith(token)) {
       searchTokens(slot, tokenIndex + 1, { ...acc, typeOnly: acc.typeOnly + 1 })
     }
   }
 
   searchTerm(0, { typeOnly: 0, typos: 0, distance: 0, literalHits: 0, quality: 0, aliasRank: 0 })
   return best
+}
+
+/**
+ * Cheap pre-check: every term has at least one alternative whose words each match some catalog
+ * word or the type word. Drinks that fail it are skipped before any backtracking.
+ */
+function feasible(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (token: string) => boolean): boolean {
+  return terms.every((term) => term.alternatives.some((alternative) => alternative.tokens.every((token) =>
+    entry.typeWord.startsWith(token)
+    || entry.words.some((word, index) => matchWord(token, word, allowTypo(token), entry.compact[index]) !== null)
+  )))
 }
 
 /**
@@ -396,9 +415,11 @@ export function searchSodas<T extends SearchableSoda>(query: string, sodas: T[],
 
   return indexed
     .map((entry) => {
+      const typed = entry as Indexed<SearchableSoda>
       let best: Score | null = null
       for (const variant of queryVariants) {
-        const score = scoreTerms(variant, entry as Indexed<SearchableSoda>, allowTypo)
+        if (!feasible(variant, typed, allowTypo)) continue
+        const score = scoreTerms(variant, typed, allowTypo, false) ?? scoreTerms(variant, typed, allowTypo, true)
         if (score && (!best || better(score, best))) best = score
       }
       return { entry, score: best }

@@ -24,7 +24,7 @@ test.describe('Sodabench swipe deck', () => {
     await page.goto('/')
     await page.click('.nav-link[data-path="/soda"]')
     await expect(page).toHaveURL('/soda')
-    await expect(page.locator('.page-heading')).toHaveText('Sodabench')
+    await expect(page.locator('.page-heading')).toHaveText('SodaArena')
     await expect(page.locator('.nav-link[data-path="/soda"]')).toHaveClass(/active/)
     await expectCard(page, 1, total)
     await expect(page.locator('.soda-card .soda-card-brand')).not.toBeEmpty()

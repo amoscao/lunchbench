@@ -150,11 +150,15 @@ soda.get('/order/latest', async (c) => {
   ).first<BuyListRow>()
   if (!row) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
 
-  const items = (JSON.parse(row.items_json) as OrderItem[]).map((item) => ({
-    ...item,
-    name: sodaName(item),
-    image_url: imageUrl(item.image_key),
-  }))
+  // Snapshots written before backups were removed may still hold "backup" rows. They were the last
+  // ranks, so dropping them on read keeps ranks 1..n contiguous.
+  const items = (JSON.parse(row.items_json) as Array<Omit<OrderItem, 'slot'> & { slot: string }>)
+    .filter((item) => item.slot !== 'backup')
+    .map((item) => ({
+      ...item,
+      name: sodaName(item),
+      image_url: imageUrl(item.image_key),
+    }))
   return c.json(
     { week_start: row.week_start, generated_at: row.generated_at, items },
     200,

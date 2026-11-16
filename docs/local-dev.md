@@ -36,7 +36,9 @@ npx wrangler d1 execute lunchbench --local --file=../migrations/0008_vegan_leade
 npx wrangler d1 execute lunchbench --local --file=../migrations/0009_matchup_sessions.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0010_legacy_lunches.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0011_sodabench.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0013_soda_barcodes.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/seed.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
 ```
 
 `seed.sql` adds 14 sample sodas and seltzers. Their images live in local R2 only after an upload. To load the placeholder images used by E2E:
@@ -50,10 +52,14 @@ To load the full 124-drink catalog with real images locally:
 ```bash
 cd worker
 npx wrangler d1 execute lunchbench --local --file=../migrations/0012_soda_catalog.sql
+# Re-run the barcode seed so the newly loaded drinks get their codes.
+npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
 cd ..
 # Downloads each image from its Walmart URL, or reads <walmart_item_id>.(jpeg|png) from --images-dir.
 node scripts/import-sodas.mjs upload --local
 ```
+
+Barcode scanning needs a secure context for the camera. `http://localhost:5173` counts; a phone on the LAN does not, so test scan mode on a phone through an HTTPS tunnel or a Pages preview.
 
 Fire the weekly soda order cron locally:
 

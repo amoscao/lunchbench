@@ -77,9 +77,23 @@ cd e2e && BASE_URL=http://localhost:5173 API_URL=http://localhost:8787 E2E_ADMIN
 - **Sodabench swipe**: deck loads with progress, right/left via buttons, arrow keys and drag, short drag snaps back, Deck done and Start over, unswiped-first deck order, arrow keys do not leak to other routes
 - **Sodabench report**: Like/Hate disabled until a pick, autocomplete, submit closes the modal and records the report, same-day newer report replaces the older one, Escape closes without reporting
 - **Soda leaderboard**: Lunch/Soda tabs, every drink ranked with type tag and swipe counts or "New soda/seltzer to try", images served from R2, swipes move a drink up
+- **Barcode scan** (camera projects below): touch devices open the report in scan mode with the rear camera; scan, match, Like and report; unknown code is logged, picked manually, reported, mapped, and matches on the next scan (same page and after reload); denied permission and no camera API land in manual search with no error; the camera stops (every track `ended`) on close, Escape, match, "Select manually", route change and page hidden; no request body carries image data (only small same-origin JSON of scalars)
+- **Admin unknown scans**: only admin sessions can read, map or dismiss; the Unknown scans tab shows scans, distinct voters, the drink picked afterwards and the mapping, never session keys; Map writes the mapping; Dismiss removes the code
 - **Purchaser `/chris`**: password gate, wrong and lunch passwords rejected, order list slot order (4 Soda, 4 Seltzer, then one soda Trial and one seltzer Trial, no Backup), session persists across reload, log out, lunch PDF export, purchaser has no admin or lunch powers, admin regenerate is reproducible
 
-The API container seeds 14 sodas and seltzers from `migrations/seed.sql` and uploads placeholder images from `scripts/data/seed-images` with `scripts/import-sodas.mjs upload --local`. E2E passwords are placeholders set in `docker-compose.e2e.yml`: `test-admin-token` (lunch), `test-admin-manager-password` (admin), `test-purchaser-password` (purchaser).
+### Fake camera
+
+Barcode tests run the real decoder on Chromium's fake camera. `e2e/fixtures/barcode-video.ts` writes Y4M clips (a still UPC-A, black on white) when the Playwright config loads. A clip is fixed per browser launch, so there is one Playwright project per clip, each a Pixel 5 emulation (touch, coarse pointer) launched with `--use-fake-ui-for-media-stream`, `--use-fake-device-for-media-stream` and `--use-file-for-fake-video-capture=<clip>`:
+
+| Project | Clip | Spec |
+|---------|------|------|
+| `camera-blank` | blank frame (scanning never ends) | `barcode-scan-camera.spec.ts` |
+| `camera-known` | `049000006346` (Coca-Cola can; the test maps it to Coca-Cola Original first) | `barcode-scan-known.spec.ts` |
+| `camera-unknown` | `012345678905` (valid, unmapped) | `barcode-scan-unknown.spec.ts` |
+
+The default `chromium` project ignores these specs. The SPA is served from `http://frontend:5173`, which is not a secure context, so the camera projects also pass `--unsafely-treat-insecure-origin-as-secure=<BASE_URL origin>`. Headless Chromium on Linux has no `BarcodeDetector`, so E2E exercises the zxing-wasm fallback. The native path is covered by format mapping unit tests only. Denied permission and a missing camera API are simulated with an init script that replaces `getUserMedia`; camera tracks are observed with an init script that records the streams `getUserMedia` returns (it does not change them).
+
+The API container seeds 14 sodas and seltzers from `migrations/seed.sql`, maps their barcodes with `0014_soda_barcodes_seed.sql`, and uploads placeholder images from `scripts/data/seed-images` with `scripts/import-sodas.mjs upload --local`. E2E passwords are placeholders set in `docker-compose.e2e.yml`: `test-admin-token` (lunch), `test-admin-manager-password` (admin), `test-purchaser-password` (purchaser).
 
 ## MANDATORY POLICY - READ CAREFULLY
 

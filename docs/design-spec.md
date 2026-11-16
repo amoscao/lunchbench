@@ -402,6 +402,15 @@ Mockups live outside the repo; this section is the source of truth.
 - Text field with autocomplete over the full catalog (`fuzzyFilter`), up to 6 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
 - Two 52px buttons: **Like** (primary) and **Hate** (`--hate` outline). Disabled until a suggestion is picked; editing the text disables them again.
 - Submitting closes the modal. Nothing else is shown.
+- Scan mode (`frontend/src/components/barcode-scanner.ts`):
+  - Default only on touch-first devices (`(pointer: coarse)`). Desktop opens in manual mode.
+  - Head row: a "Scan barcode" icon button (camera brackets, 44px, `aria-label="Scan barcode"`) left of close. Shown in manual mode when the browser has a camera API and the camera has not failed in this modal.
+  - Scan view: live rear-camera preview (`facingMode: environment`, 4:3, `--radius-md`, black behind), a scan frame (3px `--accent` border, the area outside dimmed), and a secondary "Select manually" button (always shown). Like and Hate stay visible and disabled.
+  - Match: the camera stops; the preview is replaced by the drink image (180px, `--product-bg`) and name (`--text-lg`, 700). Like and Hate enable. "Select manually" stays.
+  - Unknown code: the code is logged, the camera stops, and the modal switches to manual search with the field focused. The code goes with the manual report so the next scan matches.
+  - Permission denied, no camera, no camera API, or no decoder: straight to manual search. No error screen. The "Scan barcode" button hides.
+  - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors.
+  - No helper text: only the preview, the frame and labelled controls.
 
 ### Leaderboard tabs
 - Both leaderboards show a tab row above the heading: **Lunch** (`/leaderboard`) and **Soda** (`/leaderboard/soda`). Active tab: `--text-primary` with a 2px `--accent` underline.
@@ -427,6 +436,7 @@ Mockups live outside the repo; this section is the source of truth.
 - All components use CSS custom properties — never hardcode colors
 - No CSS framework (no Tailwind, Bootstrap, etc.) — plain CSS only
 - No external icon libraries — use Unicode symbols or inline SVG only
+- No UI libraries. One exception: the barcode decoder `zxing-wasm` (not a UI library). It is self-hosted (bundled by Vite, never a CDN), pinned to an exact version, and lazy-loaded only when scanning starts on a browser without native `BarcodeDetector`.
 - Font loading: same-origin bundled fonts only. The SPA CSP uses `font-src 'self'`.
 - Theme boot script must be the FIRST script in `<head>`, before any stylesheet
 - Component files export a function that returns an HTMLElement or renders into a container

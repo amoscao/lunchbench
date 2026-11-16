@@ -40,14 +40,35 @@ Code:
 - `worker/src/soda-deck.ts`: per-voter deck order (pure).
 - `worker/src/soda-data.ts`: D1 aggregation and snapshot writes.
 - `worker/src/routes/soda.ts`: `/api/soda/*` routes.
-- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot.
+- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot and prunes unknown scans older than 180 days.
+- `worker/src/barcode.ts`: UPC/EAN normalization to 13-digit GTINs (pure). `frontend/src/utils/barcode.ts` has the same rules.
+- `worker/src/soda-unknown-scans.ts`: groups the unknown-scan log for the admin view (pure).
+- `frontend/src/components/barcode-scanner.ts`: scan mode of the report modal. Camera preview, decode loop, lookup, unknown-scan logging.
+- `frontend/src/utils/zxing-decoder.ts`: fallback decoder (zxing-wasm), loaded only when scanning starts on a browser without `BarcodeDetector`.
 
 Data:
 
-- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), and `soda_buy_lists` (frozen weekly order snapshots).
+- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), `soda_buy_lists` (frozen weekly order snapshots), `soda_barcodes` (code to drink) and `soda_unknown_scans` (scans that matched no code).
 - `scripts/data/sodas.json`: cleaned catalog with Walmart image URLs. Images are not committed.
 - `scripts/import-sodas.mjs`: generates `migrations/0012_soda_catalog.sql` and uploads images to R2 (`--local` or `--remote`). Image keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, so the migration and the uploads agree.
+- `scripts/import-barcodes.mjs`: one-off import of retail barcodes from Open Food Facts into `scripts/data/soda-barcodes.json`, and generates `migrations/0014_soda_barcodes_seed.sql`.
 - The SPA Content-Security-Policy blocks hotlinked Walmart images. All drink images go through `GET /api/images/:key`.
+
+### Barcode scanning
+
+- Decoding runs on the device. Camera frames go from the `<video>` to the decoder and nowhere else. The server only receives the decoded digit string, its symbology, the drink id and the verdict.
+- Decoder: native `BarcodeDetector` (formats `upc_a`, `upc_e`, `ean_13`, `ean_8`) when it supports them (Chrome on Android). Otherwise `zxing-wasm` (ZXing C++ as WebAssembly, reader build), bundled by Vite and served from our origin. Its default CDN `locateFile` is overridden. It is a dynamic import, so the ~36 kB JS chunk and the ~947 kB `.wasm` (~410 kB gzip) download only when scanning starts.
+- Lookup is local: `GET /api/soda/barcodes` once per page load.
+
+### SPA Content-Security-Policy
+
+Set by `frontend/functions/_middleware.ts` on HTML responses:
+
+- `script-src 'self' 'wasm-unsafe-eval' https://gc.zgo.at`. `'wasm-unsafe-eval'` lets the barcode decoder compile WebAssembly. It does not allow `eval()` or `new Function()`.
+- No `worker-src`: the decoder runs on the main thread, no workers or `blob:` scripts.
+- `connect-src 'self'` covers the `.wasm` fetch.
+- No `Permissions-Policy` header is set, so camera access is not blocked. If one is added, it must allow `camera=(self)`.
+- `getUserMedia` needs HTTPS. Production is HTTPS; local `localhost` counts as secure.
 
 ## Resource Names
 

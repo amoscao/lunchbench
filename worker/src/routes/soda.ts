@@ -3,9 +3,9 @@ import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
-import { buildDeck, DECK_SIZE } from '../soda-deck'
+import { buildFeed } from '../soda-deck'
 import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
-import { weekStartFor, type OrderItem } from '../soda-order'
+import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 
 const soda = new Hono<{ Bindings: Bindings }>()
@@ -43,19 +43,22 @@ soda.get('/catalog', async (c) => {
   )
 })
 
+// The voter's whole feed: every active drink they have not swiped, in priority order.
 soda.get('/deck', async (c) => {
   const sessionKey = parseSessionKey(c.req.header('X-Lunchbench-Session') ?? null)
   const [drinks, swipes] = await Promise.all([
     loadDrinkStats(c.env.DB),
     sessionKey
-      ? c.env.DB.prepare('SELECT soda_id, swiped_at FROM soda_swipes WHERE session_key = ?')
+      ? c.env.DB.prepare('SELECT soda_id FROM soda_swipes WHERE session_key = ?')
         .bind(sessionKey)
-        .all<{ soda_id: number; swiped_at: string }>()
-      : Promise.resolve({ results: [] as { soda_id: number; swiped_at: string }[] }),
+        .all<{ soda_id: number }>()
+      : Promise.resolve({ results: [] as { soda_id: number }[] }),
   ])
-  const swipedAt = new Map(swipes.results.map((row) => [row.soda_id, row.swiped_at]))
-  const deck = buildDeck(drinks, swipedAt, DECK_SIZE)
-  return c.json({ sodas: deck.map(sodaCard) }, 200, { 'Cache-Control': 'no-store' })
+  const swiped = new Set(swipes.results.map((row) => row.soda_id))
+  // Seeding ties by session keeps a voter's order stable across reloads.
+  const rng = sessionKey ? seededRandom(sessionKey) : Math.random
+  const feed = buildFeed(drinks, swiped, rng)
+  return c.json({ sodas: feed.map(sodaCard) }, 200, { 'Cache-Control': 'no-store' })
 })
 
 soda.put('/swipes', async (c) => {

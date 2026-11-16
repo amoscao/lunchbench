@@ -1,5 +1,4 @@
-export const DECK_SIZE = 20
-/** One report counts as much evidence as this many swipes when ordering the deck. */
+/** One report counts as much evidence as this many swipes when ordering the feed. */
 export const DECK_REPORT_WEIGHT = 5
 
 export type DeckDrink = {
@@ -24,22 +23,14 @@ function shuffle<T>(items: T[], rng: () => number): T[] {
 }
 
 /**
- * Orders a voter's deck.
- * Drinks this voter has not swiped come first, least evidence first; ties are shuffled.
- * Swiped drinks only follow once the unswiped pool is used up, oldest swipe first.
+ * A voter's swipe feed: every drink this voter has not swiped, least evidence first, ties shuffled.
+ * Swiped drinks never come back. The feed is one continuous list; there are no fixed-size decks.
  */
-export function buildDeck<T extends DeckDrink>(
+export function buildFeed<T extends DeckDrink>(
   drinks: T[],
-  voterSwipedAt: Map<number, string>,
-  size = DECK_SIZE,
+  swipedIds: ReadonlySet<number>,
   rng: () => number = Math.random
 ): T[] {
-  const unswiped = shuffle(drinks.filter((drink) => !voterSwipedAt.has(drink.id)), rng)
-    .sort((a, b) => deckEvidence(a) - deckEvidence(b))
-  const swiped = drinks
-    .filter((drink) => voterSwipedAt.has(drink.id))
-    .sort((a, b) =>
-      (voterSwipedAt.get(a.id) ?? '').localeCompare(voterSwipedAt.get(b.id) ?? '') || a.id - b.id
-    )
-  return [...unswiped, ...swiped].slice(0, size)
+  const unswiped = [...drinks].filter((drink) => !swipedIds.has(drink.id)).sort((a, b) => a.id - b.id)
+  return shuffle(unswiped, rng).sort((a, b) => deckEvidence(a) - deckEvidence(b))
 }

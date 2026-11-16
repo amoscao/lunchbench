@@ -10,8 +10,7 @@ export type ReportModal = { close: () => void }
  * Report a soda: type-ahead over the catalog, then Like or Hate.
  * Like and Hate stay disabled until a drink is picked. A successful submit closes the modal.
  */
-export function openSodaReportModal(catalog: Soda[], onClose: () => void): ReportModal {
-  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null, onClose: () => void): ReportModal {
   const byId = new Map(catalog.map((soda) => [soda.id, soda]))
   let picked: Soda | null = null
   let suggestions: Soda[] = []

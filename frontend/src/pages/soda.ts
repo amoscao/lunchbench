@@ -271,18 +271,20 @@ export function renderSoda(container: HTMLElement): () => void {
 
   leftBtn.addEventListener('click', () => swipe('left'))
   rightBtn.addEventListener('click', () => swipe('right'))
+  // A flag, not `disabled`: disabling the focused button would drop focus before the modal records its opener.
+  let opening = false
   reportBtn.addEventListener('click', async () => {
-    if (modal) return
-    reportBtn.disabled = true
+    if (modal || opening) return
+    opening = true
     try {
       await loadCatalog()
     } catch {
-      reportBtn.disabled = false
       return
+    } finally {
+      opening = false
     }
-    reportBtn.disabled = false
     if (destroyed || modal) return
-    modal = openSodaReportModal(catalog, () => {
+    modal = openSodaReportModal(catalog, reportBtn, () => {
       modal = null
     })
   })

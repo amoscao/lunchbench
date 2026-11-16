@@ -517,7 +517,14 @@ The list has 10 rows, in order:
 2. top 4 seltzers (`slot: "top"`);
 3. one soda trial, then one seltzer trial (`slot: "trial"`).
 
-Each trial is Thompson-sampled within its own type, from that type's drinks with fewer than 3 reporters that are not favorites. Sampling is seeded by `week_start` and avoids trials from the previous 2 weeks when possible. If a type has no trial-eligible drink, its trial falls back to the next-best drink of that type not already listed. A type never gets two trials; if it has no drink left at all, its trial row is omitted.
+Each type's trial is picked from that type's drinks that are not already listed, falling through these tiers so the trial changes every week:
+
+1. trial-eligible drinks (fewer than 3 reporters) not trialed in the previous 2 weeks;
+2. any drink not trialed in the previous 2 weeks (the eligible pool is exhausted);
+3. trial-eligible drinks trialed recently;
+4. the best-scored drink left.
+
+Tiers 1-3 are Thompson-sampled with the RNG seeded by `week_start`, so a given week is reproducible. A type never gets two trials; if it has no drink left at all, its trial row is omitted.
 
 There are no backup rows. Snapshots stored before backups were removed may still contain `slot: "backup"` items. They were the last ranks, so this endpoint drops them on read and ranks stay contiguous. Such a snapshot keeps its old 3 + 3 + 3 shape until the next Monday cron. To switch the current week right away, an admin can call `POST /api/admin/soda/regenerate`.
 

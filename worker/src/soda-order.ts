@@ -171,9 +171,13 @@ function thompsonOrder(candidates: ScoredDrink[], rng: () => number): ScoredDrin
 }
 
 /**
- * One type's trial: Thompson-sampled from that type's trial-eligible drinks (n < 3, not a favorite),
- * avoiding recent trials when possible. With no eligible drink, falls back to the next-best drink
- * of that type that is not already listed. Returns null only when the type has nothing left.
+ * One type's trial, deterministic per week. Falls through, so the trial rotates week to week:
+ * 1. a fresh eligible drink (n < 3, not trialed recently), Thompson-sampled;
+ * 2. any unlisted drink of the type not trialed recently, Thompson-sampled with the same week RNG
+ *    (the eligible pool is exhausted, but the trial must still change every week);
+ * 3. a recent eligible drink, Thompson-sampled;
+ * 4. the best-scored unlisted drink.
+ * Returns null only when the type has nothing left to list.
  */
 function pickTrial(
   ranked: ScoredDrink[],
@@ -183,10 +187,16 @@ function pickTrial(
   rng: () => number
 ): ScoredDrink | null {
   const unlisted = ranked.filter((drink) => drink.type === type && !listed.has(drink.id))
-  const eligible = unlisted.filter((drink) => drink.reporters < ORDER_PARAMS.trialMaxReporters)
-  const fresh = thompsonOrder(eligible.filter((drink) => !recent.has(drink.id)), rng)
-  const repeats = thompsonOrder(eligible.filter((drink) => recent.has(drink.id)), rng)
-  return fresh[0] ?? repeats[0] ?? unlisted[0] ?? null
+  const isEligible = (drink: ScoredDrink) => drink.reporters < ORDER_PARAMS.trialMaxReporters
+  const tiers = [
+    unlisted.filter((drink) => isEligible(drink) && !recent.has(drink.id)),
+    unlisted.filter((drink) => !recent.has(drink.id)),
+    unlisted.filter((drink) => isEligible(drink) && recent.has(drink.id)),
+  ]
+  for (const tier of tiers) {
+    if (tier.length > 0) return thompsonOrder(tier, rng)[0]
+  }
+  return unlisted[0] ?? null
 }
 
 /**

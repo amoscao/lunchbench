@@ -92,7 +92,7 @@ describe('buildOrderList', () => {
     expect(ids(items, 'trial')).toEqual([12, 13])
   })
 
-  test('falls back to the next-best drink of the type when no drink is trial-eligible', () => {
+  test('falls back to another unlisted drink of the type when no drink is trial-eligible', () => {
     const drinks = [
       ...Array.from({ length: 4 }, (_, i) => drink(i + 1, 'soda', { likes: 9, reporters: 9 })),
       drink(5, 'soda', { likes: 2, hates: 2, reporters: 4 }),
@@ -102,8 +102,10 @@ describe('buildOrderList', () => {
     ]
     const items = buildOrderList(drinks, { seed: '2026-11-16' })
     const trials = items.filter((item) => item.slot === 'trial')
-    // No soda has n < 3 outside the favorites, so the soda trial is the best unlisted soda.
-    expect(trials.map((item) => [item.type, item.soda_id])).toEqual([['soda', 6], ['seltzer', 15]])
+    // No soda has n < 3 outside the favorites, so the soda trial is sampled from unlisted sodas.
+    expect(trials.map((item) => item.type)).toEqual(['soda', 'seltzer'])
+    expect([5, 6]).toContain(trials[0].soda_id)
+    expect(trials[1].soda_id).toBe(15)
   })
 
   test('never takes two trials from one type, even when the other type has none left', () => {
@@ -457,5 +459,66 @@ describe('own-evidence bar when reports skew positive', () => {
     const drinks = [...sodaMarket(report(0, 1)), make('Meh', 'Five')]
     const favorites = sodaFavorites(buildOrderList(drinks, { seed: '2026-11-16' }))
     expect(favorites).not.toContain('Fanta Orange')
+  })
+})
+
+describe('trial rotation across weeks', () => {
+  /** Runs the cron for several weeks, feeding the previous 2 weeks' trials into recentTrialIds. */
+  function runWeeks(drinks: DrinkStats[], weeks: number): Array<{ soda: number; seltzer: number }> {
+    const history: Array<{ soda: number; seltzer: number }> = []
+    for (let week = 0; week < weeks; week++) {
+      const recentTrialIds = history.slice(-2).flatMap((h) => [h.soda, h.seltzer])
+      const items = buildOrderList(drinks, { seed: addDays('2026-11-16', week * 7), recentTrialIds })
+      const trial = (type: SodaType) => items.find((item) => item.slot === 'trial' && item.type === type)!.soda_id
+      history.push({ soda: trial('soda'), seltzer: trial('seltzer') })
+    }
+    return history
+  }
+
+  function expectChangesEveryWeek(history: Array<{ soda: number; seltzer: number }>): void {
+    for (let week = 1; week < history.length; week++) {
+      expect(history[week].soda, `soda week ${week}`).not.toBe(history[week - 1].soda)
+      expect(history[week].seltzer, `seltzer week ${week}`).not.toBe(history[week - 1].seltzer)
+    }
+  }
+
+  const favorites = (): DrinkStats[] => [
+    ...Array.from({ length: 4 }, (_, i) => drink(i + 1, 'soda', { likes: 9, reporters: 9 })),
+    ...Array.from({ length: 4 }, (_, i) => drink(i + 11, 'seltzer', { likes: 9, reporters: 9 })),
+  ]
+
+  test('rotates when no unlisted drink is trial-eligible', () => {
+    const drinks = [
+      ...favorites(),
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 101, 'soda', { likes: 2, hates: 2, reporters: 4 })),
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 106, 'seltzer', { likes: 3, hates: 1, reporters: 4 })),
+    ]
+    const history = runWeeks(drinks, 6)
+    expectChangesEveryWeek(history)
+    expect(new Set(history.map((h) => h.seltzer)).size).toBeGreaterThan(2)
+  })
+
+  test('rotates when the only eligible drinks were trialed recently', () => {
+    const drinks = [
+      ...favorites(),
+      drink(101, 'soda'),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 102, 'soda', { likes: 2, hates: 2, reporters: 4 })),
+      drink(106, 'seltzer'),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 107, 'seltzer', { likes: 3, hates: 1, reporters: 4 })),
+    ]
+    const history = runWeeks(drinks, 6)
+    // Week 1 takes the eligible drink; later weeks rotate through fresh non-eligible ones
+    // instead of re-picking it while it is still recent.
+    expect(history[0]).toEqual({ soda: 101, seltzer: 106 })
+    expectChangesEveryWeek(history)
+  })
+
+  test('each week stays reproducible', () => {
+    const drinks = [
+      ...favorites(),
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 106, 'seltzer', { likes: 3, hates: 1, reporters: 4 })),
+      drink(101, 'soda'),
+    ]
+    expect(runWeeks(drinks, 4)).toEqual(runWeeks([...drinks].reverse(), 4))
   })
 })

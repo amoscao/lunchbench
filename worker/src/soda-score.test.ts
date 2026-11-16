@@ -4,6 +4,7 @@ import {
   hasData,
   ownEvidence,
   rankDrinks,
+  rankForLeaderboard,
   scoreDrinks,
   SODA_BRAND_PRIOR_STRENGTH,
   SODA_MEAN_SHRINK,
@@ -169,5 +170,35 @@ describe('ranking', () => {
     expect(hasData(drink(1))).toBe(false)
     expect(hasData(drink(1, { left_swipes: 1 }))).toBe(true)
     expect(hasData(drink(1, { hates: 1, reporters: 1 }))).toBe(true)
+  })
+})
+
+describe('public leaderboard order', () => {
+  test('drinks with their own data rank above untried drinks, even from a loved brand', () => {
+    const lovedUntried = drink(1, { brand: 'Loved' })
+    const modestLiked = drink(2, { brand: 'Plain', likes: 1, hates: 1, reporters: 2 })
+    const leftOnly = drink(3, { brand: 'Plain', left_swipes: 2 })
+    const drinks = [lovedUntried, modestLiked, leftOnly, ...brandMates('Loved', 3, 5, 0)]
+
+    // Posterior alone would put the untried Loved drink above the modest one.
+    const byPosterior = rankDrinks(drinks).map((d) => d.id)
+    expect(byPosterior.indexOf(1)).toBeLessThan(byPosterior.indexOf(2))
+
+    const board = rankForLeaderboard(drinks).map((d) => d.id)
+    expect(board.indexOf(2)).toBeLessThan(board.indexOf(1))
+    expect(board.indexOf(3)).toBeLessThan(board.indexOf(1))
+    expect(board[board.length - 1]).toBe(1)
+  })
+
+  test('the brand prior still orders untried drinks among themselves', () => {
+    const drinks = [
+      drink(1, { brand: 'Hated' }),
+      drink(2, { brand: 'Loved' }),
+      drink(3, { brand: 'Unknown' }),
+      ...brandMates('Hated', 2, 0, 4),
+      ...brandMates('Loved', 2, 4, 0),
+    ]
+    const untried = rankForLeaderboard(drinks).filter((d) => !hasData(d)).map((d) => d.id)
+    expect(untried).toEqual([2, 3, 1])
   })
 })

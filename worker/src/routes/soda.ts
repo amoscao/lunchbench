@@ -4,7 +4,7 @@ import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildDeck, DECK_SIZE } from '../soda-deck'
-import { hasData, rankDrinks, sodaName, type DrinkStats } from '../soda-score'
+import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
 import { weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 
@@ -113,7 +113,7 @@ soda.post('/reports', async (c) => {
 })
 
 soda.get('/leaderboard', async (c) => {
-  const ranked = rankDrinks(await loadDrinkStats(c.env.DB))
+  const ranked = rankForLeaderboard(await loadDrinkStats(c.env.DB))
   return c.json(
     {
       sodas: ranked.map((drink, index) => ({

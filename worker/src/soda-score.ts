@@ -162,7 +162,17 @@ export function compareDrinks(a: ScoredDrink, b: ScoredDrink): number {
     || a.id - b.id
 }
 
-/** Scores and sorts for the public leaderboard. */
+/** Scores and sorts by posterior only (score, appeal, name, id). */
 export function rankDrinks<T extends DrinkStats>(drinks: T[]): Array<ScoredDrink<T>> {
   return scoreDrinks(drinks).sort(compareDrinks)
+}
+
+/**
+ * Public leaderboard order. Drinks with their own data (R + L + n > 0) come first, then drinks with
+ * no data at all. Each group keeps the posterior order, so the brand prior still orders untried
+ * drinks, but an untried flavor of a loved brand never outranks a drink with real evidence.
+ * Product decision (owner's proxy); the weekly order list does not use this.
+ */
+export function rankForLeaderboard<T extends DrinkStats>(drinks: T[]): Array<ScoredDrink<T>> {
+  return scoreDrinks(drinks).sort((a, b) => Number(hasData(b)) - Number(hasData(a)) || compareDrinks(a, b))
 }

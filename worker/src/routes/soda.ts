@@ -3,9 +3,9 @@ import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
-import { buildFeed } from '../soda-deck'
+import { buildFeed, sessionTieKey } from '../soda-deck'
 import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
-import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
+import { hashSeed, weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 
 const soda = new Hono<{ Bindings: Bindings }>()
@@ -55,9 +55,16 @@ soda.get('/deck', async (c) => {
       : Promise.resolve({ results: [] as { soda_id: number }[] }),
   ])
   const swiped = new Set(swipes.results.map((row) => row.soda_id))
-  // Seeding ties by session keeps a voter's order stable across reloads.
-  const rng = sessionKey ? seededRandom(sessionKey) : Math.random
-  const feed = buildFeed(drinks, swiped, rng)
+  // A per-drink key seeded by session keeps each drink's place stable across swipes and reloads.
+  // Without a session, ties are random per request.
+  const randomKeys = new Map<number, number>()
+  const tieKey = sessionKey
+    ? sessionTieKey(sessionKey, hashSeed)
+    : (id: number) => {
+      if (!randomKeys.has(id)) randomKeys.set(id, Math.random())
+      return randomKeys.get(id)!
+    }
+  const feed = buildFeed(drinks, swiped, tieKey)
   return c.json({ sodas: feed.map(sodaCard) }, 200, { 'Cache-Control': 'no-store' })
 })
 

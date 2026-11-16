@@ -17,9 +17,37 @@ Lunchbench runs entirely on the Cloudflare free tier. It has four components:
 Browser
   → Cloudflare Pages (static assets + /api/* proxy)
     → Cloudflare Worker (Hono API)
-      → D1 (reads/writes for lunch data, votes, rate limits)
+      → D1 (reads/writes for lunch data, votes, soda swipes/reports, rate limits)
       → R2 (image reads/writes)
+
+Cloudflare cron trigger (Monday 12:00 UTC)
+  → Worker scheduled handler
+    → D1 (writes the weekly soda order snapshot)
 ```
+
+## Sodabench
+
+Sodabench ranks canned sodas and seltzers. It shares the Worker, D1 database, and R2 bucket with the lunch app.
+
+- `/soda`: voters swipe a 20-card deck (right = like, left = not a like) and report drinks they had (like or hate).
+- `/leaderboard/soda`: public ranking. `/leaderboard` keeps the lunch ranking; tabs switch between them.
+- `/chris`: purchaser page behind `PURCHASER_PASSWORD`. Shows the lunch PDF export and this week's order list.
+
+Code:
+
+- `worker/src/soda-score.ts`: Beta-posterior scoring with a hierarchical brand prior (pure). See the Scoring section of `docs/api-contract.md`.
+- `worker/src/soda-order.ts`: weekly order list selection, seeded Thompson sampling for trials (pure).
+- `worker/src/soda-deck.ts`: per-voter deck order (pure).
+- `worker/src/soda-data.ts`: D1 aggregation and snapshot writes.
+- `worker/src/routes/soda.ts`: `/api/soda/*` routes.
+- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot.
+
+Data:
+
+- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), and `soda_buy_lists` (frozen weekly order snapshots).
+- `scripts/data/sodas.json`: cleaned catalog with Walmart image URLs. Images are not committed.
+- `scripts/import-sodas.mjs`: generates `migrations/0012_soda_catalog.sql` and uploads images to R2 (`--local` or `--remote`). Image keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, so the migration and the uploads agree.
+- The SPA Content-Security-Policy blocks hotlinked Walmart images. All drink images go through `GET /api/images/:key`.
 
 ## Resource Names
 
@@ -57,6 +85,7 @@ The frontend proxies `/api/*` requests to the worker using a Cloudflare Pages Fu
 | Secret | Where | Purpose |
 |--------|-------|---------|
 | `ADMIN_TOKEN` | Worker secret + `.dev.vars` | Protects lunch creation and image upload routes |
+| `PURCHASER_PASSWORD` | Worker secret + `.dev.vars` | Mints `purchaser` sessions for `/chris` and `GET /api/soda/order/latest` |
 | `CLOUDFLARE_API_TOKEN` | GitHub Actions secret | Allows CI to deploy worker and pages |
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret | Identifies Cloudflare account in CI |
 

@@ -6,11 +6,12 @@ import {
   findMatchingAdminSession,
   lunchFromRow,
   validateAdminSession,
+  type SessionRole,
 } from '../helpers'
 import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
+import { writeWeeklyOrder } from '../soda-data'
 
 type AdminEnv = { Bindings: Bindings }
-type SessionRole = 'admin' | 'lunch'
 const ADMIN_SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
 
 const admin = new Hono<{ Bindings: Bindings }>()
@@ -28,7 +29,7 @@ admin.post('/verify', async (c) => {
   }
 
   const pw = body.password
-  if (!c.env.ADMIN_MANAGER_PASSWORD && !c.env.VOTE_PASSWORD) {
+  if (!c.env.ADMIN_MANAGER_PASSWORD && !c.env.VOTE_PASSWORD && !c.env.PURCHASER_PASSWORD) {
     return c.json({ error: 'Admin password not configured', code: 'SERVER_ERROR' }, 500)
   }
 
@@ -38,12 +39,17 @@ admin.post('/verify', async (c) => {
   const lunchMatches = c.env.VOTE_PASSWORD
     ? constantTimeEquals(pw, c.env.VOTE_PASSWORD)
     : false
+  const purchaserMatches = c.env.PURCHASER_PASSWORD
+    ? constantTimeEquals(pw, c.env.PURCHASER_PASSWORD)
+    : false
 
   let role: SessionRole | null = null
   if (adminMatches) {
     role = 'admin'
   } else if (lunchMatches) {
     role = 'lunch'
+  } else if (purchaserMatches) {
+    role = 'purchaser'
   }
 
   if (!role) {
@@ -57,7 +63,7 @@ admin.post('/verify', async (c) => {
     'INSERT OR REPLACE INTO admin_sessions (token, expires_at, role) VALUES (?, ?, ?)'
   ).bind(token, expiresAt, role).run()
 
-  return c.json({ token })
+  return c.json({ token, role })
 })
 
 admin.delete('/session', async (c) => {
@@ -192,6 +198,11 @@ admin.post('/reset-scores', requireAdminSession, async (c) => {
     c.env.DB.prepare('DELETE FROM votes'),
   ])
   return c.json({ reset: true })
+})
+
+admin.post('/soda/regenerate', requireAdminSession, async (c) => {
+  const weekStart = await writeWeeklyOrder(c.env.DB, new Date(), 'replace')
+  return c.json({ week_start: weekStart })
 })
 
 export { admin as adminRouter }

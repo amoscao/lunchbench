@@ -376,6 +376,50 @@ After `Promise.all` settles, the code does `next = await (nextMatchupPromise ?? 
 
 ---
 
+## 12a. Sodabench
+
+Mockups live outside the repo; this section is the source of truth.
+
+**Rule: no subtitles or helper text.** Only titles, labels, and controls. No explanatory lines such as "swipe right on sodas you like".
+
+**Nav:** Arena · Sodabench (`/soda`) · Leaderboard. `/chris` is not in the nav.
+
+### Swipe deck (`/soda`)
+- Max content width 640px.
+- Header row: page heading "Sodabench" left, primary button "+ Report a soda" right.
+- Progress row: 6px pill track (`--border`) with `--accent` fill, then `n / total` in `--text-sm`, tabular numbers. A session is 20 cards (fewer if the catalog is smaller).
+- Card: 380px max, `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px tall on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700).
+- Two decorative cards sit behind the current card, rotated -3° and 2°.
+- Swipe: pointer drag translates and rotates the card (dx/20 deg). Past 96px on release it flies out; otherwise it snaps back. A "LIKE" stamp fades in while dragging right.
+- Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with `--border-accent`, arrow ←, `aria-label="Swipe left"`. Right: `--accent` fill, arrow →, `aria-label="Swipe right"`.
+- Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal is open or a text field has focus.
+- Done: a card with "Deck done" and a secondary "Start over" button, which deals a new deck.
+- `prefers-reduced-motion`: no fly-out or snap animation.
+
+### Report modal
+- Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).
+- Title "Report a soda", close button (×, 44px).
+- Text field with autocomplete over the full catalog (`fuzzyFilter`), up to 6 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
+- Two 52px buttons: **Like** (primary) and **Hate** (`--hate` outline). Disabled until a suggestion is picked; editing the text disables them again.
+- Submitting closes the modal. Nothing else is shown.
+
+### Leaderboard tabs
+- Both leaderboards show a tab row above the heading: **Lunch** (`/leaderboard`) and **Soda** (`/leaderboard/soda`). Active tab: `--text-primary` with a 2px `--accent` underline.
+- The lunch page heading and table are unchanged.
+
+### Soda leaderboard (`/leaderboard/soda`)
+- Heading "Soda Leaderboard". Table columns: Rank (gold/silver/bronze badges as lunch), Drink (40px thumbnail + name), Type tag, Swipes.
+- Type tags: Soda (`--bg-hover`), Seltzer (`--tag-seltzer-bg` / `--tag-seltzer-text`).
+- Swipes: → right count in accent, ← left count in `--text-secondary`. A drink with no data shows "New soda to try" or "New seltzer to try" in bold.
+
+### Purchaser page (`/chris`)
+- Logged out: heading "Purchaser Login", password field, "Log in". The token is kept in localStorage (`lb_purchaser_session_token`), separate from the Add Lunch token.
+- Logged in: heading "This Week's Order" with "Week of Mon D" beside it; secondary buttons "Export lunch PDF" and "Log out".
+- One ranked table, read-only: #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`), Backup (outlined). Backup rows sit on `--bg-primary` with secondary text so they read as optional.
+- No quantities, no summary tiles, no substitutions text.
+
+---
+
 ## 13. Implementation Notes
 
 - Use a single `frontend/src/styles/main.css` file for all global CSS variables, resets, and base styles

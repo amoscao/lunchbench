@@ -11,3 +11,7 @@ database_id = "ab999e13-bac3-47b8-8246-b5e9aa82a8b3"
 [[r2_buckets]]
 binding = "IMAGES"
 bucket_name = "lunchbench-images"
+
+# Weekly Sodabench order list. Monday 12:00 UTC (7-8 am Eastern).
+[triggers]
+crons = ["0 12 * * 1"]

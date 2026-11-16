@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { clearStoredSessionToken, getStoredSessionToken, setStoredSessionToken } from './auth-storage'
+import {
+  clearStoredSessionToken,
+  getStoredSessionToken,
+  PURCHASER_SESSION_KEY,
+  setStoredSessionToken,
+} from './auth-storage'
 
 const KEY = 'lb_admin_session_token'
 const storage = new Map<string, string>()
@@ -31,5 +36,17 @@ describe('auth storage', () => {
     clearStoredSessionToken()
 
     expect(getStoredSessionToken()).toBeNull()
+  })
+
+  test('keeps the purchaser token separate from the lunch token', () => {
+    setStoredSessionToken('lunch-token')
+    setStoredSessionToken('purchaser-token', PURCHASER_SESSION_KEY)
+
+    expect(getStoredSessionToken()).toBe('lunch-token')
+    expect(getStoredSessionToken(PURCHASER_SESSION_KEY)).toBe('purchaser-token')
+
+    clearStoredSessionToken(PURCHASER_SESSION_KEY)
+    expect(getStoredSessionToken(PURCHASER_SESSION_KEY)).toBeNull()
+    expect(getStoredSessionToken()).toBe('lunch-token')
   })
 })

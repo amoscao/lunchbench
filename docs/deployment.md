@@ -26,7 +26,39 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0005_glicko.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0006_glicko_defaults.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0007_session_roles.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0009_matchup_sessions.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0011_sodabench.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0012_soda_catalog.sql
 ```
+
+### Sodabench launch steps
+`main` auto-deploys on push (`.github/workflows/deploy.yml`). Run ALL of these BEFORE merging the Sodabench PR, in this order:
+
+1. Apply the schema. Additive; the current Worker ignores the new tables.
+   ```bash
+   cd worker
+   npx wrangler d1 execute lunchbench --remote --file=../migrations/0011_sodabench.sql
+   ```
+2. Upload the catalog images to the production bucket, from the repo root:
+   ```bash
+   node scripts/import-sodas.mjs upload --remote
+   ```
+   It downloads each image from its Walmart URL (or reads `--images-dir <dir>` files named `<walmart_item_id>.jpeg|png`) and puts it at the key the catalog migration uses.
+3. Load the catalog:
+   ```bash
+   cd worker
+   npx wrangler d1 execute lunchbench --remote --file=../migrations/0012_soda_catalog.sql
+   ```
+   Upload images before (or together with) this step. A catalog row whose image is missing renders as a broken image.
+4. Set the purchaser password (value chosen by the owner; never paste it anywhere else):
+   ```bash
+   cd worker
+   npx wrangler secret put PURCHASER_PASSWORD
+   ```
+5. Merge. The deploy registers the Monday cron from `worker/wrangler.toml`. Until it first fires, `/chris` generates the current week's list on demand.
+
+If the PR merges before step 1, the `/api/soda/*` routes return 500. Before step 3, the deck and soda leaderboard are empty. Before step 4, `/chris` accepts only the admin password.
+
+`seed.sql` is for local dev and E2E only. Do not apply it to production.
 
 ## Automated Deployment (GitHub Actions)
 

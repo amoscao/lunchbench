@@ -41,6 +41,7 @@ function requiresRestrictedCorsOrigin(c: Context): boolean {
   if (path.startsWith('/api/admin')) return true
   if (path.startsWith('/api/vote')) return true
   if (path.startsWith('/api/lunches') && method === 'POST') return true
+  if (path.startsWith('/api/soda') && method !== 'GET' && method !== 'HEAD') return true
   return false
 }
 

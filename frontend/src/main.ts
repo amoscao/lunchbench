@@ -8,6 +8,9 @@ import { renderHome } from './pages/home'
 import { renderLeaderboard } from './pages/leaderboard'
 import { renderAdd } from './pages/add'
 import { renderAdmin } from './pages/admin'
+import { renderSoda } from './pages/soda'
+import { renderSodaLeaderboard } from './pages/soda-leaderboard'
+import { renderChris } from './pages/chris'
 
 const appEl = document.getElementById('app')!
 appEl.style.display = 'flex'
@@ -28,6 +31,9 @@ appEl.insertBefore(nav, mainEl)
 router
   .add('/', (c) => renderHome(c, (path) => router.navigate(path)))
   .add('/leaderboard', (c) => renderLeaderboard(c, (path) => router.navigate(path)))
+  .add('/leaderboard/soda', (c) => renderSodaLeaderboard(c, (path) => router.navigate(path)))
+  .add('/soda', (c) => renderSoda(c))
+  .add('/chris', (c) => renderChris(c))
   .add('/add', (c) => renderAdd(c))
   .add('/admin', (c) => renderAdmin(c))
 

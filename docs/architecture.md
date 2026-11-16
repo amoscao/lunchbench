@@ -44,6 +44,7 @@ Code:
 
 Data:
 
+- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), and `soda_buy_lists` (frozen weekly order snapshots).
 - `scripts/data/sodas.json`: cleaned catalog with Walmart image URLs. Images are not committed.
 - `scripts/import-sodas.mjs`: generates `migrations/0012_soda_catalog.sql` and uploads images to R2 (`--local` or `--remote`). Image keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, so the migration and the uploads agree.
 - The SPA Content-Security-Policy blocks hotlinked Walmart images. All drink images go through `GET /api/images/:key`.

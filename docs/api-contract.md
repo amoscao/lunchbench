@@ -392,7 +392,9 @@ Voters swipe drinks and report drinks they had. The purchaser reads a frozen wee
 
 Voter identity is the browser-local `lb_session_id` UUID sent as `X-Lunchbench-Session`. There is no voter login.
 Writes require a valid session header and return `400 BAD_REQUEST` without one.
-Writes are rate-limited per client IP: swipes 1200 per hour, reports 300 per hour (`429 RATE_LIMITED`).
+Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour (`429 RATE_LIMITED`).
+
+**Accepted risk: ballot stuffing.** Voters have no login. The session UUID is client-generated, so one person can clear localStorage (or script fresh UUIDs) and swipe or report the same drink many times. The per-IP rate limits cap the damage, but a shared office IP means they must stay loose. Lunchbench accepts this for an internal office tool. The order list is advisory and Chris can skip any row.
 Writes come only from allowed browser origins (see `docs/13-environment-and-deployment-config.md`).
 
 ### Soda Object Shape
@@ -413,11 +415,11 @@ type Soda = {
 Pure functions in `worker/src/soda-score.ts`. Per drink:
 
 - `R` / `L`: voters whose latest swipe is right / left.
-- `likes` / `hates`: voters whose latest report is like / hate. `n` = distinct reporters.
+- `likes` / `hates`: voters whose report is like / hate (one report row per voter per drink). `n` = distinct reporters.
 - Posterior on θ (chance a drinker is glad it was bought): prior Beta(1, 1). Each like adds 1 to α, each hate adds 1 to β.
 - Right swipes: κ = min(3, 0.2·R) · 3/(3+n). Add 0.75κ to α and 0.25κ to β. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
 - Left swipes are not negative evidence ("not a like" includes "haven't had it"). They only lower the tiebreak `appeal = (R+1)/(R+L+2)`.
-- Rank key: posterior mean α/(α+β) desc, then appeal desc, then name, then id.
+- Rank key: posterior mean α/(α+β) desc, then appeal desc. The public leaderboard breaks remaining ties by name, then id. The weekly order list breaks them with a shuffle seeded by `week_start`, so a fresh catalog (all tied) does not buy alphabetically.
 
 ### GET /api/soda/catalog
 Every active drink, ordered by brand then flavor. Used by the report autocomplete.
@@ -452,7 +454,7 @@ Records the voter's swipe. A later swipe on the same drink replaces the earlier 
 **Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `429 RATE_LIMITED`
 
 ### POST /api/soda/reports
-Records that the voter had the drink and liked or hated it. One report per voter per drink per UTC day: a second report the same day replaces the first. Scoring uses each voter's latest report per drink.
+Records that the voter had the drink and liked or hated it. One report per voter per drink: a newer report replaces the older one (latest verdict wins).
 
 **Headers:** `X-Lunchbench-Session: <uuid>` (required)
 
@@ -505,7 +507,7 @@ The list is, in order:
 3. 3 trials (`slot: "trial"`): Thompson-sampled from drinks with fewer than 3 reporters that are not favorites, seeded by `week_start`, avoiding trials from the previous 2 weeks when possible;
 4. backups (`slot: "backup"`): the next 2 sodas and 2 seltzers, in rank order.
 
-Favorites (top and backup) prefer drinks with some evidence (`R + n > 0`) whose score is at least the prior mean, then fill by score.
+Favorites (top and backup) prefer drinks with some evidence (`R + n > 0`) whose score is at least the prior mean, then fill by score. Exact score ties use the week-seeded shuffle.
 Fewer rows come back when the catalog is too small to fill every slot.
 There is no inventory or purchase tracking.
 

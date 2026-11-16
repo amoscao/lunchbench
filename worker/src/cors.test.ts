@@ -117,8 +117,18 @@ describe('CORS', () => {
   test('does not allow arbitrary origins on soda writes', async () => {
     const swipe = await preflight('/api/soda/swipes', 'https://evil.example', 'PUT')
     const report = await preflight('/api/soda/reports', 'https://evil.example', 'POST')
+    const unknownScan = await preflight('/api/soda/unknown-scans', 'https://evil.example', 'POST')
+    const adminMap = await preflight('/api/admin/soda/barcodes', 'https://evil.example', 'POST')
 
     expect(swipe.status).toBe(403)
     expect(report.status).toBe(403)
+    expect(unknownScan.status).toBe(403)
+    expect(adminMap.status).toBe(403)
+  })
+
+  test('allows barcode writes from the frontend origin', async () => {
+    const res = await preflight('/api/soda/unknown-scans', 'https://lunchbench.xyz', 'POST')
+    expect(res.status).toBe(204)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://lunchbench.xyz')
   })
 })

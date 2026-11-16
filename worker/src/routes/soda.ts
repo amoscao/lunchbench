@@ -7,12 +7,16 @@ import { buildDeck, DECK_SIZE } from '../soda-deck'
 import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
 import { weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
+import { isBarcodeFormat, normalizeBarcode } from '../barcode'
 
 const soda = new Hono<{ Bindings: Bindings }>()
 
 // Writes are keyed by client IP. An office shares one IP, so limits are generous.
 const SWIPE_LIMIT = { limit: 1200, windowSeconds: 3600 }
 const REPORT_LIMIT = { limit: 60, windowSeconds: 3600 }
+const UNKNOWN_SCAN_LIMIT = { limit: 60, windowSeconds: 3600 }
+// Voter-learned barcode mappings. Stricter: anyone can submit them without logging in.
+const BARCODE_LEARN_LIMIT = { limit: 20, windowSeconds: 3600 }
 
 type SodaRow = Pick<DrinkStats, 'id' | 'brand' | 'flavor' | 'type' | 'image_key'>
 
@@ -95,6 +99,12 @@ soda.post('/reports', async (c) => {
   if (!Number.isInteger(sodaId) || (verdict !== 'like' && verdict !== 'hate')) {
     return c.json({ error: 'Invalid request body', code: 'BAD_REQUEST' }, 400)
   }
+  // Optional: the unknown barcode this voter scanned before picking the drink manually.
+  const hasBarcode = body.barcode !== undefined && body.barcode !== null
+  const barcode = hasBarcode ? normalizeBarcode(body.barcode) : null
+  if (hasBarcode && !barcode) {
+    return c.json({ error: 'Invalid barcode', code: 'BAD_REQUEST' }, 400)
+  }
 
   const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_report', REPORT_LIMIT.limit, REPORT_LIMIT.windowSeconds)
   if (!rl.allowed) return c.json({ error: 'Too many reports', code: 'RATE_LIMITED' }, 429)
@@ -109,7 +119,74 @@ soda.post('/reports', async (c) => {
   ).bind(sessionKey, verdict, sodaId).first<{ soda_id: number }>()
   if (!row) return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
 
-  return c.json({ ok: true })
+  if (!barcode) return c.json({ ok: true })
+  const mappedSodaId = await learnBarcode(c.env.DB, getClientIp(c.req.raw), sessionKey, barcode, row.soda_id)
+  return c.json({ ok: true, barcode_soda_id: mappedSodaId })
+})
+
+/**
+ * Resolves this voter's latest unresolved unknown scan of `code` to the drink they reported, then
+ * maps the code to that drink with source 'voter' if nobody mapped it yet (first mapping wins).
+ * Learning needs that scan row, so a report cannot map a code its voter never logged as unknown.
+ * Returns the drink the code maps to afterwards, or null.
+ */
+async function learnBarcode(db: D1Database, ip: string, sessionKey: string, code: string, sodaId: number): Promise<number | null> {
+  const resolved = await db.prepare(
+    `UPDATE soda_unknown_scans SET resolved_soda_id = ?, resolved_by = 'voter'
+     WHERE id = (
+       SELECT id FROM soda_unknown_scans
+       WHERE session_key = ? AND code = ? AND resolved_soda_id IS NULL
+       ORDER BY id DESC LIMIT 1
+     )
+     RETURNING id`
+  ).bind(sodaId, sessionKey, code).first<{ id: number }>()
+  if (resolved) {
+    const rl = await checkRateLimit(db, ip, 'soda_barcode_learn', BARCODE_LEARN_LIMIT.limit, BARCODE_LEARN_LIMIT.windowSeconds)
+    if (rl.allowed) {
+      await db.prepare(
+        `INSERT INTO soda_barcodes (code, soda_id, source) VALUES (?, ?, 'voter')
+         ON CONFLICT(code) DO NOTHING`
+      ).bind(code, sodaId).run()
+    }
+  }
+  const mapping = await db.prepare(
+    'SELECT b.soda_id FROM soda_barcodes b JOIN sodas s ON s.id = b.soda_id WHERE b.code = ? AND s.is_active = 1'
+  ).bind(code).first<{ soda_id: number }>()
+  return mapping?.soda_id ?? null
+}
+
+// Every barcode mapped to an active drink. The client fetches this once and looks scans up locally.
+soda.get('/barcodes', async (c) => {
+  const result = await c.env.DB.prepare(
+    `SELECT b.code, b.soda_id FROM soda_barcodes b
+     JOIN sodas s ON s.id = b.soda_id
+     WHERE s.is_active = 1
+     ORDER BY b.code ASC`
+  ).all<{ code: string; soda_id: number }>()
+  return c.json({ barcodes: result.results }, 200, { 'Cache-Control': 'no-cache' })
+})
+
+// Logs a scanned barcode that matched no known drink, for the admin "Unknown scans" list.
+// The body is the decoded string and its symbology only. No image data is accepted.
+soda.post('/unknown-scans', async (c) => {
+  const sessionKey = parseSessionKey(c.req.header('X-Lunchbench-Session') ?? null)
+  if (!sessionKey) return c.json({ error: 'Session header required', code: 'BAD_REQUEST' }, 400)
+
+  const body = await readJson(c.req.raw)
+  const format = body.format
+  if (!isBarcodeFormat(format)) {
+    return c.json({ error: 'Invalid format', code: 'BAD_REQUEST' }, 400)
+  }
+  const code = normalizeBarcode(body.barcode, format)
+  if (!code) return c.json({ error: 'Invalid barcode', code: 'BAD_REQUEST' }, 400)
+
+  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_unknown_scan', UNKNOWN_SCAN_LIMIT.limit, UNKNOWN_SCAN_LIMIT.windowSeconds)
+  if (!rl.allowed) return c.json({ error: 'Too many scans', code: 'RATE_LIMITED' }, 429)
+
+  await c.env.DB.prepare(
+    'INSERT INTO soda_unknown_scans (code, format, session_key) VALUES (?, ?, ?)'
+  ).bind(code, format, sessionKey).run()
+  return c.json({ ok: true, code })
 })
 
 soda.get('/leaderboard', async (c) => {

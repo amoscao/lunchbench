@@ -99,16 +99,22 @@ test.describe('Sodabench report a soda', () => {
     expect(reports).toBe(0)
   })
 
-  test('arrow keys in the report field do not swipe the deck', async ({ page }) => {
+  test('arrow keys in the report field do not swipe the feed', async ({ page }) => {
+    let swipes = 0
+    page.on('request', (request) => {
+      if (request.url().includes('/api/soda/swipes')) swipes += 1
+    })
     await page.goto('/soda')
-    const label = page.locator('.soda-progress-label')
-    await expect(label).toHaveText(/^1 \//)
+    const top = page.locator('.soda-card[data-depth="0"]')
+    await expect(top).toBeVisible()
+    const id = await top.getAttribute('data-soda-id')
     const dialog = await openReport(page)
     await dialog.getByRole('combobox').fill('lime')
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowLeft')
     await page.keyboard.press('Escape')
-    await expect(label).toHaveText(/^1 \//)
+    await expect(top).toHaveAttribute('data-soda-id', id!)
+    expect(swipes).toBe(0)
   })
 
   test('Tab stays inside the dialog and Escape closes it from any control', async ({ page }) => {

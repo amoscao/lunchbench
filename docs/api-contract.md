@@ -485,7 +485,7 @@ With `barcode`, after the report is saved:
 
 The report modal can scan a can's barcode (see `docs/design-spec.md`). Decoding runs on the device; no image or frame ever leaves it. The server only receives the decoded digit string.
 
-Every code is stored and compared as a 13-digit GTIN: UPC-E is expanded to UPC-A, then UPC-A and EAN-8 are zero-padded on the left. The GTIN check digit must be valid. The same rules live in `worker/src/barcode.ts` and `frontend/src/utils/barcode.ts`.
+Every code is stored and compared as a 13-digit GTIN: UPC-E is expanded to UPC-A, then UPC-A and EAN-8 are zero-padded on the left. The GTIN check digit must be valid. A UPC-E from a decoder may arrive short: 6 digits (number system 0 assumed, check digit computed) or 7 digits (six digits + check with number system 0 when that check is valid, else number system + six digits with the check computed). Short forms are only read as UPC-E when `format` is `upc_e`; a computed check digit cannot catch a misread. The same rules live in `worker/src/barcode.ts` and `frontend/src/utils/barcode.ts`.
 
 ### GET /api/soda/barcodes
 Every barcode mapped to an active drink. The client fetches it once per page load and looks scans up locally; there is no request per scan.
@@ -501,7 +501,7 @@ Logs a scanned code that matched no known drink, for the admin "Unknown scans" l
 ```json
 { "barcode": "0012345678905", "format": "ean_13" }
 ```
-`format` is the decoder's symbology: `upc_a`, `upc_e`, `ean_13` or `ean_8`. It decides whether 8 digits are UPC-E or EAN-8. The body is the barcode string and format only; there is no field for image data.
+`format` is the decoder's symbology: `upc_a`, `upc_e`, `ean_13` or `ean_8`. It decides whether a code under 12 digits is UPC-E or EAN-8. The body is the barcode string and format only; there is no field for image data.
 
 **Response 200:** `{ "ok": true, "code": "0012345678905" }` (the normalized code)
 
@@ -623,12 +623,13 @@ There is no inventory or purchase tracking.
       "last_seen": "2026-11-16 15:10:04",
       "picks": [ { "soda_id": 12, "name": "OLIPOP Vintage Cola", "count": 2 } ],
       "mapped_soda_id": 12,
-      "mapped_name": "OLIPOP Vintage Cola"
+      "mapped_name": "OLIPOP Vintage Cola",
+      "mapped_source": "voter"
     }
   ]
 }
 ```
-`first_seen` / `last_seen` are SQLite UTC timestamps. `picks` counts scans that voters resolved by reporting a drink manually; admin mappings are not picks.
+`first_seen` / `last_seen` are SQLite UTC timestamps. `picks` counts scans that voters resolved by reporting a drink manually; admin mappings are not picks. `mapped_source` is `seed`, `voter` or `admin` (null when unmapped). The admin tab shows it next to the drink.
 
 **Errors:** `401 UNAUTHORIZED`
 
@@ -642,9 +643,9 @@ There is no inventory or purchase tracking.
 **Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`, `404 NOT_FOUND` (unknown or inactive drink)
 
 ### DELETE /api/admin/soda/unknown-scans/:code
-**Requires admin auth.** Dismisses a code (for example a non-soda barcode): deletes its rows from the log. A mapping, if any, stays. A later scan logs the code again.
+**Requires admin auth.** Dismisses a code (for example a non-soda barcode a voter then "reported" as a drink): deletes its rows from the log and its `voter` mapping, if any. The next scan of the code is unknown again, so it is logged again. `seed` and `admin` mappings stay; to change one, map the code to another drink.
 
-**Response 200:** `{ "dismissed": 3 }`
+**Response 200:** `{ "dismissed": 3, "voter_mapping_removed": true }`
 
 **Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`
 

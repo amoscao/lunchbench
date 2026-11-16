@@ -409,7 +409,8 @@ Mockups live outside the repo; this section is the source of truth.
   - Match: the camera stops; the preview is replaced by the drink image (180px, `--product-bg`) and name (`--text-lg`, 700). Like and Hate enable. "Select manually" stays.
   - Unknown code: the code is logged, the camera stops, and the modal switches to manual search with the field focused. The code goes with the manual report so the next scan matches.
   - Permission denied, no camera, no camera API, or no decoder: straight to manual search. No error screen. The "Scan barcode" button hides.
-  - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors.
+  - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors, including while the decoder is still loading. A camera that ends on its own drops to manual search.
+  - Admin "Unknown scans" tab: the Mapped column shows the drink and its source, e.g. "Sprite Original (voter)". Dismiss removes the code's scans and a voter mapping; seed and admin mappings stay.
   - No helper text: only the preview, the frame and labelled controls.
 
 ### Leaderboard tabs

@@ -57,7 +57,8 @@ Data:
 ### Barcode scanning
 
 - Decoding runs on the device. Camera frames go from the `<video>` to the decoder and nowhere else. The server only receives the decoded digit string, its symbology, the drink id and the verdict.
-- Decoder: native `BarcodeDetector` (formats `upc_a`, `upc_e`, `ean_13`, `ean_8`) when it supports them (Chrome on Android). Otherwise `zxing-wasm` (ZXing C++ as WebAssembly, reader build), bundled by Vite and served from our origin. Its default CDN `locateFile` is overridden. It is a dynamic import, so the ~36 kB JS chunk and the ~947 kB `.wasm` (~410 kB gzip) download only when scanning starts.
+- Decoder: native `BarcodeDetector` (formats `upc_a`, `upc_e`, `ean_13`, `ean_8`) when it supports them (Chrome on Android). Otherwise `zxing-wasm` (ZXing C++ as WebAssembly, reader build), bundled by Vite and served from our origin. Its default CDN `locateFile` is overridden. It is a dynamic import, so the ~36 kB JS chunk and the ~947 kB `.wasm` (~410 kB gzip) download only when scanning starts. It runs on the main thread, so frames are downscaled to 960 px on the long side and the slower `tryHarder` pass runs on every other frame only.
+- Camera and decoder start in parallel. The preview shows as soon as the camera opens; a stop while the decoder is still loading still ends every track. A track that ends on its own (device lost) drops the modal to manual search.
 - Lookup is local: `GET /api/soda/barcodes` once per page load.
 
 ### SPA Content-Security-Policy

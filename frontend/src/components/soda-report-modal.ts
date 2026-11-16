@@ -83,6 +83,8 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
         enterManualMode(null)
       },
     })
+    // The "Scan barcode" button just hid; keep focus inside the dialog.
+    scanSlot.querySelector<HTMLElement>('.barcode-scan-manual')?.focus()
   }
 
   function enterManualMode(unknown: UnknownScan | null): void {
@@ -250,7 +252,6 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
   document.body.style.overflow = 'hidden'
   if (prefersScanMode()) {
     enterScanMode()
-    modal.querySelector<HTMLElement>('.barcode-scan-manual')?.focus()
   } else {
     enterManualMode(null)
   }

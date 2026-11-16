@@ -181,6 +181,7 @@ export function mountScanPanel(container: HTMLElement, catalog: Soda[], handlers
   }
 
   async function start(): Promise<void> {
+    if (destroyed) return
     if (!cameraSupported()) {
       fail(false)
       return
@@ -214,7 +215,8 @@ export function mountScanPanel(container: HTMLElement, catalog: Soda[], handlers
     handlers.onManual(null)
   })
   document.addEventListener('visibilitychange', onVisibilityChange)
-  void start()
+  // Start after returning, so handlers never fire before the caller holds the panel.
+  queueMicrotask(() => void start())
 
   return { stop }
 }

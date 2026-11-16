@@ -1963,66 +1963,32 @@ img {
 
 .soda-report-open { padding: 10px 16px; }
 
-.soda-progress {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.soda-progress-track {
-  flex: 1;
-  height: 6px;
-  background: var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.soda-progress-fill {
-  height: 100%;
-  width: 0;
-  background: var(--accent);
-  border-radius: 999px;
-  transition: width 0.2s ease;
-}
-
-.soda-progress-label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
 .soda-stage {
   position: relative;
-  display: flex;
-  justify-content: center;
-  padding: var(--space-2) 0 var(--space-1);
-  min-height: 460px;
+  height: var(--soda-stage-height);
+  /* Room for the cards stacked underneath to peek out below the top card. */
+  --soda-card-height: 440px;
+  --soda-stage-height: 470px;
 }
 
-.soda-stage-back {
-  position: absolute;
-  top: 24px;
-  width: 380px;
-  max-width: 100%;
-  height: 420px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
+body.soda-route { overflow-x: clip; }
 
-.soda-stage-back-1 { transform: rotate(-3deg); }
-.soda-stage-back-2 { top: 18px; transform: rotate(2deg); }
-
-.soda-slot {
+.soda-feed {
   position: relative;
-  z-index: 1;
+  height: 100%;
   width: 380px;
   max-width: 100%;
+  margin: 0 auto;
 }
 
 .soda-card {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
+  height: var(--soda-card-height);
+  display: flex;
+  flex-direction: column;
   background: var(--bg-surface);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
@@ -2032,38 +1998,51 @@ img {
   user-select: none;
   -webkit-user-select: none;
   cursor: grab;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transform-origin: 50% 50%;
+  will-change: transform;
 }
 
-.soda-card.dragging {
-  cursor: grabbing;
-  transition: none;
+.soda-card[data-depth="1"],
+.soda-card[data-depth="2"] {
+  pointer-events: none;
+  cursor: default;
 }
 
-.soda-card.flying {
-  transition: transform 0.22s ease-in, opacity 0.22s ease-in;
-}
+.soda-card.dragging { cursor: grabbing; }
+.soda-card.leaving { pointer-events: none; }
+/* Cards moving up one depth after a swipe (SETTLE_MS in swipe-stack.ts). */
+.soda-card.settling { transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.3, 1); }
+.soda-card.fading { opacity: 0; transition: opacity 0.12s linear; }
 
-.soda-card-stamp {
+.soda-stamp {
   position: absolute;
-  top: 18px;
-  left: 18px;
+  top: 20px;
   z-index: 1;
-  border: 3px solid var(--accent);
-  color: var(--accent);
+  border: 3px solid currentColor;
   background: var(--bg-surface);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.08em;
   padding: 4px 10px;
   border-radius: 8px;
-  transform: rotate(-12deg);
   opacity: 0;
   pointer-events: none;
 }
 
+.soda-stamp-like {
+  left: 18px;
+  color: var(--accent);
+  transform: rotate(-12deg);
+}
+
+.soda-stamp-nope {
+  right: 18px;
+  color: var(--hate);
+  transform: rotate(12deg);
+}
+
 .soda-card-image {
-  height: 320px;
+  flex: 0 0 320px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2085,7 +2064,9 @@ img {
 }
 
 .soda-card-info {
-  padding: 18px 20px 20px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px 18px;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -2104,30 +2085,48 @@ img {
   font-size: var(--text-lg);
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: 1.2;
   color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.soda-card-done {
-  min-height: 420px;
+.soda-end {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-width: 100%;
+  height: var(--soda-card-height);
   padding: var(--space-8);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--space-4);
-  cursor: default;
   text-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
 }
 
-.soda-done-title {
+.soda-end-title {
   font-size: var(--text-lg);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .soda-card-skeleton {
-  width: 100%;
-  height: 420px;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-width: 100%;
+  height: var(--soda-card-height);
   border-radius: var(--radius-lg);
 }
 
@@ -2166,13 +2165,6 @@ img {
   transform: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .soda-card,
-  .soda-card.flying,
-  .soda-progress-fill {
-    transition: none;
-  }
-}
 
 /* =====================
    Sodabench: report modal
@@ -2400,12 +2392,12 @@ img {
 .chris-login { max-width: 400px; }
 
 @media (max-width: 640px) {
-  .soda-stage { min-height: 400px; }
-  .soda-stage-back { height: 380px; }
-  .soda-card-image { height: 260px; }
+  .soda-stage {
+    --soda-card-height: 380px;
+    --soda-stage-height: 408px;
+  }
+  .soda-card-image { flex-basis: 260px; }
   .soda-card-image img { width: 230px; height: 230px; }
-  .soda-card-done { min-height: 360px; }
-  .soda-card-skeleton { height: 360px; }
 
   .modal-backdrop {
     align-items: flex-end;

@@ -11,6 +11,9 @@ export type UnknownScanRow = {
 
 export type UnknownScanPick = { soda_id: number; name: string; count: number }
 
+export type BarcodeSource = 'seed' | 'voter' | 'admin'
+export type CodeMapping = { soda_id: number; source: BarcodeSource }
+
 export type UnknownScanGroup = {
   code: string
   formats: string[]
@@ -22,6 +25,7 @@ export type UnknownScanGroup = {
   picks: UnknownScanPick[]
   mapped_soda_id: number | null
   mapped_name: string | null
+  mapped_source: BarcodeSource | null
 }
 
 /**
@@ -30,7 +34,7 @@ export type UnknownScanGroup = {
  */
 export function groupUnknownScans(
   rows: UnknownScanRow[],
-  mapped: Map<string, number>,
+  mapped: Map<string, CodeMapping>,
   names: Map<number, string>
 ): UnknownScanGroup[] {
   const groups = new Map<string, {
@@ -61,7 +65,8 @@ export function groupUnknownScans(
   const nameOf = (id: number): string => names.get(id) ?? `#${id}`
   return [...groups.entries()]
     .map(([code, group]): UnknownScanGroup => {
-      const mappedId = mapped.get(code) ?? null
+      const mapping = mapped.get(code) ?? null
+      const mappedId = mapping?.soda_id ?? null
       return {
         code,
         formats: [...group.formats].sort(),
@@ -74,6 +79,7 @@ export function groupUnknownScans(
           .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
         mapped_soda_id: mappedId,
         mapped_name: mappedId === null ? null : nameOf(mappedId),
+        mapped_source: mapping?.source ?? null,
       }
     })
     .sort((a, b) => {

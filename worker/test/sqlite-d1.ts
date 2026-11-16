@@ -30,6 +30,7 @@ export function createTestD1(): { db: D1Database; sqlite: SqliteDatabase } {
   function statement(sql: string, values: unknown[] = []) {
     const stmt = () => sqlite.prepare(sql)
     return {
+      sql,
       bind: (...next: unknown[]) => statement(sql, next),
       async first<T>(column?: string): Promise<T | null> {
         const row = plain(stmt().get(...values))
@@ -48,8 +49,9 @@ export function createTestD1(): { db: D1Database; sqlite: SqliteDatabase } {
 
   const db = {
     prepare: (sql: string) => statement(sql),
+    // Like D1: every result has rows (for reads) and meta.changes (for writes).
     async batch(statements: ReturnType<typeof statement>[]) {
-      return Promise.all(statements.map((s) => s.all()))
+      return Promise.all(statements.map((s) => (/^\s*(SELECT|WITH)\b|\bRETURNING\b/i.test(s.sql) ? s.all() : s.run())))
     },
   }
   return { db: db as unknown as D1Database, sqlite }

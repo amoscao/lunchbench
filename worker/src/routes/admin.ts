@@ -12,7 +12,7 @@ import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
 import { writeWeeklyOrder } from '../soda-data'
 import { normalizeBarcode } from '../barcode'
 import { sodaName } from '../soda-score'
-import { groupUnknownScans, type UnknownScanRow } from '../soda-unknown-scans'
+import { groupUnknownScans, type CodeMapping, type UnknownScanRow } from '../soda-unknown-scans'
 
 type AdminEnv = { Bindings: Bindings }
 const ADMIN_SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
@@ -215,13 +215,13 @@ admin.get('/soda/unknown-scans', requireAdminSession, async (c) => {
       'SELECT code, format, session_key, created_at, resolved_soda_id, resolved_by FROM soda_unknown_scans'
     ),
     c.env.DB.prepare(
-      'SELECT code, soda_id FROM soda_barcodes WHERE code IN (SELECT code FROM soda_unknown_scans)'
+      'SELECT code, soda_id, source FROM soda_barcodes WHERE code IN (SELECT code FROM soda_unknown_scans)'
     ),
     c.env.DB.prepare('SELECT id, brand, flavor FROM sodas'),
   ])
   const groups = groupUnknownScans(
     scans.results as UnknownScanRow[],
-    new Map((mapped.results as { code: string; soda_id: number }[]).map((row) => [row.code, row.soda_id])),
+    new Map((mapped.results as (CodeMapping & { code: string })[]).map((row) => [row.code, { soda_id: row.soda_id, source: row.source }])),
     new Map((sodas.results as { id: number; brand: string; flavor: string }[]).map((row) => [row.id, sodaName(row)]))
   )
   return c.json({ codes: groups }, 200, { 'Cache-Control': 'no-store' })
@@ -250,12 +250,16 @@ admin.post('/soda/barcodes', requireAdminSession, async (c) => {
   return c.json({ code, soda_id: row.soda_id })
 })
 
-// Dismisses a code (e.g. not a soda): deletes its scans from the log. A later scan logs it again.
+// Dismisses a code (e.g. not a soda): deletes its scans from the log and any voter-learned mapping,
+// so a later scan is unknown again and logged. Seed and admin mappings stay.
 admin.delete('/soda/unknown-scans/:code', requireAdminSession, async (c) => {
   const code = normalizeBarcode(c.req.param('code'))
   if (!code) return c.json({ error: 'Invalid barcode', code: 'BAD_REQUEST' }, 400)
-  const result = await c.env.DB.prepare('DELETE FROM soda_unknown_scans WHERE code = ?').bind(code).run()
-  return c.json({ dismissed: result.meta.changes ?? 0 })
+  const [scans, mapping] = await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM soda_unknown_scans WHERE code = ?').bind(code),
+    c.env.DB.prepare("DELETE FROM soda_barcodes WHERE code = ? AND source = 'voter'").bind(code),
+  ])
+  return c.json({ dismissed: scans.meta.changes ?? 0, voter_mapping_removed: (mapping.meta.changes ?? 0) > 0 })
 })
 
 export { admin as adminRouter }

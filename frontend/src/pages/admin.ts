@@ -129,6 +129,7 @@ type UnknownScanGroup = {
   picks: { soda_id: number; name: string; count: number }[]
   mapped_soda_id: number | null
   mapped_name: string | null
+  mapped_source: 'seed' | 'voter' | 'admin' | null
 }
 
 async function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -472,7 +473,7 @@ function renderDashboard(container: HTMLElement): void {
               <td style="white-space:nowrap">${escapeHtml(formatSeen(group.first_seen))}</td>
               <td style="white-space:nowrap">${escapeHtml(formatSeen(group.last_seen))}</td>
               <td>${group.picks.map((pick) => `${escapeHtml(pick.name)} ×${pick.count}`).join('<br>') || '-'}</td>
-              <td>${group.mapped_name ? escapeHtml(group.mapped_name) : '-'}</td>
+              <td>${group.mapped_name ? `${escapeHtml(group.mapped_name)} (${escapeHtml(group.mapped_source ?? '')})` : '-'}</td>
               <td style="white-space:nowrap">
                 <select class="form-input" style="width:180px;padding:4px 6px;font-size:12px;display:inline-block" aria-label="Drink for ${escapeHtml(group.code)}">
                   ${options(group.mapped_soda_id ?? group.picks[0]?.soda_id ?? null)}

@@ -40,11 +40,11 @@ describe('groupUnknownScans', () => {
     const groups = groupUnknownScans([
       scan('MAPPED', 's1', '2026-11-05 00:00:00'),
       scan('OPEN', 's1', '2026-11-01 00:00:00'),
-    ], new Map([['MAPPED', 1]]), names)
+    ], new Map([['MAPPED', { soda_id: 1, source: 'voter' as const }]]), names)
 
-    expect(groups.map((group) => [group.code, group.mapped_name])).toEqual([
-      ['OPEN', null],
-      ['MAPPED', 'OLIPOP Vintage Cola'],
+    expect(groups.map((group) => [group.code, group.mapped_name, group.mapped_source])).toEqual([
+      ['OPEN', null, null],
+      ['MAPPED', 'OLIPOP Vintage Cola', 'voter'],
     ])
   })
 

@@ -5,6 +5,8 @@ import { ADMIN_MANAGER_PASSWORD, ADMIN_TOKEN, API_URL, PURCHASER_PASSWORD, verif
 // Valid check digits, not real products, distinct from the camera clips.
 const MAP_ME = '0098765432105'
 const PICKED = '0011111111110'
+// Sprite Original 12 oz can, mapped by the seed migration.
+const SEEDED = '0049000001327'
 
 async function sodaIdByName(name: string): Promise<number> {
   const res = await fetch(`${API_URL}/api/soda/catalog`)
@@ -44,6 +46,7 @@ test.describe('Admin unknown scans', () => {
       body: JSON.stringify({ soda_id: await sodaIdByName('Sprite Original'), verdict: 'like', barcode: PICKED }),
     })
     expect(res.status).toBe(200)
+    await logScan(sessions[0], SEEDED)
   })
 
   test('only admin sessions can read or change the log', async () => {
@@ -71,17 +74,26 @@ test.describe('Admin unknown scans', () => {
 
     const picked = page.locator('tr', { hasText: PICKED }).locator('td')
     await expect(picked.nth(5)).toHaveText('Sprite Original ×1')
-    await expect(picked.nth(6)).toHaveText('Sprite Original')
+    await expect(picked.nth(6)).toHaveText('Sprite Original (voter)')
+    await expect(page.locator('tr', { hasText: SEEDED }).locator('td').nth(6)).toHaveText('Sprite Original (seed)')
 
     const text = await page.locator('#admin-tab-content').innerText()
     for (const session of sessions) expect(text).not.toContain(session)
 
     await row.getByRole('combobox').selectOption({ label: 'Dr Pepper Original' })
     await row.getByRole('button', { name: 'Map' }).click()
-    await expect(page.locator('tr', { hasText: MAP_ME }).locator('td').nth(6)).toHaveText('Dr Pepper Original')
+    await expect(page.locator('tr', { hasText: MAP_ME }).locator('td').nth(6)).toHaveText('Dr Pepper Original (admin)')
     expect(await mappedTo(MAP_ME)).toBe(drPepper)
 
-    await page.locator('tr', { hasText: PICKED }).getByRole('button', { name: 'Dismiss' }).click()
-    await expect(page.locator('tr', { hasText: PICKED })).toHaveCount(0)
+    // Dismiss drops voter-learned mappings (the code is unknown again) and keeps admin and seed ones.
+    const sprite = await sodaIdByName('Sprite Original')
+    expect(await mappedTo(PICKED)).toBe(sprite)
+    for (const code of [PICKED, MAP_ME, SEEDED]) {
+      await page.locator('tr', { hasText: code }).getByRole('button', { name: 'Dismiss' }).click()
+      await expect(page.locator('tr', { hasText: code })).toHaveCount(0)
+    }
+    expect(await mappedTo(PICKED)).toBeUndefined()
+    expect(await mappedTo(MAP_ME)).toBe(drPepper)
+    expect(await mappedTo(SEEDED)).toBe(sprite)
   })
 })

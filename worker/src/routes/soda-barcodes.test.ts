@@ -155,6 +155,7 @@ describe('admin unknown scans', () => {
       picks: [{ soda_id: cola, name: 'OLIPOP Vintage Cola', count: 1 }],
       mapped_soda_id: cola,
       mapped_name: 'OLIPOP Vintage Cola',
+      mapped_source: 'voter',
     })
   })
 
@@ -185,7 +186,33 @@ describe('admin unknown scans', () => {
     await voter('POST', '/unknown-scans', { barcode: UNKNOWN_UPC_A, format: 'upc_a' })
     await voter('POST', '/unknown-scans', { barcode: '098765432105', format: 'upc_a' })
 
-    expect(await (await adminCall('DELETE', `/soda/unknown-scans/${UNKNOWN_GTIN}`)).json()).toEqual({ dismissed: 1 })
+    expect(await (await adminCall('DELETE', `/soda/unknown-scans/${UNKNOWN_GTIN}`)).json()).toEqual({ dismissed: 1, voter_mapping_removed: false })
     expect(sqlite.prepare('SELECT code FROM soda_unknown_scans').all().map((row) => row.code)).toEqual([OTHER_GTIN])
+  })
+
+  test('dismiss removes a voter-learned mapping, so the next scan is unknown and logged again', async () => {
+    const { voter, adminCall, cola, mapping } = setup()
+    await voter('POST', '/unknown-scans', { barcode: UNKNOWN_UPC_A, format: 'upc_a' })
+    await voter('POST', '/reports', { soda_id: cola, verdict: 'like', barcode: UNKNOWN_GTIN })
+    expect(mapping(UNKNOWN_GTIN)!.source).toBe('voter')
+
+    expect(await (await adminCall('DELETE', `/soda/unknown-scans/${UNKNOWN_GTIN}`)).json()).toEqual({ dismissed: 1, voter_mapping_removed: true })
+    expect(mapping(UNKNOWN_GTIN)).toBeUndefined()
+    const list = await (await voter('GET', '/barcodes', undefined)).json() as { barcodes: { code: string }[] }
+    expect(list.barcodes.map((row) => row.code)).not.toContain(UNKNOWN_GTIN)
+  })
+
+  test('dismiss keeps admin and seed mappings', async () => {
+    const { sqlite, voter, adminCall, coke, mapping } = setup()
+    const seeded = sqlite.prepare("SELECT code, soda_id FROM soda_barcodes WHERE source = 'seed' LIMIT 1").get()!
+    await voter('POST', '/unknown-scans', { barcode: String(seeded.code), format: 'ean_13' })
+    await voter('POST', '/unknown-scans', { barcode: UNKNOWN_UPC_A, format: 'upc_a' })
+    await adminCall('POST', '/soda/barcodes', { code: UNKNOWN_GTIN, soda_id: coke })
+
+    for (const code of [String(seeded.code), UNKNOWN_GTIN]) {
+      expect(await (await adminCall('DELETE', `/soda/unknown-scans/${code}`)).json()).toEqual({ dismissed: 1, voter_mapping_removed: false })
+    }
+    expect({ ...mapping(String(seeded.code)) }).toEqual({ soda_id: seeded.soda_id, source: 'seed' })
+    expect({ ...mapping(UNKNOWN_GTIN) }).toEqual({ soda_id: coke, source: 'admin' })
   })
 })

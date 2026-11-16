@@ -1,4 +1,4 @@
-import { compareByScore, hasData, ownEvidence, SODA_SCORE_PARAMS, scoreDrinks, type DrinkStats, type ScoredDrink, type SodaType } from './soda-score'
+import { compareByScore, hasData, hasOwnEvidence, ownEvidence, SODA_SCORE_PARAMS, scoreDrinks, type DrinkStats, type ScoredDrink, type SodaType } from './soda-score'
 
 export type OrderSlot = 'top' | 'trial' | 'backup'
 
@@ -15,6 +15,9 @@ export type OrderItem = {
   has_data: boolean
 }
 
+/** Upper limit on the own-evidence bar for favorites. */
+export const OWN_EVIDENCE_BAR_CAP = 0.5
+
 export const ORDER_PARAMS = {
   topPerType: 3,
   backupsPerType: 2,
@@ -23,6 +26,7 @@ export const ORDER_PARAMS = {
   trialMaxReporters: 3,
   /** Weeks of past trials to avoid repeating. */
   trialCooldownWeeks: 2,
+  ownEvidenceBarCap: OWN_EVIDENCE_BAR_CAP,
 } as const
 
 export type OrderOptions = {
@@ -88,36 +92,46 @@ export function sampleBeta(alpha: number, beta: number, rng: () => number): numb
   return x / (x + y)
 }
 
-/** Own evidence mean a/(a+b), or null when the drink has no evidence (R + n = 0). */
+/** Own evidence mean a/(a+b), or null when the drink has no own evidence (R + n = 0). */
 function ownMean(drink: ScoredDrink): number | null {
-  if (drink.right_swipes + drink.reporters === 0) return null
+  if (!hasOwnEvidence(drink)) return null
   const own = ownEvidence(drink)
   return own.a / (own.a + own.b)
 }
 
 /**
- * A backed favorite has some evidence (R + n > 0), a posterior mean at least the type mean, and
- * its OWN evidence mean a/(a+b) at least the type mean. The last check stops a strong brand from
- * carrying a drink whose only evidence is a hate into a top slot. A swipe-only drink has an own
- * mean of 0.75. The bar is the type mean, not the drink's brand prior: a favorite should be a good
- * drink of its type, and a strong brand should not hold its own good drinks to a higher bar.
+ * Bar for a drink's OWN evidence mean: min(type_mean, 0.5). Capped at 0.5 because people tend to
+ * report what they liked, which can push the type mean above 0.75, the own mean of a swipe-only
+ * drink. Without the cap, every swipe-only drink would count as known-bad.
+ */
+function ownBar(drink: ScoredDrink): number {
+  return Math.min(drink.type_mean, OWN_EVIDENCE_BAR_CAP)
+}
+
+/**
+ * A backed favorite has own evidence (R + n > 0), a posterior mean at least the type mean, and an
+ * own evidence mean a/(a+b) at least min(type_mean, 0.5). The own check stops a strong brand from
+ * carrying a drink whose only evidence is a hate into a top slot. The posterior bar is the type mean,
+ * not the drink's brand prior: a favorite should be a good drink of its type, and a strong brand
+ * should not hold its own good drinks to a higher bar.
  */
 function isBacked(drink: ScoredDrink): boolean {
   const own = ownMean(drink)
-  return own !== null && own >= drink.type_mean && drink.score >= drink.type_mean
+  return own !== null && own >= ownBar(drink) && drink.score >= drink.type_mean
 }
 
-/** Own evidence says below average for its type. */
+/** Own evidence says net-negative: own mean below min(type_mean, 0.5). */
 function isKnownBad(drink: ScoredDrink): boolean {
   const own = ownMean(drink)
-  return own !== null && own < drink.type_mean
+  return own !== null && own < ownBar(drink)
 }
 
 /**
  * Picks favorites for one type: the top and backup slots. Fills in tiers, each in rank order:
  * 1. backed drinks;
- * 2. the rest, except known-bad drinks (unknown drinks, or positive evidence the brand pulls down);
- * 3. known-bad drinks, whose own evidence is below the type mean.
+ * 2. the rest, except known-bad drinks: untried drinks, and drinks with decent own evidence whose
+ *    posterior sits below the type mean;
+ * 3. known-bad drinks, whose own evidence mean is below min(type_mean, 0.5).
  */
 function pickFavorites(ranked: ScoredDrink[], type: SodaType, count: number): ScoredDrink[] {
   const ofType = ranked.filter((drink) => drink.type === type)

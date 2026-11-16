@@ -375,3 +375,55 @@ describe('favorites across real brands', () => {
     expect(topSodas).not.toContain('A&W Root Beer')
   })
 })
+
+describe('own-evidence bar when reports skew positive', () => {
+  let id = 700
+  const make = (brand: string, flavor: string, overrides: Partial<DrinkStats> = {}): DrinkStats =>
+    ({ ...drink(id++, 'soda', overrides), brand, flavor })
+  const report = (likes: number, hates: number) => ({ likes, hates, reporters: likes + hates })
+
+  /** Reviewer repro: people report what they liked, so the soda type mean sits above 0.75. */
+  function sodaMarket(fanta: Partial<DrinkStats>): DrinkStats[] {
+    id = 700
+    return [
+      make('Coca-Cola', 'Original', report(9, 1)),
+      make('Pepsi', 'Original', report(8, 1)),
+      make('Dr Pepper', 'Original', report(8, 1)),
+      make('Fanta', 'Orange', fanta),
+      make('Meh', 'One', report(1, 2)),
+      make('Meh', 'Two', report(1, 2)),
+      make('Meh', 'Three'),
+      make('Meh', 'Four'),
+      make('bubly', 'Lime', { type: 'seltzer' }),
+    ]
+  }
+  const sodaFavorites = (items: OrderItem[]) =>
+    items.filter((i) => i.slot !== 'trial' && i.type === 'soda').map((i) => `${i.brand} ${i.flavor}`)
+
+  test('the type mean is above a swipe-only drink\'s own mean of 0.75', () => {
+    const fanta = rankForWeek(sodaMarket({ right_swipes: 15 }), '2026-11-16').find((d) => d.brand === 'Fanta')!
+    expect(fanta.type_mean).toBeGreaterThan(0.75)
+  })
+
+  test('a swipe-only drink outranks untried flavors of a net-hated brand', () => {
+    const favorites = sodaFavorites(buildOrderList(sodaMarket({ right_swipes: 15 }), { seed: '2026-11-16' }))
+    expect(favorites.slice(0, 3).sort()).toEqual(['Coca-Cola Original', 'Dr Pepper Original', 'Pepsi Original'])
+    expect(favorites[3]).toBe('Fanta Orange')
+  })
+
+  test('a mostly liked drink (3 likes, 1 hate) is still a favorite', () => {
+    const favorites = sodaFavorites(buildOrderList(sodaMarket(report(3, 1)), { seed: '2026-11-16' }))
+    expect(favorites[3]).toBe('Fanta Orange')
+  })
+
+  test('drinks whose own evidence is net-hated rank after untried drinks', () => {
+    const favorites = sodaFavorites(buildOrderList(sodaMarket({ right_swipes: 15 }), { seed: '2026-11-16' }))
+    expect(favorites[4]).toMatch(/^Meh (Three|Four)$/)
+  })
+
+  test('a hated-only drink stays out of favorites while untried drinks remain', () => {
+    const drinks = [...sodaMarket(report(0, 1)), make('Meh', 'Five')]
+    const favorites = sodaFavorites(buildOrderList(drinks, { seed: '2026-11-16' }))
+    expect(favorites).not.toContain('Fanta Orange')
+  })
+})

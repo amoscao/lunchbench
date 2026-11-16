@@ -198,7 +198,10 @@ async function main() {
   process.exit(1)
 }
 
-main().catch((error) => {
-  console.error(error.message)
-  process.exit(1)
-})
+// Run only as a CLI, so tests can import the key helpers.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error.message)
+    process.exit(1)
+  })
+}

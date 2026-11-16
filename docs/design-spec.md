@@ -393,17 +393,22 @@ Mockups live outside the repo; this section is the source of truth.
 - Swipe physics (`frontend/src/utils/swipe-physics.ts`): pointer events, `requestAnimationFrame` and CSS transforms only.
   - **Drag:** the card follows the pointer 1:1 in x and y. Rotation is 0.07°/px, capped at ±20°, and the sign flips when the card is grabbed in its bottom half.
   - **Commit:** |dx| > 35% of the card width, or a flick faster than 0.5 px/ms (measured over the last 100 ms) in the same direction.
-  - **Fling:** the card keeps its momentum. It flies along the release velocity, keeps its vertical drift, keeps spinning, and fully leaves the viewport. Duration is 600/speed ms, clamped 200-400 ms, ease-out.
+  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning until its rotated box is fully off-screen. Duration is distance / speed, clamped to 100-600 ms. The rest position is taken from the box center, which rotation does not move.
   - **Snap back:** a damped spring with a slight overshoot.
   - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
   - **Stamps:** LIKE (`--accent`, top left) and NOPE (`--hate`, top right) fade in and tilt with |dx|.
-  - **Input:** the flying card ignores input; the promoted card can be dragged at once, so rapid swipes work. Swipe requests are fire-and-forget, retried once, with a "Swipe not saved" alert on a second failure.
+  - **Input:** the flying card ignores input; the promoted card can be dragged at once, so rapid swipes work. Holding an arrow key counts once (auto-repeat is ignored). A lost pointer capture, or a mouse move with no button held, ends the drag with a snap back. Swipe requests are fire-and-forget, retried once, with a "Swipe not saved" alert on a second failure.
+  - **Screen readers:**
+    - each card is named "Brand Flavor";
+    - a visually hidden polite live region announces the new top drink;
+    - the end state is `role="status"`;
+    - when the feed empties, focus moves to its title instead of falling to the page body.
   - **Touch:** `touch-action: pan-y` keeps vertical page scroll on phones; pointer capture holds the drag.
   - While on `/soda`, `body` gets `overflow-x: clip` so flung cards never flash a horizontal scrollbar.
 - Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with `--border-accent`, arrow ←, `aria-label="Swipe left"`. Right: `--accent` fill, arrow →, `aria-label="Swipe right"`. Buttons and arrow keys trigger the same fling with a default velocity and a slight upward arc.
 - Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal is open or a text field has focus.
-- End: after the last drink, a card titled "You've rated everything". No subtitle. "Report a soda" stays available.
-- `prefers-reduced-motion`: the card fades out in 120 ms; no fling, spring or scaling.
+- End: after the last drink, a card titled "You've rated everything" ("No drinks yet" if the catalog itself is empty). No subtitle. "Report a soda" stays available.
+- `prefers-reduced-motion`: the card fades out in 120 ms. There is no fling, no spring, and no scaling: the cards underneath neither scale with the drag nor animate when promoted.
 
 ### Report modal
 - Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).

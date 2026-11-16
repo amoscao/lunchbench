@@ -440,7 +440,7 @@ The voter's whole swipe feed: every active drink this voter has not swiped yet. 
 
 **Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
 
-Order: least evidence first (`R + L + 5·n`). Ties are shuffled with an RNG seeded by the session key, so a voter sees a stable order across reloads. Swiped drinks never come back. Once every drink is swiped, the list is empty.
+Order: least evidence first (`R + L + 5·n`). Ties are broken by a per-drink key, `hash(session key + ":" + drink id)`. Each drink therefore keeps its place relative to the others, as long as evidence doesn't change, across swipes and reloads. Without a session header, ties are random. Swiped drinks never come back. Once every drink is swiped, the list is empty.
 
 **Response 200:** `{ "sodas": [Soda] }`
 

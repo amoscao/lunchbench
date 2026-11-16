@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { expandUpcE, gtinCheckDigitValid, isBarcodeFormat, normalizeBarcode } from './barcode'
+import { completeUpcE, expandUpcE, gtinCheckDigitValid, isBarcodeFormat, normalizeBarcode } from './barcode'
 
 describe('barcode normalization', () => {
   test('validates GTIN check digits', () => {
@@ -29,6 +29,20 @@ describe('barcode normalization', () => {
     // Format only matters for 8 digits; without it they are EAN-8.
     expect(normalizeBarcode('049000006346')).toBe('0049000006346')
     expect(normalizeBarcode('96385074')).toBe('0000096385074')
+  })
+
+  test('completes short UPC-E codes from native decoders (number system 0, computed check)', () => {
+    expect(completeUpcE('04963406')).toBe('04963406')
+    expect(completeUpcE('4963406')).toBe('04963406') // six digits + check, number system dropped
+    expect(completeUpcE('0496340')).toBe('04963406') // number system + six digits, check dropped
+    expect(completeUpcE('496340')).toBe('04963406') // both dropped
+    expect(completeUpcE('12345')).toBeNull()
+    expect(normalizeBarcode('496340', 'upc_e')).toBe('0049000006346')
+    expect(normalizeBarcode('4963406', 'upc_e')).toBe('0049000006346')
+    expect(normalizeBarcode('0496340', 'upc_e')).toBe('0049000006346')
+    // Short codes only count as UPC-E when the decoder says so.
+    expect(normalizeBarcode('496340', 'ean_8')).toBeNull()
+    expect(normalizeBarcode('4963406')).toBeNull()
   })
 
   test('rejects bad check digits, lengths, characters and all zeros', () => {

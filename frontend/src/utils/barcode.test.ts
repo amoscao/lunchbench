@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { Soda } from '../api'
 import {
+  completeUpcE,
   expandUpcE,
   gtinCheckDigitValid,
   loadBarcodeMap,
@@ -36,6 +37,20 @@ describe('barcode normalization (same cases as the worker)', () => {
     expect(normalizeBarcode('049000006346', 'upc_a')).toBe('0049000006346')
     expect(normalizeBarcode('0049000006346', 'ean_13')).toBe('0049000006346')
     expect(normalizeBarcode('96385074', 'ean_8')).toBe('0000096385074')
+  })
+
+  test('completes short UPC-E codes from native decoders (number system 0, computed check)', () => {
+    expect(completeUpcE('04963406')).toBe('04963406')
+    expect(completeUpcE('4963406')).toBe('04963406') // six digits + check, number system dropped
+    expect(completeUpcE('0496340')).toBe('04963406') // number system + six digits, check dropped
+    expect(completeUpcE('496340')).toBe('04963406') // both dropped
+    expect(completeUpcE('12345')).toBeNull()
+    expect(normalizeBarcode('496340', 'upc_e')).toBe('0049000006346')
+    expect(normalizeBarcode('4963406', 'upc_e')).toBe('0049000006346')
+    expect(normalizeBarcode('0496340', 'upc_e')).toBe('0049000006346')
+    // Short codes only count as UPC-E when the decoder says so.
+    expect(normalizeBarcode('496340', 'ean_8')).toBeNull()
+    expect(normalizeBarcode('4963406')).toBeNull()
   })
 
   test('rejects bad check digits and non-retail shapes', () => {

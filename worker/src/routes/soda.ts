@@ -5,7 +5,7 @@ import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildFeed, sessionTieKey } from '../soda-deck'
 import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
-import { hashSeed, weekStartFor, type OrderItem } from '../soda-order'
+import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 
 const soda = new Hono<{ Bindings: Bindings }>()
@@ -59,7 +59,7 @@ soda.get('/deck', async (c) => {
   // Without a session, ties are random per request.
   const randomKeys = new Map<number, number>()
   const tieKey = sessionKey
-    ? sessionTieKey(sessionKey, hashSeed)
+    ? sessionTieKey(sessionKey, seededRandom)
     : (id: number) => {
       if (!randomKeys.has(id)) randomKeys.set(id, Math.random())
       return randomKeys.get(id)!

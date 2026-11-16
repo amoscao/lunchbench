@@ -31,7 +31,11 @@ export function buildFeed<T extends DeckDrink>(
     .map((entry) => entry.drink)
 }
 
-/** Tie key stable per voter and drink: hash of "<session>:<id>". */
-export function sessionTieKey(sessionKey: string, hash: (text: string) => number): (id: number) => number {
-  return (id) => hash(`${sessionKey}:${id}`)
+/**
+ * Tie key stable per voter and drink. The seed "<session>:<id>" is hashed and then run through a
+ * PRNG finalizer (`seeded(text)()`), because a raw string hash mixes the trailing id digits poorly
+ * and would start most voters on the same few drinks.
+ */
+export function sessionTieKey(sessionKey: string, seeded: (text: string) => () => number): (id: number) => number {
+  return (id) => seeded(`${sessionKey}:${id}`)()
 }

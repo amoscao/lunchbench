@@ -163,6 +163,7 @@ test.describe('SodaArena swipe feed', () => {
     await expect(page.locator('.soda-end-title')).toHaveText("You've rated everything")
     await expect(page.locator('.soda-end')).toHaveAttribute('role', 'status')
     await expect(page.locator('.soda-end-title')).toBeFocused()
+    await expect(page.locator('.soda-announce')).toHaveText("You've rated everything")
     await expect(page.locator(TOP)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Swipe right' })).toBeDisabled()
     await expect(page.getByRole('button', { name: 'Report a soda' })).toBeEnabled()

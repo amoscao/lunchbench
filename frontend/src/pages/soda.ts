@@ -103,8 +103,10 @@ export function renderSoda(container: HTMLElement): () => void {
       // Unknown: assume the voter rated everything.
     }
     if (destroyed) return
-    announcer.textContent = ''
-    const state = showState(catalogEmpty ? 'No drinks yet' : "You've rated everything")
+    const title = catalogEmpty ? 'No drinks yet' : "You've rated everything"
+    // Announced even when focus is elsewhere (the status card is also role="status").
+    announcer.textContent = title
+    const state = showState(title)
     // The swipe buttons just got disabled; keep focus on the page instead of letting it fall to body.
     if (focusWasHere) state.querySelector<HTMLElement>('.soda-end-title')?.focus()
   }

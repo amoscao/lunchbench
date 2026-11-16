@@ -317,7 +317,8 @@ export class SwipeStack<T> {
     const start = performance.now()
     const step = (now: number): void => {
       // Constant velocity: the card leaves at the speed the hand released it.
-      const t = Math.min(1, (now - start) / plan.durationMs)
+      // rAF timestamps can precede `start` by a fraction of a frame; never step backwards.
+      const t = Math.min(1, Math.max(0, (now - start) / plan.durationMs))
       const e = t
       this.setPose(card.el, {
         x: from.x + (plan.toX - from.x) * e,

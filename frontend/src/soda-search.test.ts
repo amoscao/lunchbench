@@ -160,12 +160,12 @@ describe('brand-only queries list the flagship first', () => {
 })
 
 describe('aliases', () => {
-  // Expected top result for every alias key, so each entry is checked against the real catalog.
-  const topByAlias: Record<string, string> = {
+  // Every alias key, checked against the real catalog. Exact top results only where the order is
+  // intended (flagship, alias order, best match); otherwise the top result's brand or set.
+  const exactTop: Record<string, string> = {
     'coke': 'Coca-Cola Original',
     'coca cola': 'Coca-Cola Original',
     'cocacola': 'Coca-Cola Original',
-    'max': 'Pepsi Zero Sugar',
     'dew': 'Mountain Dew Original',
     'mtn': 'Mountain Dew Original',
     'mtn dew': 'Mountain Dew Original',
@@ -174,43 +174,66 @@ describe('aliases', () => {
     'dp': 'Dr Pepper Original',
     'dr p': 'Dr Pepper Original',
     'doctor pepper': 'Dr Pepper Original',
-    'root beer': "Barq's Root Beer",
-    'rootbeer': "Barq's Root Beer",
-    'ginger ale': 'Great Value Ginger Ale',
-    'gingerale': 'Great Value Ginger Ale',
     'la croix': 'LaCroix Pure',
     'lacroix': 'LaCroix Pure',
-    'bubbly': 'bubly Blackberry',
-    'gv': "Sam's Choice Cola",
-    'great value': 'Great Value Dr Thunder',
-    'walmart': "Sam's Choice Cola",
-    'walmart brand': "Sam's Choice Cola",
-    'olipop': 'OLIPOP Cherry Cola',
-    'oli pop': 'OLIPOP Cherry Cola',
-    'poppy': 'poppi Orange',
-    'seltzer': 'LaCroix Pure',
-    'seltzers': 'LaCroix Pure',
-    'sparkling': 'Sparkling Ice Blue Raspberry +Caffeine',
-    'sparkling water': 'LaCroix Pure',
-    'fizzy water': 'LaCroix Pure',
-    'soda': 'OLIPOP Cream Soda',
-    'sodas': 'OLIPOP Cream Soda',
-    'pop': 'poppi Doc Pop',
-    'zero': 'Pepsi Zero Sugar',
-    'diet': 'Pepsi Diet',
-    'sugar free': 'Canada Dry Ginger Ale Caffeine-Free Zero Sugar',
-    'orange': 'Fanta Orange',
-    'cherry': 'bubly Cherry',
     'lemon lime': 'Starry Lemon Lime',
-    'creme': 'OLIPOP Cream Soda',
+  }
+  const topIn: Record<string, (drink: Drink) => boolean> = {
+    'max': (d) => d.brand === 'Pepsi' || /zero/i.test(d.flavor),
+    'root beer': (d) => /root beer/i.test(d.flavor),
+    'rootbeer': (d) => /root beer/i.test(d.flavor),
+    'ginger ale': (d) => /ginger ale/i.test(d.flavor),
+    'gingerale': (d) => /ginger ale/i.test(d.flavor),
+    'bubbly': (d) => d.brand === 'bubly',
+    'gv': (d) => d.brand === 'Great Value',
+    'great value': (d) => d.brand === 'Great Value',
+    'walmart': (d) => d.brand === 'Great Value',
+    'walmart brand': (d) => d.brand === 'Great Value',
+    'olipop': (d) => d.brand === 'OLIPOP',
+    'oli pop': (d) => d.brand === 'OLIPOP',
+    'poppy': (d) => d.brand === 'poppi',
+    'seltzer': (d) => d.type === 'seltzer',
+    'seltzers': (d) => d.type === 'seltzer',
+    'sparkling': (d) => d.type === 'seltzer',
+    'sparkling water': (d) => d.type === 'seltzer',
+    'fizzy water': (d) => d.type === 'seltzer',
+    'soda': (d) => d.type === 'soda',
+    'sodas': (d) => d.type === 'soda',
+    'pop': (d) => d.type === 'soda',
+    'zero': (d) => /zero|diet/i.test(d.flavor),
+    'diet': (d) => /zero|diet/i.test(d.flavor),
+    'sugar free': (d) => /zero|diet/i.test(d.flavor),
+    'orange': (d) => /orange|tangerine|mandarin/i.test(d.flavor),
+    'cherry': (d) => /cherry/i.test(d.flavor),
+    'creme': (d) => /cream/i.test(d.flavor),
   }
 
   test('covers every alias key', () => {
-    expect(Object.keys(topByAlias).sort()).toEqual(Object.keys(SODA_ALIASES).sort())
+    expect([...Object.keys(exactTop), ...Object.keys(topIn)].sort()).toEqual(Object.keys(SODA_ALIASES).sort())
   })
 
-  test.each(Object.entries(topByAlias))('%s -> %s', (alias, top) => {
+  test.each(Object.entries(exactTop))('%s -> %s', (alias, top) => {
     expect(first(alias)).toBe(top)
+  })
+
+  test.each(Object.keys(topIn))('%s -> first result is in the expected set', (alias) => {
+    const top = searchSodas(alias, catalog)[0]
+    expect(top, alias).toBeDefined()
+    expect(topIn[alias](top), `${alias} -> ${top.brand} ${top.flavor}`).toBe(true)
+  })
+
+  test.each(['gv', 'walmart', 'walmart brand'])('%s lists the first-listed brand (Great Value) first', (query) => {
+    const results = searchSodas(query, catalog, 1000).map((d) => d.brand)
+    const greatValue = results.filter((brand) => brand === 'Great Value').length
+    expect(results.slice(0, greatValue).every((brand) => brand === 'Great Value')).toBe(true)
+  })
+
+  test.each([
+    ['sprite', 'Sprite Original'],
+    ['polar', 'Polar Original'],
+    ['pepsi', 'Pepsi Original'],
+  ])('brand %s -> %s', (query, top) => {
+    expect(first(query)).toBe(top)
   })
 
   test.each([
@@ -273,11 +296,28 @@ describe('aliases', () => {
     ['diet cok', 'Coca-Cola Diet'],
     ['pepsi m', 'Pepsi Zero Sugar'],
     ['doctor p', 'Dr Pepper Original'],
-    ['walm', "Sam's Choice Cola"],
     ['fizzy w', 'LaCroix Pure'],
     ['bubbl', 'bubly Blackberry'],
   ])('aliases work while typing: %s -> %s', (query, top) => {
     expect(first(query)).toBe(top)
+  })
+
+  test('walm lists Great Value first while typing walmart', () => {
+    expect(searchSodas('walm', catalog)[0].brand).toBe('Great Value')
+  })
+
+  test.each([
+    ['doct', 'Dr Pepper Original'],
+    ['docto', 'Dr Pepper Original'],
+    ['doctor', 'Dr Pepper Original'],
+  ])('a longer alias key counts while typing: %s -> %s', (query, top) => {
+    expect(first(query)).toBe(top)
+  })
+
+  test('fizzy already lists seltzers before "w" is typed', () => {
+    const results = searchSodas('fizzy', catalog, 1000)
+    expect(results.filter((d) => d.type === 'seltzer').length).toBe(catalog.filter((d) => d.type === 'seltzer').length)
+    expect(results.map((d) => d.name)).toContain('poppi Cranberry Fizz')
   })
 })
 
@@ -292,6 +332,21 @@ describe('limits and non-matches', () => {
   test('caps results at 8', () => {
     expect(MAX_RESULTS).toBe(8)
     expect(names('soda')).toHaveLength(8)
+  })
+
+  test('long repeated queries stay fast (no exponential backtracking)', () => {
+    for (const query of [Array(16).fill('seltzer').join(' '), Array(16).fill('soda').join(' '), Array(30).fill('s').join(' ')]) {
+      const start = performance.now()
+      searchSodas(query, catalog)
+      expect(performance.now() - start, query.slice(0, 20)).toBeLessThan(50)
+    }
+  })
+
+  test('only the first 8 query words count', () => {
+    // Words 4-8 ("soda") match the type word; the 9th ("xyz") would match nothing but is ignored.
+    const query = ['coke', 'diet', 'cherry', 'soda', 'soda', 'soda', 'soda', 'soda', 'xyz'].join(' ')
+    expect(first(query)).toBe('Coca-Cola Diet Cherry')
+    expect(names(query.replace(/ soda/g, ''))).toEqual([])
   })
 
   test('stays fast over the full catalog', () => {

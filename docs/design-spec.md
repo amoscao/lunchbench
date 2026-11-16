@@ -406,15 +406,17 @@ Mockups live outside the repo; this section is the source of truth.
   - Words match exactly, by prefix while typing ("str lem"), or inside a longer word for 4+ letters ("berry" finds Raspberry).
   - The type word ("soda"/"seltzer") also matches, but ranks below brand and flavor matches. The seltzer and soda aliases cover searching by type.
   - Typos are forgiven per word: 1 edit (Damerau-Levenshtein) for 4-7 letters, 2 for 8+. Only words no catalog word contains get typo matching, so "diet" never drags in "dirty". A typo against the start of a longer word needs 5+ letters and the same first letter, so "mint" does not match "Vintage".
-  - Nicknames live in one exported map, `SODA_ALIASES` ("coke", "dp", "gv", "walmart brand", "sparkling water", "zero", "max", "creme", …). An alias can widen to several brands or flavors and combines with the other words in either order ("diet coke" = "coke diet"). Expansions match exactly or by prefix only. While the last word is still being typed, alias keys that start with it count too ("cok", "doctor p", "fizzy w").
+  - Nicknames live in one exported map, `SODA_ALIASES` ("coke", "dp", "gv", "walmart brand", "sparkling water", "zero", "max", "creme", …). An alias can widen to several brands or flavors and combines with the other words in either order ("diet coke" = "coke diet"). Expansions match exactly or by prefix only. While the last word is still being typed, alias keys that continue it count too, including longer keys ("cok", "doct" → doctor pepper, "fizzy" → fizzy water, "doctor p").
   - Ranking, in order:
     1. type-word-only matches last;
     2. fewer typos;
     3. smaller total edit distance;
     4. more words matched as typed;
     5. better match quality (exact, then prefix, then inside a word);
-    6. shorter names, not counting "Original"/"Pure", so a brand query ("coke", "polar") lists the flagship first;
-    7. catalog order.
+    6. the first-listed alias expansion ("gv" lists Great Value before Sam's Choice and bettergoods);
+    7. shorter names, not counting "Original"/"Pure", so a brand query ("coke", "polar") lists the flagship first;
+    8. catalog order.
+  - Only the first 8 words of a query count, which keeps every keystroke instant.
 - Two 52px buttons: **Hate** (`--hate` outline) on the left and **Like** (primary) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
 - Submitting closes the modal. Nothing else is shown.
 

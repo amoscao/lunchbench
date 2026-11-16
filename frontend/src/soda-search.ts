@@ -68,6 +68,8 @@ export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
 }
 
 export const MAX_RESULTS = 8
+/** Words beyond this are ignored; no drink name needs more, and it bounds the matching work. */
+export const MAX_QUERY_WORDS = 8
 const STOPWORDS = new Set(['and'])
 const MAX_ALIAS_WORDS = 3
 /** Flavors that mark a brand's flagship. They don't count toward name length, so "coke" lists Original first. */
@@ -175,6 +177,8 @@ function matchWord(token: string, word: string, allowTypo: boolean, compact = fa
 
 type Alternative = {
   tokens: string[]
+  /** Position in the term's list: 0 = as typed, then alias expansions in listed order. */
+  rank: number
   /** Matched as the user typed it (not via an alias). */
   literal: boolean
   /** Best quality this alternative may score: alias keys matched by prefix cap at PREFIX. */
@@ -188,22 +192,38 @@ type Term = {
   mergeable: boolean
 }
 
-function aliasAlternatives(expansions: readonly string[], cap: number): Alternative[] {
-  return expansions.map((expansion) => ({ tokens: expansion.split(' '), literal: false, cap }))
+/**
+ * The typed words, then each alias expansion once, in order. Expansions identical to the typed
+ * words or to an earlier expansion are dropped, so self-mapped keys add no extra work.
+ */
+function buildAlternatives(phrase: string[], expansions: Array<{ text: string; cap: number }>): Alternative[] {
+  const seen = new Set([phrase.join(' ')])
+  const out: Alternative[] = [{ tokens: phrase, literal: true, cap: EXACT, rank: 0 }]
+  for (const { text, cap } of expansions) {
+    if (seen.has(text)) continue
+    seen.add(text)
+    out.push({ tokens: text.split(' '), literal: false, cap, rank: out.length })
+  }
+  return out
 }
 
-/** Alias keys whose words match `phrase`, with the last word allowed to be a prefix. */
+/**
+ * Alias keys the user may still be typing. All typed words but the last must match the key's
+ * words exactly; the last typed word is a prefix of the next key word. The key may be longer than
+ * what was typed so far ("doctor" -> "doctor pepper", "fizzy" -> "fizzy water").
+ */
 function prefixAliasKeys(phrase: string[]): string[] {
+  const last = phrase.length - 1
   return Object.keys(SODA_ALIASES).filter((key) => {
     const keyWords = key.split(' ')
-    if (keyWords.length !== phrase.length) return false
-    const last = phrase.length - 1
-    return keyWords.every((word, i) => (i === last ? word.startsWith(phrase[i]) && word !== phrase[i] : word === phrase[i]))
+    if (keyWords.length < phrase.length) return false
+    if (keyWords.join(' ') === phrase.join(' ')) return false
+    return phrase.every((word, i) => (i === last ? keyWords[i].startsWith(word) : keyWords[i] === word))
   })
 }
 
 export function parseQuery(query: string): Term[] {
-  const tokens = words(query).filter((token) => !STOPWORDS.has(token))
+  const tokens = words(query).filter((token) => !STOPWORDS.has(token)).slice(0, MAX_QUERY_WORDS)
   const terms: Term[] = []
   let i = 0
   while (i < tokens.length) {
@@ -218,11 +238,10 @@ export function parseQuery(query: string): Term[] {
       // The typed words always stay an alternative ("cok" may also be a brand prefix).
       terms.push({
         literal: phrase,
-        alternatives: [
-          { tokens: phrase, literal: true, cap: EXACT },
-          ...(exact ? aliasAlternatives(exact, EXACT) : []),
-          ...partialKeys.flatMap((key) => aliasAlternatives(SODA_ALIASES[key], PREFIX)),
-        ],
+        alternatives: buildAlternatives(phrase, [
+          ...(exact ?? []).map((text) => ({ text, cap: EXACT })),
+          ...partialKeys.flatMap((key) => SODA_ALIASES[key].map((text) => ({ text, cap: PREFIX }))),
+        ]),
         mergeable: false,
       })
       i += length
@@ -230,7 +249,7 @@ export function parseQuery(query: string): Term[] {
       break
     }
     if (!matched) {
-      terms.push({ literal: [tokens[i]], alternatives: [{ tokens: [tokens[i]], literal: true, cap: EXACT }], mergeable: true })
+      terms.push({ literal: [tokens[i]], alternatives: buildAlternatives([tokens[i]], []), mergeable: true })
       i += 1
     }
   }
@@ -248,7 +267,7 @@ function variants(terms: Term[]): Term[][] {
       const group = terms.slice(i, i + span)
       if (!group.every((term) => term.mergeable)) continue
       const merged = group.map((term) => term.literal[0]).join('')
-      const term: Term = { literal: [merged], alternatives: [{ tokens: [merged], literal: true, cap: EXACT }], mergeable: false }
+      const term: Term = { literal: [merged], alternatives: buildAlternatives([merged], []), mergeable: false }
       out.push([...terms.slice(0, i), term, ...terms.slice(i + span)])
     }
   }
@@ -261,11 +280,17 @@ type Score = {
   distance: number
   literalHits: number
   quality: number
+  /** Sum of the alias positions used; on ties the first-listed expansion wins ("gv" -> Great Value). */
+  aliasRank: number
+}
+
+function compareScores(a: Score, b: Score): number {
+  return a.typeOnly - b.typeOnly || a.typos - b.typos || a.distance - b.distance
+    || b.literalHits - a.literalHits || b.quality - a.quality || a.aliasRank - b.aliasRank
 }
 
 function better(a: Score, b: Score): boolean {
-  return (a.typeOnly - b.typeOnly || a.typos - b.typos || a.distance - b.distance
-    || b.literalHits - a.literalHits || b.quality - a.quality) < 0
+  return compareScores(a, b) < 0
 }
 
 type Slot = { tokens: string[]; literal: boolean; cap: number; termIndex: number; typoFree: boolean }
@@ -297,7 +322,11 @@ function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (t
       return
     }
     for (const alternative of terms[termIndex].alternatives) {
-      searchTokens({ tokens: alternative.tokens, literal: alternative.literal, cap: alternative.cap, termIndex, typoFree: true }, 0, acc)
+      searchTokens(
+        { tokens: alternative.tokens, literal: alternative.literal, cap: alternative.cap, termIndex, typoFree: true },
+        0,
+        { ...acc, aliasRank: acc.aliasRank + alternative.rank }
+      )
     }
   }
 
@@ -312,8 +341,10 @@ function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (t
     }
     const token = slot.tokens[tokenIndex]
     const options = tokenOptions(token, slot.cap)
+    let triedWord = false
     for (const option of options) {
       if (used.has(option.word)) continue
+      triedWord = true
       used.add(option.word)
       const next = option.match.quality === TYPO ? { ...slot, typoFree: false } : slot
       searchTokens(next, tokenIndex + 1, {
@@ -324,13 +355,15 @@ function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (t
       })
       used.delete(option.word)
     }
-    // The type word: "s" or "selt" can still match, but ranks below any brand/flavor match.
-    if (entry.typeWord.startsWith(token)) {
+    // The type word: "s" or "selt" can still match, but ranks below any brand/flavor match, so it
+    // is only worth trying when no unused brand/flavor word fits. That also keeps the search linear
+    // for queries like "seltzer seltzer seltzer…".
+    if (!triedWord && entry.typeWord.startsWith(token)) {
       searchTokens(slot, tokenIndex + 1, { ...acc, typeOnly: acc.typeOnly + 1 })
     }
   }
 
-  searchTerm(0, { typeOnly: 0, typos: 0, distance: 0, literalHits: 0, quality: 0 })
+  searchTerm(0, { typeOnly: 0, typos: 0, distance: 0, literalHits: 0, quality: 0, aliasRank: 0 })
   return best
 }
 
@@ -342,8 +375,10 @@ function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (t
  * 3. smaller total edit distance;
  * 4. more words matched as typed (not via an alias);
  * 5. better match quality (exact > prefix > inside a word);
- * 6. shorter names, not counting "Original"/"Pure", so a brand query lists its flagship first;
- * 7. catalog order.
+ * 6. the first-listed alias expansion ("gv" lists Great Value before Sam's Choice);
+ * 7. shorter names, not counting "Original"/"Pure", so a brand query lists its flagship first;
+ * 8. catalog order.
+ * Only the first 8 query words count.
  */
 export function searchSodas<T extends SearchableSoda>(query: string, sodas: T[], limit = MAX_RESULTS): T[] {
   const terms = parseQuery(query)
@@ -370,11 +405,7 @@ export function searchSodas<T extends SearchableSoda>(query: string, sodas: T[],
     })
     .filter((result): result is { entry: Indexed<T>; score: Score } => result.score !== null)
     .sort((a, b) =>
-      a.score.typeOnly - b.score.typeOnly
-      || a.score.typos - b.score.typos
-      || a.score.distance - b.score.distance
-      || b.score.literalHits - a.score.literalHits
-      || b.score.quality - a.score.quality
+      compareScores(a.score, b.score)
       || a.entry.wordCount - b.entry.wordCount
       || a.entry.order - b.entry.order
     )

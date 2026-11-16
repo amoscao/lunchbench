@@ -35,6 +35,11 @@
   --text-lg: 22px;
   --text-xl: 30px;
   --text-logo: 20px;
+  --product-bg: #ffffff;
+  --hate: #1d4ed8;
+  --tag-seltzer-bg: #dbeafe;
+  --tag-seltzer-text: #1e3a8a;
+  --modal-scrim: rgba(17, 17, 16, 0.4);
 }
 
 [data-theme="dark"] {
@@ -51,6 +56,10 @@
   --accent-text:  hsl(222, 35%, 6%);
   --accent-subtle: hsl(168, 60%, 12%);
   --accent2:      hsl(282, 82%, 68%);
+  --hate:         #60a5fa;
+  --tag-seltzer-bg: hsl(217, 50%, 18%);
+  --tag-seltzer-text: #bfdbfe;
+  --modal-scrim: rgba(0, 0, 0, 0.6);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.6);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.7);
 }
@@ -1903,4 +1912,527 @@ img {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+/* =====================
+   Leaderboard tabs (Lunch / Soda)
+   ===================== */
+.board-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.board-tab {
+  padding: 8px 18px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.board-tab:hover { color: var(--text-primary); }
+
+.board-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* =====================
+   Sodabench: swipe deck
+   ===================== */
+.soda-page {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.soda-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.soda-header .page-heading { margin: 0; }
+
+.soda-report-open { padding: 10px 16px; }
+
+.soda-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.soda-progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.soda-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.soda-progress-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.soda-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0 var(--space-1);
+  min-height: 460px;
+}
+
+.soda-stage-back {
+  position: absolute;
+  top: 24px;
+  width: 380px;
+  max-width: 100%;
+  height: 420px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.soda-stage-back-1 { transform: rotate(-3deg); }
+.soda-stage-back-2 { top: 18px; transform: rotate(2deg); }
+
+.soda-slot {
+  position: relative;
+  z-index: 1;
+  width: 380px;
+  max-width: 100%;
+}
+
+.soda-card {
+  position: relative;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.soda-card.dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.soda-card.flying {
+  transition: transform 0.22s ease-in, opacity 0.22s ease-in;
+}
+
+.soda-card-stamp {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 1;
+  border: 3px solid var(--accent);
+  color: var(--accent);
+  background: var(--bg-surface);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 8px;
+  transform: rotate(-12deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.soda-card-image {
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--product-bg);
+}
+
+.soda-card-image img {
+  width: 290px;
+  height: 290px;
+  max-width: 90%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.soda-card-initial {
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--border-accent);
+}
+
+.soda-card-info {
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.soda-card-brand {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.soda-card-flavor {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.soda-card-done {
+  min-height: 420px;
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  cursor: default;
+  text-align: center;
+}
+
+.soda-done-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.soda-card-skeleton {
+  width: 100%;
+  height: 420px;
+  border-radius: var(--radius-lg);
+}
+
+.soda-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.soda-swipe-btn {
+  min-height: 56px;
+  border-radius: 999px;
+  border: 1px solid var(--border-accent);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, transform 0.1s;
+}
+
+.soda-swipe-btn:hover { background: var(--bg-hover); }
+.soda-swipe-btn:active { transform: scale(0.98); }
+
+.soda-swipe-right {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.soda-swipe-right:hover { background: var(--accent-hover); }
+
+.soda-swipe-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soda-card,
+  .soda-card.flying,
+  .soda-progress-fill {
+    transition: none;
+  }
+}
+
+/* =====================
+   Sodabench: report modal
+   ===================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--modal-scrim);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 120px var(--space-4) var(--space-4);
+}
+
+.soda-report-modal {
+  width: 440px;
+  max-width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.soda-report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.soda-report-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.modal-close:hover { background: var(--bg-hover); }
+
+.soda-report-search { position: relative; }
+
+.soda-report-input { min-height: 48px; font-size: 16px; }
+
+.soda-suggest {
+  list-style: none;
+  margin-top: 6px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.soda-suggest-item {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.soda-suggest-item:hover,
+.soda-suggest-item.selected {
+  background: var(--bg-hover);
+}
+
+.soda-suggest-item img,
+.soda-suggest-noimg {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--product-bg);
+  border-radius: var(--radius-sm);
+}
+
+.soda-report-error { margin: 0; }
+
+.soda-report-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.soda-report-actions .btn {
+  min-height: 52px;
+  font-size: var(--text-base);
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.soda-report-hate {
+  background: var(--bg-surface);
+  color: var(--hate);
+  border: 1px solid var(--hate);
+}
+
+.soda-report-hate:hover { background: var(--bg-hover); }
+
+/* =====================
+   Sodabench: leaderboard and order list
+   ===================== */
+.soda-thumb {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--product-bg);
+  border-radius: var(--radius-sm);
+}
+
+.soda-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.col-type { width: 96px; }
+.col-swipes { width: 150px; text-align: right; white-space: nowrap; }
+.leaderboard-table thead th.col-swipes { text-align: right; }
+
+.soda-tag {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.soda-tag-soda { background: var(--bg-hover); color: var(--text-primary); }
+.soda-tag-seltzer { background: var(--tag-seltzer-bg); color: var(--tag-seltzer-text); }
+.soda-tag-trial { background: var(--accent-subtle); color: var(--accent-hover); }
+.soda-tag-backup { background: var(--bg-surface); color: var(--text-secondary); border-color: var(--border-accent); }
+
+.swipe-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.swipe-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swipe-count-right { color: var(--accent-hover); font-weight: 700; }
+.swipe-count-left { color: var(--text-secondary); font-weight: 600; }
+
+[data-theme="dark"] .swipe-count-right { color: var(--accent); }
+
+.soda-new {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: normal;
+}
+
+.order-rank {
+  font-size: var(--text-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.order-row-backup td { background: var(--bg-primary); }
+.order-row-backup .order-rank,
+.order-row-backup .lunch-name-row { color: var(--text-secondary); }
+
+.chris-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.chris-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.chris-title .page-heading { margin: 0; }
+
+.chris-week {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chris-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.chris-actions .btn { padding: 10px 16px; }
+
+.chris-login { max-width: 400px; }
+
+@media (max-width: 640px) {
+  .soda-stage { min-height: 400px; }
+  .soda-stage-back { height: 380px; }
+  .soda-card-image { height: 260px; }
+  .soda-card-image img { width: 230px; height: 230px; }
+  .soda-card-done { min-height: 360px; }
+  .soda-card-skeleton { height: 360px; }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .soda-report-modal {
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .soda-table td,
+  .soda-table th,
+  .order-table td,
+  .order-table th {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .soda-table .col-name,
+  .order-table .col-name { min-width: 0; }
+  .soda-table .col-rank,
+  .order-table .col-rank { width: 40px; }
+  .col-type,
+  .col-swipes { width: auto; }
+  .swipe-counts { gap: 8px; }
+  .soda-thumb { width: 32px; height: 32px; }
+  .soda-new { font-size: var(--text-xs); }
 }

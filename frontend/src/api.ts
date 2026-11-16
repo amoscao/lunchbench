@@ -233,3 +233,102 @@ export async function verifyAdminToken(password: string): Promise<string> {
   const body = await res.json() as { token: string }
   return body.token
 }
+
+export type SodaType = 'soda' | 'seltzer'
+
+export type Soda = {
+  id: number
+  brand: string
+  flavor: string
+  name: string
+  type: SodaType
+  image_url: string | null
+}
+
+export type SodaLeaderboardRow = Soda & {
+  rank: number
+  right_swipes: number
+  left_swipes: number
+  likes: number
+  hates: number
+  reporters: number
+  score: number
+  has_data: boolean
+}
+
+export type SodaOrderItem = {
+  rank: number
+  slot: 'top' | 'trial' | 'backup'
+  soda_id: number
+  brand: string
+  flavor: string
+  name: string
+  type: SodaType
+  image_url: string | null
+  right_swipes: number
+  left_swipes: number
+  has_data: boolean
+}
+
+export type SodaOrder = {
+  week_start: string
+  generated_at: string
+  items: SodaOrderItem[]
+}
+
+export async function getSodaCatalog(): Promise<Soda[]> {
+  const res = await fetch(`${BASE}/soda/catalog`)
+  if (!res.ok) throw new Error(`Soda catalog fetch failed: ${res.status}`)
+  const data = await res.json() as { sodas: Soda[] }
+  return data.sodas.map(normalizeLunch)
+}
+
+export async function getSodaDeck(): Promise<Soda[]> {
+  const res = await fetch(`${BASE}/soda/deck`, {
+    headers: { 'X-Lunchbench-Session': getSessionId() },
+  })
+  if (!res.ok) throw new Error(`Soda deck fetch failed: ${res.status}`)
+  const data = await res.json() as { sodas: Soda[] }
+  return data.sodas.map(normalizeLunch)
+}
+
+export async function submitSodaSwipe(sodaId: number, direction: 'right' | 'left'): Promise<void> {
+  const res = await fetch(`${BASE}/soda/swipes`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
+    body: JSON.stringify({ soda_id: sodaId, direction }),
+  })
+  if (!res.ok) throw new ApiError(`Swipe failed: ${res.status}`, res.status)
+}
+
+export async function submitSodaReport(sodaId: number, verdict: 'like' | 'hate'): Promise<void> {
+  const res = await fetch(`${BASE}/soda/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
+    body: JSON.stringify({ soda_id: sodaId, verdict }),
+  })
+  if (!res.ok) throw new ApiError(`Report failed: ${res.status}`, res.status)
+}
+
+export async function getSodaLeaderboard(): Promise<SodaLeaderboardRow[]> {
+  const res = await fetch(`${BASE}/soda/leaderboard`)
+  if (!res.ok) throw new Error(`Soda leaderboard fetch failed: ${res.status}`)
+  const data = await res.json() as { sodas: SodaLeaderboardRow[] }
+  return data.sodas.map(normalizeLunch)
+}
+
+export async function getSodaOrder(token: string): Promise<SodaOrder> {
+  const res = await fetch(`${BASE}/soda/order/latest`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new ApiError(`Order fetch failed: ${res.status}`, res.status)
+  const data = await res.json() as SodaOrder
+  return { ...data, items: data.items.map(normalizeLunch) }
+}
+
+export async function revokeSession(token: string): Promise<void> {
+  await fetch(`${BASE}/admin/session`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}

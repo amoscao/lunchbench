@@ -161,6 +161,8 @@ test.describe('SodaArena swipe feed', () => {
     }
 
     await expect(page.locator('.soda-end-title')).toHaveText("You've rated everything")
+    await expect(page.locator('.soda-end')).toHaveAttribute('role', 'status')
+    await expect(page.locator('.soda-end-title')).toBeFocused()
     await expect(page.locator(TOP)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Swipe right' })).toBeDisabled()
     await expect(page.getByRole('button', { name: 'Report a soda' })).toBeEnabled()
@@ -170,6 +172,75 @@ test.describe('SodaArena swipe feed', () => {
     await expect.poll(async () => (await feedIds(await sessionId(page))).length).toBe(0)
     await page.reload()
     await expect(page.locator('.soda-end-title')).toHaveText("You've rated everything")
+  })
+
+  test('flung cards fully leave the viewport on both sides, even when rotated', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { exits: Array<{ left: number; right: number; vw: number }> }
+      w.exits = []
+      const remove = Element.prototype.remove
+      Element.prototype.remove = function (this: Element) {
+        if (this.classList.contains('leaving')) {
+          const r = this.getBoundingClientRect()
+          w.exits.push({ left: r.left, right: r.right, vw: window.innerWidth })
+        }
+        return remove.call(this)
+      }
+    })
+    await page.goto('/soda')
+    const exits = () => page.evaluate(() => (window as unknown as { exits: Array<{ left: number; right: number; vw: number }> }).exits)
+
+    let id = await topId(page)
+    await drag(page, { dx: -250, steps: 12, stepMs: 16, grabAt: 0.3 })
+    await expectDismissed(page, id)
+    await expect.poll(async () => (await exits()).length).toBe(1)
+    id = await topId(page)
+    await drag(page, { dx: 250, steps: 12, stepMs: 16, grabAt: 0.7 })
+    await expectDismissed(page, id)
+    await expect.poll(async () => (await exits()).length).toBe(2)
+    id = await topId(page)
+    await page.keyboard.press('ArrowLeft')
+    await expectDismissed(page, id)
+    await expect.poll(async () => (await exits()).length).toBe(3)
+
+    const [left, right, button] = await exits()
+    expect(left.right).toBeLessThanOrEqual(0)
+    expect(right.left).toBeGreaterThanOrEqual(right.vw)
+    expect(button.right).toBeLessThanOrEqual(0)
+  })
+
+  test('holding an arrow key records exactly one swipe', async ({ page }) => {
+    await page.goto('/soda')
+    const log = countSwipes(page)
+    const id = await topId(page)
+    // Repeated keydowns without keyup arrive with event.repeat = true, like OS auto-repeat.
+    for (let i = 0; i < 20; i++) await page.keyboard.down('ArrowRight')
+    await page.keyboard.up('ArrowRight')
+    await page.waitForTimeout(600)
+    expect(log.requests).toEqual([{ soda_id: id, direction: 'right' }])
+  })
+
+  test('announces the new top drink to screen readers, and cards are named', async ({ page }) => {
+    await page.goto('/soda')
+    const top = page.locator(TOP)
+    await expect(top).toBeVisible()
+    const name = await top.getAttribute('aria-label')
+    expect(name).toMatch(/\S+ \S+/)
+    const announcer = page.locator('.soda-announce')
+    await expect(announcer).toHaveAttribute('aria-live', 'polite')
+    await expect(announcer).toHaveText(name!)
+
+    const next = await page.locator(NEXT).getAttribute('aria-label')
+    await page.keyboard.press('ArrowRight')
+    await expect(announcer).toHaveText(next!)
+  })
+
+  test('an empty catalog says "No drinks yet"', async ({ page }) => {
+    await page.route('**/api/soda/deck', (route) => route.fulfill({ json: { sodas: [] } }))
+    await page.route('**/api/soda/catalog', (route) => route.fulfill({ json: { sodas: [] } }))
+    await page.goto('/soda')
+    await expect(page.locator('.soda-end-title')).toHaveText('No drinks yet')
+    await expect(page.getByRole('button', { name: 'Swipe right' })).toBeDisabled()
   })
 
   test('the feed API returns only drinks this voter has not swiped', async () => {
@@ -253,13 +324,20 @@ test.describe('SodaArena swipe feed on a phone', () => {
     await expect.poll(async () => (await getSodaRow(id)).right_swipes).toBe(before.right_swipes + 1)
   })
 
-  test('a vertical touch drag scrolls instead of swiping', async ({ page }) => {
+  test('a mostly vertical touch drag scrolls the page instead of swiping', async ({ page }) => {
     await page.goto('/soda')
     const log = countSwipes(page)
     const id = await topId(page)
-    await touchDrag(page, 0, -200)
-    await page.waitForTimeout(600)
+    // Make the page taller than the phone screen so a vertical drag has somewhere to scroll.
+    await page.evaluate(() => { document.body.style.minHeight = '3000px' })
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+
+    await touchDrag(page, 12, -260)
+    await page.waitForTimeout(800)
+
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
     expect(await topId(page)).toBe(id)
     expect(log.requests).toHaveLength(0)
+    await expect(page.locator(TOP)).not.toHaveAttribute('style', /translate3d/)
   })
 })

@@ -399,8 +399,14 @@ Mockups live outside the repo; this section is the source of truth.
 ### Report modal
 - Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).
 - Title "Report a soda", close button (×, 44px).
-- Text field with autocomplete over the full catalog (`fuzzyFilter`), up to 6 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
-- Two 52px buttons: **Like** (primary) and **Hate** (`--hate` outline). Disabled until a suggestion is picked; editing the text disables them again.
+- Text field with autocomplete over the full catalog, up to 8 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
+- Search (`frontend/src/soda-search.ts`, local, no request per keystroke):
+  - Normalization ignores case, punctuation, apostrophes, accents and the spaces in brand names: "dr pepper" = "Dr. Pepper", "la croix" = "LaCroix", "a and w" / "aw" = "A&W", "barqs" = "Barq's".
+  - Every typed word must match brand, flavor, combined name or type ("seltzer"), in any order, by prefix while typing ("str lem").
+  - Typos are forgiven per word: 1 edit (Damerau-Levenshtein) for 4-7 letters, 2 for 8+. Only words the catalog does not contain get typo matching, so a real word like "diet" never drags in "dirty".
+  - Nicknames live in one exported map, `SODA_ALIASES` ("coke", "dp", "gv", "walmart brand", "sparkling water", "zero", …). An alias can widen to several brands or flavors and combines with the other words ("diet cherry"). Expansions match exactly or by prefix only.
+  - Ranking: typo matches last; then more words matched as typed; then match quality; then shorter names; then catalog order.
+- Two 52px buttons: **Hate** (`--hate` outline) on the left and **Like** (primary) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
 - Submitting closes the modal. Nothing else is shown.
 
 ### Leaderboard tabs

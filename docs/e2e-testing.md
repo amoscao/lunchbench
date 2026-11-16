@@ -75,7 +75,7 @@ cd e2e && BASE_URL=http://localhost:5173 API_URL=http://localhost:8787 E2E_ADMIN
 - **Add Lunch**: mode switching, text-only add, authentication, error states, image upload area, client-side file validation
 - **API**: health, matchup, vote (win + tie), invalid requests, auth, image upload rejection
 - **Sodabench swipe**: deck loads with progress, right/left via buttons, arrow keys and drag, short drag snaps back, Deck done and Start over, unswiped-first deck order, arrow keys do not leak to other routes
-- **Sodabench report**: Like/Hate disabled until a pick, autocomplete, submit closes the modal and records the report, same-day newer report replaces the older one, Escape closes without reporting
+- **Sodabench report**: Like/Hate disabled until a pick, autocomplete (misspellings, nicknames, spacing variants), Hate left / Like right in DOM, visual and tab order, submit closes the modal and records the report, same-day newer report replaces the older one, Escape closes without reporting
 - **Soda leaderboard**: Lunch/Soda tabs, every drink ranked with type tag and swipe counts or "New soda/seltzer to try", images served from R2, swipes move a drink up
 - **Purchaser `/chris`**: password gate, wrong and lunch passwords rejected, order list slot order (3 Soda, 3 Seltzer, 3 Trial, 4 Backup), session persists across reload, log out, lunch PDF export, purchaser has no admin or lunch powers, admin regenerate is reproducible
 

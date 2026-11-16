@@ -1,4 +1,4 @@
-import { compareByScore, hasData, posterior, SODA_SCORE_PARAMS, sodaScore, type DrinkStats, type SodaType } from './soda-score'
+import { compareByScore, hasData, SODA_SCORE_PARAMS, scoreDrinks, type DrinkStats, type ScoredDrink, type SodaType } from './soda-score'
 
 export type OrderSlot = 'top' | 'trial' | 'backup'
 
@@ -88,18 +88,21 @@ export function sampleBeta(alpha: number, beta: number, rng: () => number): numb
   return x / (x + y)
 }
 
-const PRIOR_MEAN = SODA_SCORE_PARAMS.prior.alpha / (SODA_SCORE_PARAMS.prior.alpha + SODA_SCORE_PARAMS.prior.beta)
-
-/** Some evidence (R + n > 0) and not net-negative, so a hated drink never outranks an unknown one. */
-function isBacked(drink: DrinkStats): boolean {
-  return drink.right_swipes + drink.reporters > 0 && sodaScore(drink) >= PRIOR_MEAN
+/**
+ * Some evidence (R + n > 0) and a posterior mean at least the type mean, so a drink that is
+ * known to be worse than an average soda (or seltzer) never outranks an unknown one.
+ * The bar is the type mean, not the drink's own brand prior: a favorite should be a good drink
+ * of its type, and a strong brand should not hold its own good drinks to a higher bar.
+ */
+function isBacked(drink: ScoredDrink): boolean {
+  return drink.right_swipes + drink.reporters > 0 && drink.score >= drink.type_mean
 }
 
 /**
  * Picks favorites for one type: the top and backup slots.
  * Prefers backed drinks, then fills by score.
  */
-function pickFavorites(ranked: DrinkStats[], type: SodaType, count: number): DrinkStats[] {
+function pickFavorites(ranked: ScoredDrink[], type: SodaType, count: number): ScoredDrink[] {
   const ofType = ranked.filter((drink) => drink.type === type)
   return [...ofType.filter(isBacked), ...ofType.filter((drink) => !isBacked(drink))].slice(0, count)
 }
@@ -117,19 +120,16 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
  * Ranks by score and appeal. Exact ties are broken by a week-seeded shuffle, not by name,
  * so a fresh catalog (everything tied at the prior) does not always buy the same alphabetical drinks.
  */
-export function rankForWeek(drinks: DrinkStats[], seed: string): DrinkStats[] {
-  const byId = [...drinks].sort((a, b) => a.id - b.id)
+export function rankForWeek(drinks: DrinkStats[], seed: string): ScoredDrink[] {
+  const byId = scoreDrinks(drinks).sort((a, b) => a.id - b.id)
   return seededShuffle(byId, seededRandom(`${seed}:ties`)).sort(compareByScore)
 }
 
 /** Thompson-samples θ̃ for each candidate and returns them ordered by draw, best first. */
-function thompsonOrder(candidates: DrinkStats[], rng: () => number): DrinkStats[] {
+function thompsonOrder(candidates: ScoredDrink[], rng: () => number): ScoredDrink[] {
   return [...candidates]
     .sort((a, b) => a.id - b.id)
-    .map((drink) => {
-      const { alpha, beta } = posterior(drink)
-      return { drink, draw: sampleBeta(alpha, beta, rng) }
-    })
+    .map((drink) => ({ drink, draw: sampleBeta(drink.alpha, drink.beta, rng) }))
     .sort((a, b) => b.draw - a.draw || a.drink.id - b.drink.id)
     .map(({ drink }) => drink)
 }
@@ -185,7 +185,7 @@ export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): Ord
 
 export function orderParams(seed: string, recentTrialIds: number[]): Record<string, unknown> {
   return {
-    model: 'beta-posterior-v2',
+    model: 'beta-brand-prior-v3',
     seed,
     score: SODA_SCORE_PARAMS,
     order: ORDER_PARAMS,

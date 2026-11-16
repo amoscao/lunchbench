@@ -2,18 +2,22 @@ import { describe, expect, test } from 'vitest'
 import {
   compareDrinks,
   hasData,
-  posterior,
+  ownEvidence,
   rankDrinks,
+  scoreDrinks,
+  SODA_BRAND_PRIOR_STRENGTH,
+  SODA_MEAN_SHRINK,
   sodaAppeal,
-  sodaScore,
   swipeKappa,
   type DrinkStats,
 } from './soda-score'
 
+let nextId = 1000
+
 function drink(id: number, overrides: Partial<DrinkStats> = {}): DrinkStats {
   return {
     id,
-    brand: 'Brand',
+    brand: `Brand ${id}`,
     flavor: `Flavor ${id}`,
     type: 'soda',
     image_key: null,
@@ -26,50 +30,121 @@ function drink(id: number, overrides: Partial<DrinkStats> = {}): DrinkStats {
   }
 }
 
-describe('soda scoring', () => {
-  test('no data is the Beta(1, 1) prior', () => {
-    expect(posterior(drink(1))).toEqual({ alpha: 1, beta: 1 })
-    expect(sodaScore(drink(1))).toBe(0.5)
-  })
+function brandMates(brand: string, count: number, likes: number, hates: number): DrinkStats[] {
+  return Array.from({ length: count }, () => drink(nextId++, { brand, likes, hates, reporters: likes + hates }))
+}
 
-  test('each report adds one to alpha or beta', () => {
-    const p = posterior(drink(1, { likes: 3, hates: 1, reporters: 4 }))
-    expect(p).toEqual({ alpha: 4, beta: 2 })
-    expect(sodaScore(drink(1, { likes: 3, hates: 1, reporters: 4 }))).toBeCloseTo(4 / 6)
+function scoreOf(drinks: DrinkStats[], id: number) {
+  const scored = scoreDrinks(drinks).find((d) => d.id === id)
+  if (!scored) throw new Error(`no drink ${id}`)
+  return scored
+}
+
+describe('own evidence', () => {
+  test('each report adds one to a or b', () => {
+    expect(ownEvidence(drink(1, { likes: 3, hates: 1, reporters: 4 }))).toEqual({ a: 3, b: 1 })
   })
 
   test('five right swipes weigh one report, split 0.75 / 0.25', () => {
     expect(swipeKappa(5, 0)).toBeCloseTo(1)
-    const p = posterior(drink(1, { right_swipes: 5 }))
-    expect(p.alpha).toBeCloseTo(1.75)
-    expect(p.beta).toBeCloseTo(1.25)
+    const e = ownEvidence(drink(1, { right_swipes: 5 }))
+    expect(e.a).toBeCloseTo(0.75)
+    expect(e.b).toBeCloseTo(0.25)
   })
 
-  test('right-swipe weight caps at 3 pseudo-counts', () => {
+  test('right-swipe weight caps at 3 pseudo-counts and fades as reports arrive', () => {
     expect(swipeKappa(15, 0)).toBeCloseTo(3)
     expect(swipeKappa(500, 0)).toBeCloseTo(3)
-  })
-
-  test('right-swipe weight fades as reports arrive', () => {
     expect(swipeKappa(15, 3)).toBeCloseTo(1.5)
     expect(swipeKappa(15, 27)).toBeCloseTo(0.3)
   })
 
-  test('left swipes do not change the score', () => {
-    expect(sodaScore(drink(1, { right_swipes: 4, left_swipes: 50 })))
-      .toBe(sodaScore(drink(1, { right_swipes: 4 })))
+  test('left swipes add no evidence', () => {
+    expect(ownEvidence(drink(1, { right_swipes: 4, left_swipes: 50 })))
+      .toEqual(ownEvidence(drink(1, { right_swipes: 4 })))
+  })
+})
+
+describe('hierarchical brand prior', () => {
+  test('with no data anywhere every drink is Beta(1, 1)', () => {
+    const scored = scoreDrinks([drink(1), drink(2, { brand: 'Brand 1' }), drink(3, { type: 'seltzer' })])
+    for (const d of scored) {
+      expect(d.alpha).toBeCloseTo(1)
+      expect(d.beta).toBeCloseTo(1)
+      expect(d.score).toBeCloseTo(0.5)
+    }
   })
 
-  test('left swipes lower appeal', () => {
+  test('a single-drink brand gets exactly the type-mean prior (leave-one-out)', () => {
+    const drinks = [
+      drink(1, { brand: 'Solo', likes: 3, reporters: 3 }),
+      ...brandMates('Other', 3, 2, 0),
+      drink(2, { type: 'seltzer', hates: 5, reporters: 5 }),
+    ]
+    const solo = scoreOf(drinks, 1)
+    // Σ_soda a = 3 + 3·2 = 9, Σ_soda (a+b) = 9. The seltzer does not count.
+    const typeMean = (9 + SODA_MEAN_SHRINK * 0.5) / (9 + SODA_MEAN_SHRINK)
+    expect(solo.type_mean).toBeCloseTo(typeMean)
+    expect(solo.prior_mean).toBeCloseTo(typeMean)
+    expect(solo.alpha).toBeCloseTo(SODA_BRAND_PRIOR_STRENGTH * typeMean + 3)
+    expect(solo.beta).toBeCloseTo(SODA_BRAND_PRIOR_STRENGTH * (1 - typeMean))
+  })
+
+  test('the brand prior leaves the drink itself out', () => {
+    const drinks = [drink(1, { brand: 'B', likes: 4, reporters: 4 }), drink(2, { brand: 'B' })]
+    const first = scoreOf(drinks, 1)
+    // Drink 1's prior only sees drink 2, which has no data, so it equals the type mean.
+    expect(first.prior_mean).toBeCloseTo(first.type_mean)
+    // Drink 2's prior sees drink 1's four likes.
+    expect(scoreOf(drinks, 2).prior_mean).toBeGreaterThan(first.type_mean)
+  })
+
+  test('a no-data drink from a hated brand scores below 0.5 and below loved or unknown brands', () => {
+    const hatedNew = drink(1, { brand: 'Hated' })
+    const lovedNew = drink(2, { brand: 'Loved' })
+    const unknownNew = drink(3, { brand: 'Unknown' })
+    const drinks = [
+      hatedNew, lovedNew, unknownNew,
+      ...brandMates('Hated', 3, 0, 4),
+      ...brandMates('Loved', 3, 4, 0),
+      drink(4, { brand: 'Unknown' }),
+    ]
+    const hated = scoreOf(drinks, 1).score
+    const loved = scoreOf(drinks, 2).score
+    const unknown = scoreOf(drinks, 3).score
+
+    expect(hated).toBeLessThan(0.5)
+    expect(hated).toBeLessThan(unknown)
+    expect(hated).toBeLessThan(loved)
+    expect(loved).toBeGreaterThan(unknown)
+  })
+
+  test('lots of own evidence barely moves when brand-mates are bad', () => {
+    // Same bad drinks in both worlds, so the type mean is identical; only brand membership changes.
+    const star = { brand: 'Star', likes: 10, reporters: 10 }
+    const solo = scoreOf([drink(1, star), ...brandMates('Elsewhere', 4, 0, 5)], 1)
+    const withBadMates = scoreOf([drink(1, star), ...brandMates('Star', 4, 0, 5)], 1)
+
+    const priorShift = solo.prior_mean - withBadMates.prior_mean
+    const scoreShift = solo.score - withBadMates.score
+    expect(priorShift).toBeGreaterThan(0.25)
+    expect(scoreShift).toBeGreaterThan(0)
+    expect(scoreShift).toBeLessThan(0.06)
+    expect(scoreShift).toBeLessThan(priorShift / 4)
+    expect(withBadMates.score).toBeGreaterThan(0.8)
+  })
+
+  test('brands are keyed by the catalog brand string as-is', () => {
+    const drinks = [drink(1, { brand: 'poppi' }), ...brandMates('Poppi', 3, 0, 4)]
+    expect(scoreOf(drinks, 1).prior_mean).toBeCloseTo(scoreOf(drinks, 1).type_mean)
+  })
+})
+
+describe('ranking', () => {
+  test('left swipes lower appeal only', () => {
     expect(sodaAppeal(drink(1))).toBe(0.5)
     expect(sodaAppeal(drink(1, { right_swipes: 4, left_swipes: 0 }))).toBeCloseTo(5 / 6)
     expect(sodaAppeal(drink(1, { right_swipes: 4, left_swipes: 6 }))).toBeCloseTo(5 / 12)
-  })
-
-  test('one hate outweighs many right swipes', () => {
-    const swiped = drink(1, { right_swipes: 100 })
-    const hatedByReporters = drink(2, { right_swipes: 100, hates: 3, reporters: 3 })
-    expect(sodaScore(hatedByReporters)).toBeLessThan(sodaScore(swiped))
   })
 
   test('ranks by posterior mean, then appeal, then name', () => {
@@ -84,8 +159,10 @@ describe('soda scoring', () => {
   })
 
   test('ties with equal appeal fall back to name, then id', () => {
-    expect(compareDrinks(drink(2, { flavor: 'Apple' }), drink(1, { flavor: 'Banana' }))).toBeLessThan(0)
-    expect(compareDrinks(drink(1, { flavor: 'Same' }), drink(2, { flavor: 'Same' }))).toBeLessThan(0)
+    const [a, b] = scoreDrinks([drink(2, { flavor: 'Apple', brand: 'X' }), drink(1, { flavor: 'Banana', brand: 'X' })])
+    expect(compareDrinks(a, b)).toBeLessThan(0)
+    const [c, d] = scoreDrinks([drink(1, { flavor: 'Same', brand: 'X' }), drink(2, { flavor: 'Same', brand: 'X' })])
+    expect(compareDrinks(c, d)).toBeLessThan(0)
   })
 
   test('hasData is true for any swipe or report', () => {

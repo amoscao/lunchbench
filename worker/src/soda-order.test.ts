@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   addDays,
   buildOrderList,
+  orderParams,
   rankForWeek,
   sampleBeta,
   seededRandom,
@@ -257,5 +258,66 @@ describe('fresh catalog (no data)', () => {
   test('rankForWeek keeps score order above the seeded tiebreak', () => {
     const drinks = [...fresh(), drink(99, 'soda', { likes: 1, reporters: 1 })]
     expect(rankForWeek(drinks, '2026-11-16')[0].id).toBe(99)
+  })
+})
+
+describe('brand prior in the order list', () => {
+  // Favorites fill from the 'Fav' brands; the trial pool is one unknown drink per brand.
+  function catalogWithBrands(): DrinkStats[] {
+    return [
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 1, 'soda', { brand: 'Fav Soda', likes: 5, reporters: 5 })),
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 6, 'seltzer', { brand: 'Fav Seltzer', likes: 5, reporters: 5 })),
+      ...Array.from({ length: 3 }, (_, i) => drink(i + 11, 'soda', { brand: 'Hated', hates: 2, reporters: 2 })),
+      ...Array.from({ length: 3 }, (_, i) => drink(i + 14, 'soda', { brand: 'Loved', likes: 2, reporters: 2 })),
+      drink(20, 'soda', { brand: 'Hated' }),
+      drink(21, 'soda', { brand: 'Loved' }),
+      drink(22, 'soda', { brand: 'Unknown' }),
+    ]
+  }
+
+  test('trial sampling is reproducible with brand priors', () => {
+    const a = buildOrderList(catalogWithBrands(), { seed: '2026-11-16' })
+    const b = buildOrderList([...catalogWithBrands()].reverse(), { seed: '2026-11-16' })
+    expect(ids(b, 'trial')).toEqual(ids(a, 'trial'))
+    expect(ids(a, 'trial')).toHaveLength(3)
+  })
+
+  test('Thompson draws favor an unknown drink from a loved brand over one from a hated brand', () => {
+    let lovedFirst = 0
+    const weeks = 60
+    for (let week = 0; week < weeks; week++) {
+      const drinks = catalogWithBrands().filter((d) => d.id !== 22)
+      const items = buildOrderList(drinks, { seed: addDays('2026-11-16', week * 7), recentTrialIds: [] })
+      const trials = ids(items, 'trial')
+      const hatedIndex = trials.indexOf(20)
+      const lovedIndex = trials.indexOf(21)
+      if (lovedIndex !== -1 && (hatedIndex === -1 || lovedIndex < hatedIndex)) lovedFirst += 1
+    }
+    expect(lovedFirst / weeks).toBeGreaterThan(0.75)
+  })
+
+  test('favorites need a posterior at least the type mean', () => {
+    const drinks = [
+      drink(1, 'soda', { likes: 4, reporters: 4 }),
+      drink(2, 'soda', { hates: 2, reporters: 2 }),
+      drink(3, 'soda'),
+      drink(4, 'soda'),
+      drink(5, 'soda'),
+      drink(6, 'soda'),
+    ]
+    const scored = rankForWeek(drinks, '2026-11-16')
+    const hated = scored.find((d) => d.id === 2)!
+    expect(hated.score).toBeLessThan(hated.type_mean)
+
+    const items = buildOrderList(drinks, { seed: '2026-11-16' })
+    const favorites = items.filter((item) => item.slot !== 'trial').map((item) => item.soda_id)
+    expect(favorites[0]).toBe(1)
+    expect(favorites).not.toContain(2)
+  })
+
+  test('the snapshot params record the brand prior constants', () => {
+    const params = orderParams('2026-11-16', []) as { score: { meanShrink: number; brandPriorStrength: number } }
+    expect(params.score.meanShrink).toBe(4)
+    expect(params.score.brandPriorStrength).toBe(2)
   })
 })

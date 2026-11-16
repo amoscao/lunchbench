@@ -4,7 +4,7 @@ import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildDeck, DECK_SIZE } from '../soda-deck'
-import { hasData, rankDrinks, sodaName, sodaScore, type DrinkStats } from '../soda-score'
+import { hasData, rankDrinks, sodaName, type DrinkStats } from '../soda-score'
 import { weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 
@@ -124,7 +124,7 @@ soda.get('/leaderboard', async (c) => {
         likes: drink.likes,
         hates: drink.hates,
         reporters: drink.reporters,
-        score: sodaScore(drink),
+        score: drink.score,
         has_data: hasData(drink),
       })),
     },

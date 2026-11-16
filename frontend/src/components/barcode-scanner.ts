@@ -12,7 +12,10 @@ import { escapeHtml } from '../utils/escape-html'
 // the only thing sent to the server is the decoded digit string (and its symbology) of an unknown code.
 
 const SCAN_INTERVAL_MS = 120
-const MAX_DECODE_WIDTH = 1280
+// ZXing runs on the main thread. Frames are downscaled to this long side, and the slower
+// `tryHarder` pass runs on every other frame only, so older iPhones stay responsive.
+// 960px still gives a 12 oz can barcode filling the scan frame ~3px per module.
+const MAX_DECODE_LONG_SIDE = 960
 
 type DecodedBarcode = { rawValue: string; format: string }
 type Detector = { detect: (video: HTMLVideoElement) => Promise<DecodedBarcode[]> }
@@ -52,13 +55,15 @@ async function createDetector(): Promise<Detector | null> {
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d', { willReadFrequently: true })
     if (!context) return null
+    let attempt = 0
     return {
       async detect(video) {
-        const scale = Math.min(1, MAX_DECODE_WIDTH / video.videoWidth)
+        const scale = Math.min(1, MAX_DECODE_LONG_SIDE / Math.max(video.videoWidth, video.videoHeight))
         canvas.width = Math.round(video.videoWidth * scale)
         canvas.height = Math.round(video.videoHeight * scale)
         context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        return zxing.decodeImageData(context.getImageData(0, 0, canvas.width, canvas.height))
+        attempt += 1
+        return zxing.decodeImageData(context.getImageData(0, 0, canvas.width, canvas.height), attempt % 2 === 0)
       },
     }
   } catch {
@@ -187,26 +192,39 @@ export function mountScanPanel(container: HTMLElement, catalog: Soda[], handlers
       return
     }
     void loadBarcodeMap().catch(() => undefined)
-    const [streamResult, detectorResult] = await Promise.allSettled([
-      navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      }),
-      createDetector(),
-    ])
-    if (streamResult.status === 'fulfilled') stream = streamResult.value
+    // Camera and decoder start in parallel. The stream is held (and shown) the moment it arrives,
+    // so a stop() while the decoder is still loading reaches it; a stream that arrives after a
+    // stop() is stopped at once.
+    const streamReady = navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    }).then((opened) => {
+      if (cameraOff) {
+        opened.getTracks().forEach((track) => track.stop())
+        return null
+      }
+      stream = opened
+      // The camera can end on its own (unplugged, revoked, taken by another app): go manual
+      // instead of leaving a frozen preview with the decode loop running.
+      opened.getVideoTracks().forEach((track) => track.addEventListener('ended', () => {
+        if (!cameraOff) fail(false)
+      }))
+      video.srcObject = opened
+      void video.play().catch(() => undefined)
+      return opened
+    })
+    // Denied or no camera: go manual now, without waiting for the decoder to load.
+    streamReady.catch(() => fail(false))
+    const [streamResult, detectorResult] = await Promise.allSettled([streamReady, createDetector()])
     if (destroyed || cameraOff) {
       stopCamera()
       return
     }
     const detector = detectorResult.status === 'fulfilled' ? detectorResult.value : null
-    if (!stream || !detector) {
+    if (streamResult.status !== 'fulfilled' || !streamResult.value || !detector) {
       fail(false)
       return
     }
-    video.srcObject = stream
-    await video.play().catch(() => undefined)
-    if (cameraOff) return
     void scanLoop(detector)
   }
 

@@ -84,6 +84,61 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
     await expect(dialog.getByRole('button', { name: 'Scan barcode' })).toBeVisible()
   })
 
+  // Hold the WebAssembly decoder so the camera is live while startup is still pending.
+  async function delayDecoder(page: import('@playwright/test').Page): Promise<() => boolean> {
+    let held = false
+    await page.route('**/*zxing_reader*.wasm*', async (route) => {
+      held = true
+      await new Promise((resolve) => setTimeout(resolve, 6000))
+      await route.continue().catch(() => undefined)
+    })
+    return () => held
+  }
+
+  test('closing while the decoder is still loading stops the camera at once', async ({ page }) => {
+    const held = await delayDecoder(page)
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    await expect.poll(() => liveTracks(page)).toBeGreaterThan(0)
+    await expect.poll(held).toBe(true)
+
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await expect(dialog).toBeHidden()
+    await expect.poll(() => liveTracks(page), { timeout: 1000 }).toBe(0)
+  })
+
+  test('hiding the page while the decoder is still loading stops the camera at once', async ({ page }) => {
+    const held = await delayDecoder(page)
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    await expect.poll(() => liveTracks(page)).toBeGreaterThan(0)
+    await expect.poll(held).toBe(true)
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await expect.poll(() => liveTracks(page), { timeout: 1000 }).toBe(0)
+    await expect(dialog.getByRole('combobox')).toBeVisible()
+  })
+
+  test('a camera that ends on its own falls back to manual', async ({ page }) => {
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    await expect.poll(() => liveTracks(page)).toBeGreaterThan(0)
+
+    // track.stop() alone fires no event; a real device loss fires `ended` on the track.
+    await page.evaluate(() => {
+      for (const track of window.__lbStreams.flatMap((stream) => stream.getVideoTracks())) {
+        track.stop()
+        track.dispatchEvent(new Event('ended'))
+      }
+    })
+    await expect(dialog.getByRole('combobox')).toBeFocused()
+    await expect(dialog.getByLabel('Camera')).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: 'Scan barcode' })).toBeHidden()
+  })
+
   test('denied camera permission lands in manual search with no error', async ({ page }) => {
     await page.addInitScript(() => {
       navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Permission denied', 'NotAllowedError'))

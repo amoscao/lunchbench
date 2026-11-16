@@ -17,10 +17,11 @@ export async function initZxing(): Promise<void> {
   await prepareZXingModule({ overrides, fireImmediately: true })
 }
 
-export async function decodeImageData(image: ImageData): Promise<DecodedBarcode[]> {
+/** `tryHarder` is the slower, more thorough pass; the scanner alternates it to keep frames cheap. */
+export async function decodeImageData(image: ImageData, tryHarder: boolean): Promise<DecodedBarcode[]> {
   const results = await readBarcodes(image, {
     formats: ['EAN13', 'EAN8', 'UPCA', 'UPCE'],
-    tryHarder: true,
+    tryHarder,
     maxNumberOfSymbols: 1,
   })
   return results

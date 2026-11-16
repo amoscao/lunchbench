@@ -77,7 +77,7 @@ cd e2e && BASE_URL=http://localhost:5173 API_URL=http://localhost:8787 E2E_ADMIN
 - **Sodabench swipe**: deck loads with progress, right/left via buttons, arrow keys and drag, short drag snaps back, Deck done and Start over, unswiped-first deck order, arrow keys do not leak to other routes
 - **Sodabench report**: Like/Hate disabled until a pick, autocomplete, submit closes the modal and records the report, same-day newer report replaces the older one, Escape closes without reporting
 - **Soda leaderboard**: Lunch/Soda tabs, every drink ranked with type tag and swipe counts or "New soda/seltzer to try", images served from R2, swipes move a drink up
-- **Purchaser `/chris`**: password gate, wrong and lunch passwords rejected, order list slot order (3 Soda, 3 Seltzer, 3 Trial, 4 Backup), session persists across reload, log out, lunch PDF export, purchaser has no admin or lunch powers, admin regenerate is reproducible
+- **Purchaser `/chris`**: password gate, wrong and lunch passwords rejected, order list slot order (4 Soda, 4 Seltzer, then one soda Trial and one seltzer Trial, no Backup), session persists across reload, log out, lunch PDF export, purchaser has no admin or lunch powers, admin regenerate is reproducible
 
 The API container seeds 14 sodas and seltzers from `migrations/seed.sql` and uploads placeholder images from `scripts/data/seed-images` with `scripts/import-sodas.mjs upload --local`. E2E passwords are placeholders set in `docker-compose.e2e.yml`: `test-admin-token` (lunch), `test-admin-manager-password` (admin), `test-purchaser-password` (purchaser).
 

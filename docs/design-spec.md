@@ -415,7 +415,7 @@ Mockups live outside the repo; this section is the source of truth.
 ### Purchaser page (`/chris`)
 - Logged out: heading "Purchaser Login", password field, "Log in". The token is kept in localStorage (`lb_purchaser_session_token`), separate from the Add Lunch token.
 - Logged in: heading "This Week's Order" with "Week of Mon D" beside it; secondary buttons "Export lunch PDF" and "Log out".
-- One ranked table, read-only: #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`), Backup (outlined). Backup rows sit on `--bg-primary` with secondary text so they read as optional.
+- One ranked table, read-only, 10 rows: 4 sodas, 4 seltzers, one soda trial, one seltzer trial. Columns #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`).
 - No quantities, no summary tiles, no substitutions text.
 
 ---

@@ -48,52 +48,75 @@ const ids = (items: OrderItem[], slot: OrderItem['slot']) =>
   items.filter((item) => item.slot === slot).map((item) => item.soda_id)
 
 describe('buildOrderList', () => {
-  test('orders top sodas, top seltzers, trials, then backups', () => {
+  test('lists 4 top sodas, 4 top seltzers, then one soda trial and one seltzer trial', () => {
     const items = buildOrderList(catalog(), { seed: '2026-11-16' })
 
-    expect(items).toHaveLength(13)
-    expect(items.map((item) => item.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
-    expect(slots(items).slice(0, 6)).toEqual([
-      'top:soda', 'top:soda', 'top:soda',
-      'top:seltzer', 'top:seltzer', 'top:seltzer',
+    expect(items).toHaveLength(10)
+    expect(items.map((item) => item.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(slots(items)).toEqual([
+      'top:soda', 'top:soda', 'top:soda', 'top:soda',
+      'top:seltzer', 'top:seltzer', 'top:seltzer', 'top:seltzer',
+      'trial:soda', 'trial:seltzer',
     ])
-    expect(items.slice(6, 9).every((item) => item.slot === 'trial')).toBe(true)
-    expect(items.slice(9).every((item) => item.slot === 'backup')).toBe(true)
-    expect(items.slice(9).filter((item) => item.type === 'soda')).toHaveLength(2)
-    expect(items.slice(9).filter((item) => item.type === 'seltzer')).toHaveLength(2)
+    expect(items.some((item) => (item.slot as string) === 'backup')).toBe(false)
   })
 
-  test('top slots take the best-scored drink of each type', () => {
+  test('top slots take the best-scored drinks of each type', () => {
     const items = buildOrderList(catalog(), { seed: '2026-11-16' })
-    expect(ids(items, 'top')).toEqual([1, 2, 3, 11, 12, 13])
+    expect(ids(items, 'top')).toEqual([1, 2, 3, 4, 11, 12, 13, 14])
   })
 
-  test('backups are the next two of each type, in overall rank order', () => {
+  test('trials are low-data drinks of their own type that are not favorites', () => {
     const items = buildOrderList(catalog(), { seed: '2026-11-16' })
-    // Sodas 4 and 5 have liked reports, so they outrank swiped-only seltzers.
-    expect(ids(items, 'backup')).toEqual([4, 5, 14, 15])
-  })
-
-  test('trials are low-data drinks that are not favorites', () => {
-    const items = buildOrderList(catalog(), { seed: '2026-11-16' })
-    const favorites = new Set([...ids(items, 'top'), ...ids(items, 'backup')])
-    for (const id of ids(items, 'trial')) {
-      expect(favorites.has(id)).toBe(false)
-      const source = catalog().find((d) => d.id === id)!
+    const favorites = new Set(ids(items, 'top'))
+    const trials = items.filter((item) => item.slot === 'trial')
+    expect(trials.map((item) => item.type)).toEqual(['soda', 'seltzer'])
+    for (const item of trials) {
+      expect(favorites.has(item.soda_id)).toBe(false)
+      const source = catalog().find((d) => d.id === item.soda_id)!
+      expect(source.type).toBe(item.type)
       expect(source.reporters).toBeLessThan(3)
     }
-    expect(new Set(ids(items, 'trial')).size).toBe(3)
   })
 
-  test('drinks with 3+ reporters are never trials', () => {
+  test('drinks with 3+ reporters are never sampled as trials', () => {
     const drinks = [
-      ...Array.from({ length: 5 }, (_, i) => drink(i + 1, 'soda', { likes: 5, reporters: 5 })),
-      ...Array.from({ length: 5 }, (_, i) => drink(i + 6, 'seltzer', { likes: 5, reporters: 5 })),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 1, 'soda', { likes: 5, reporters: 5 })),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 5, 'seltzer', { likes: 5, reporters: 5 })),
       drink(11, 'soda', { likes: 1, hates: 2, reporters: 3 }),
-      drink(12, 'seltzer', { reporters: 2, likes: 1, hates: 1 }),
+      drink(12, 'soda', { likes: 1, reporters: 1 }),
+      drink(13, 'seltzer', { reporters: 2, likes: 1, hates: 1 }),
+      drink(14, 'seltzer', { likes: 3, reporters: 3 }),
     ]
     const items = buildOrderList(drinks, { seed: '2026-11-16' })
-    expect(ids(items, 'trial')).toEqual([12])
+    expect(ids(items, 'trial')).toEqual([12, 13])
+  })
+
+  test('falls back to the next-best drink of the type when no drink is trial-eligible', () => {
+    const drinks = [
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 1, 'soda', { likes: 9, reporters: 9 })),
+      drink(5, 'soda', { likes: 2, hates: 2, reporters: 4 }),
+      drink(6, 'soda', { likes: 4, reporters: 4 }),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 11, 'seltzer', { right_swipes: 5 })),
+      drink(15, 'seltzer'),
+    ]
+    const items = buildOrderList(drinks, { seed: '2026-11-16' })
+    const trials = items.filter((item) => item.slot === 'trial')
+    // No soda has n < 3 outside the favorites, so the soda trial is the best unlisted soda.
+    expect(trials.map((item) => [item.type, item.soda_id])).toEqual([['soda', 6], ['seltzer', 15]])
+  })
+
+  test('never takes two trials from one type, even when the other type has none left', () => {
+    const drinks = [
+      ...Array.from({ length: 8 }, (_, i) => drink(i + 1, 'soda')),
+      ...Array.from({ length: 3 }, (_, i) => drink(i + 11, 'seltzer')),
+    ]
+    const items = buildOrderList(drinks, { seed: '2026-11-16' })
+    expect(slots(items)).toEqual([
+      'top:soda', 'top:soda', 'top:soda', 'top:soda',
+      'top:seltzer', 'top:seltzer', 'top:seltzer',
+      'trial:soda',
+    ])
   })
 
   test('same seed gives the same trials', () => {
@@ -119,16 +142,15 @@ describe('buildOrderList', () => {
 
   test('falls back to recent trials when nothing else is eligible', () => {
     const drinks = [
-      ...Array.from({ length: 5 }, (_, i) => drink(i + 1, 'soda', { right_swipes: 10 })),
-      ...Array.from({ length: 5 }, (_, i) => drink(i + 6, 'seltzer', { right_swipes: 10 })),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 1, 'soda', { right_swipes: 10 })),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 6, 'seltzer', { right_swipes: 10 })),
       drink(11, 'soda'),
       drink(12, 'seltzer'),
       drink(13, 'soda'),
     ]
     const items = buildOrderList(drinks, { seed: '2026-11-16', recentTrialIds: [11, 12] })
-    const trials = ids(items, 'trial')
-    expect(trials[0]).toBe(13)
-    expect(trials.slice(1).sort()).toEqual([11, 12])
+    // Soda 13 is fresh, so it beats recent soda 11; seltzer 12 is the only seltzer left.
+    expect(ids(items, 'trial')).toEqual([13, 12])
   })
 
   test('favorites prefer drinks with evidence over unknown drinks', () => {
@@ -262,13 +284,15 @@ describe('fresh catalog (no data)', () => {
 })
 
 describe('brand prior in the order list', () => {
-  // Favorites fill from the 'Fav' brands; the trial pool is one unknown drink per brand.
+  // Favorites fill from the 'Fav' brands. Brand-mates have 3 reporters (not trial-eligible),
+  // so the soda trial pool is one unknown drink per brand.
   function catalogWithBrands(): DrinkStats[] {
     return [
-      ...Array.from({ length: 5 }, (_, i) => drink(i + 1, 'soda', { brand: 'Fav Soda', likes: 5, reporters: 5 })),
-      ...Array.from({ length: 5 }, (_, i) => drink(i + 6, 'seltzer', { brand: 'Fav Seltzer', likes: 5, reporters: 5 })),
-      ...Array.from({ length: 3 }, (_, i) => drink(i + 11, 'soda', { brand: 'Hated', hates: 2, reporters: 2 })),
-      ...Array.from({ length: 3 }, (_, i) => drink(i + 14, 'soda', { brand: 'Loved', likes: 2, reporters: 2 })),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 1, 'soda', { brand: 'Fav Soda', likes: 5, reporters: 5 })),
+      ...Array.from({ length: 4 }, (_, i) => drink(i + 6, 'seltzer', { brand: 'Fav Seltzer', likes: 5, reporters: 5 })),
+      drink(10, 'seltzer', { brand: 'Fresh Seltzer' }),
+      ...Array.from({ length: 3 }, (_, i) => drink(i + 11, 'soda', { brand: 'Hated', hates: 3, reporters: 3 })),
+      ...Array.from({ length: 3 }, (_, i) => drink(i + 14, 'soda', { brand: 'Loved', likes: 3, reporters: 3 })),
       drink(20, 'soda', { brand: 'Hated' }),
       drink(21, 'soda', { brand: 'Loved' }),
       drink(22, 'soda', { brand: 'Unknown' }),
@@ -279,21 +303,22 @@ describe('brand prior in the order list', () => {
     const a = buildOrderList(catalogWithBrands(), { seed: '2026-11-16' })
     const b = buildOrderList([...catalogWithBrands()].reverse(), { seed: '2026-11-16' })
     expect(ids(b, 'trial')).toEqual(ids(a, 'trial'))
-    expect(ids(a, 'trial')).toHaveLength(3)
+    expect(ids(a, 'trial')).toHaveLength(2)
+    expect([20, 21, 22]).toContain(ids(a, 'trial')[0])
+    expect(ids(a, 'trial')[1]).toBe(10)
   })
 
   test('Thompson draws favor an unknown drink from a loved brand over one from a hated brand', () => {
-    let lovedFirst = 0
+    let loved = 0
     const weeks = 60
     for (let week = 0; week < weeks; week++) {
       const drinks = catalogWithBrands().filter((d) => d.id !== 22)
       const items = buildOrderList(drinks, { seed: addDays('2026-11-16', week * 7), recentTrialIds: [] })
-      const trials = ids(items, 'trial')
-      const hatedIndex = trials.indexOf(20)
-      const lovedIndex = trials.indexOf(21)
-      if (lovedIndex !== -1 && (hatedIndex === -1 || lovedIndex < hatedIndex)) lovedFirst += 1
+      const sodaTrial = items.find((item) => item.slot === 'trial' && item.type === 'soda')!
+      expect([20, 21]).toContain(sodaTrial.soda_id)
+      if (sodaTrial.soda_id === 21) loved += 1
     }
-    expect(lovedFirst / weeks).toBeGreaterThan(0.75)
+    expect(loved / weeks).toBeGreaterThan(0.75)
   })
 
   test('favorites need a posterior at least the type mean', () => {
@@ -370,9 +395,12 @@ describe('favorites across real brands', () => {
   test('swipe-only and liked sodas from several brands are backed favorites', () => {
     const items = buildOrderList(seltzerMarket(), { seed: '2026-11-16' })
     const topSodas = items.filter((i) => i.slot === 'top' && i.type === 'soda').map(name)
-    expect(topSodas).toContain('Coca-Cola Original')
-    expect(topSodas).toContain('Sprite Original')
-    expect(topSodas).not.toContain('A&W Root Beer')
+    expect(topSodas.slice(0, 3)).toEqual(['Coca-Cola Original', 'Coca-Cola Zero Sugar', 'Sprite Original'])
+    // Dr Pepper (2 likes, 1 hate) has a posterior below the soda type mean, so the untried
+    // A&W takes the fourth slot. No soda is left that is trial-eligible, so the soda trial
+    // falls back to the next-best unlisted soda.
+    expect(topSodas[3]).toBe('A&W Root Beer')
+    expect(name(items.find((i) => i.slot === 'trial' && i.type === 'soda')!)).toBe('Dr Pepper Original')
   })
 })
 
@@ -417,8 +445,12 @@ describe('own-evidence bar when reports skew positive', () => {
   })
 
   test('drinks whose own evidence is net-hated rank after untried drinks', () => {
-    const favorites = sodaFavorites(buildOrderList(sodaMarket({ right_swipes: 15 }), { seed: '2026-11-16' }))
-    expect(favorites[4]).toMatch(/^Meh (Three|Four)$/)
+    // Only three sodas are backed, so the fourth favorite slot goes to an untried Meh flavor,
+    // not to the net-hated Meh One or Two.
+    const drinks = sodaMarket(report(0, 1)).filter((d) => d.brand !== 'Fanta')
+    const favorites = sodaFavorites(buildOrderList(drinks, { seed: '2026-11-16' }))
+    expect(favorites).toHaveLength(4)
+    expect(favorites[3]).toMatch(/^Meh (Three|Four)$/)
   })
 
   test('a hated-only drink stays out of favorites while untried drinks remain', () => {

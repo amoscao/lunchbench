@@ -477,10 +477,10 @@ Records that the voter had the drink and liked or hated it. One report per voter
 ### GET /api/soda/leaderboard
 Every active drink (sodas and seltzers together), ranked in two groups:
 
-1. drinks with their own data (`R + L + n > 0`), in posterior order;
-2. drinks with no data at all, in posterior order.
+1. drinks with their own evidence (`R + n > 0`: a right swipe or a report), in posterior order;
+2. drinks without own evidence (untried, or left swipes only), in posterior order, then appeal.
 
-The brand prior still orders the untried drinks among themselves, but an untried flavor of a loved brand never outranks a drink with real evidence. This grouping is a product decision (made by the owner's proxy, open to revisit) and applies to this endpoint only; the weekly order list uses the plain posterior order.
+Left swipes are not evidence, so a left swipe alone does not move a drink into group 1. The brand prior still orders group 2, but an untried flavor of a loved brand never outranks a drink with real evidence. `has_data` (which counts left swipes) only chooses between showing swipe counts and "New soda/seltzer to try". This grouping is a product decision (made by the owner's proxy, open to revisit) and applies to this endpoint only; the weekly order list uses the plain posterior order.
 
 **Response 200:**
 ```json
@@ -520,9 +520,9 @@ The list is, in order:
 
 Favorites (top and backup) fill in tiers, each in rank order:
 
-1. Backed drinks: some evidence (`R + n > 0`), posterior mean at least the type mean `m_type`, and own evidence mean `a/(a+b)` at least `m_type`. The own-evidence check stops a strong brand from carrying a drink whose only evidence is a hate into a top slot. A swipe-only drink has an own mean of 0.75.
-2. Every other drink except known-bad ones: untried drinks, and drinks with positive evidence that the brand prior pulls below `m_type`.
-3. Known-bad drinks: own evidence mean below `m_type`.
+1. Backed drinks: own evidence (`R + n > 0`), posterior mean at least the type mean `m_type`, and own evidence mean `a/(a+b)` at least `min(m_type, 0.5)`. The own-evidence check stops a strong brand from carrying a drink whose only evidence is a hate into a top slot. It is capped at 0.5 because people tend to report what they liked, which can push `m_type` above 0.75, the own mean of a swipe-only drink.
+2. Every other drink except known-bad ones: untried drinks, and drinks with decent own evidence whose posterior sits below `m_type`.
+3. Known-bad drinks: own evidence mean below `min(m_type, 0.5)`, such as a drink with only hates.
 
 The bar is the type mean, not the drink's own brand prior: a favorite should beat an average soda (or seltzer), and a strong brand should not hold its own good drinks to a higher bar. Exact score ties use the week-seeded shuffle.
 Fewer rows come back when the catalog is too small to fill every slot.

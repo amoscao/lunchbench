@@ -321,3 +321,57 @@ describe('brand prior in the order list', () => {
     expect(params.score.brandPriorStrength).toBe(2)
   })
 })
+
+describe('favorites across real brands', () => {
+  let id = 500
+  const make = (brand: string, flavor: string, type: SodaType, overrides: Partial<DrinkStats> = {}): DrinkStats =>
+    ({ ...drink(id++, type, overrides), brand, flavor })
+  const report = (likes: number, hates: number) => ({ likes, hates, reporters: likes + hates })
+
+  /** Reviewer repro: a once-hated flavor of a strong seltzer brand, plus untried bubly. */
+  function seltzerMarket(): DrinkStats[] {
+    id = 500
+    return [
+      make('Waterloo', 'Summer Berry', 'seltzer', report(4, 0)),
+      make('Waterloo', 'Cherry Limeade', 'seltzer', report(3, 0)),
+      make('Waterloo', 'Raspberry Nectarine', 'seltzer', report(0, 1)),
+      make('LaCroix', 'Lime', 'seltzer', report(0, 3)),
+      make('LaCroix', 'Coconut', 'seltzer', report(1, 3)),
+      make('Polar', 'Original', 'seltzer', report(0, 2)),
+      make('Polar', 'Orange Vanilla', 'seltzer', report(0, 2)),
+      make('bubly', 'Grapefruit', 'seltzer'),
+      make('bubly', 'Lime', 'seltzer'),
+      make('Coca-Cola', 'Original', 'soda', report(3, 0)),
+      make('Coca-Cola', 'Zero Sugar', 'soda', report(1, 0)),
+      make('Dr Pepper', 'Original', 'soda', report(2, 1)),
+      make('Sprite', 'Original', 'soda', { right_swipes: 6 }),
+      make('A&W', 'Root Beer', 'soda'),
+    ]
+  }
+
+  const name = (item: OrderItem) => `${item.brand} ${item.flavor}`
+
+  test('the brand prior is in play: the hated Waterloo flavor scores above the seltzer type mean', () => {
+    const scored = rankForWeek(seltzerMarket(), '2026-11-16')
+    const hated = scored.find((d) => d.brand === 'Waterloo' && d.flavor === 'Raspberry Nectarine')!
+    expect(hated.type_mean).toBeLessThan(0.5)
+    expect(hated.score).toBeGreaterThan(hated.type_mean)
+  })
+
+  test('a drink whose own evidence is a hate never takes a top slot over untried drinks', () => {
+    const items = buildOrderList(seltzerMarket(), { seed: '2026-11-16' })
+    const topSeltzers = items.filter((i) => i.slot === 'top' && i.type === 'seltzer').map(name)
+
+    expect(topSeltzers.slice(0, 2)).toEqual(['Waterloo Summer Berry', 'Waterloo Cherry Limeade'])
+    expect(topSeltzers).not.toContain('Waterloo Raspberry Nectarine')
+    expect(topSeltzers.some((n) => n.startsWith('bubly '))).toBe(true)
+  })
+
+  test('swipe-only and liked sodas from several brands are backed favorites', () => {
+    const items = buildOrderList(seltzerMarket(), { seed: '2026-11-16' })
+    const topSodas = items.filter((i) => i.slot === 'top' && i.type === 'soda').map(name)
+    expect(topSodas).toContain('Coca-Cola Original')
+    expect(topSodas).toContain('Sprite Original')
+    expect(topSodas).not.toContain('A&W Root Beer')
+  })
+})

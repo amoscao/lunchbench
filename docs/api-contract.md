@@ -436,11 +436,11 @@ Every active drink, ordered by brand then flavor. Used by the report autocomplet
 ```
 
 ### GET /api/soda/deck
-Up to 20 drinks for this voter's swipe session.
+The voter's whole swipe feed: every active drink this voter has not swiped yet. There are no fixed-size decks. The full catalog is about 124 small rows, so the client loads it once.
 
 **Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
 
-Order: drinks this voter has not swiped come first, least evidence first (`R + L + 5·n`), ties shuffled. Swiped drinks only follow once the unswiped pool is used up, oldest swipe first.
+Order: least evidence first (`R + L + 5·n`). Ties are shuffled with an RNG seeded by the session key, so a voter sees a stable order across reloads. Swiped drinks never come back. Once every drink is swiped, the list is empty.
 
 **Response 200:** `{ "sodas": [Soda] }`
 

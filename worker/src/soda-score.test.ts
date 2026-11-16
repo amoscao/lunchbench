@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   compareDrinks,
   hasData,
+  hasOwnEvidence,
   ownEvidence,
   rankDrinks,
   rankForLeaderboard,
@@ -174,11 +175,11 @@ describe('ranking', () => {
 })
 
 describe('public leaderboard order', () => {
-  test('drinks with their own data rank above untried drinks, even from a loved brand', () => {
+  test('drinks with their own evidence rank above drinks without, even from a loved brand', () => {
     const lovedUntried = drink(1, { brand: 'Loved' })
     const modestLiked = drink(2, { brand: 'Plain', likes: 1, hates: 1, reporters: 2 })
-    const leftOnly = drink(3, { brand: 'Plain', left_swipes: 2 })
-    const drinks = [lovedUntried, modestLiked, leftOnly, ...brandMates('Loved', 3, 5, 0)]
+    const swipedRight = drink(3, { brand: 'Plain', right_swipes: 1 })
+    const drinks = [lovedUntried, modestLiked, swipedRight, ...brandMates('Loved', 3, 5, 0)]
 
     // Posterior alone would put the untried Loved drink above the modest one.
     const byPosterior = rankDrinks(drinks).map((d) => d.id)
@@ -188,6 +189,30 @@ describe('public leaderboard order', () => {
     expect(board.indexOf(2)).toBeLessThan(board.indexOf(1))
     expect(board.indexOf(3)).toBeLessThan(board.indexOf(1))
     expect(board[board.length - 1]).toBe(1)
+  })
+
+  test('a left-swipe-only drink from a loved brand ranks below a drink with modest real evidence', () => {
+    const lovedLeftOnly = drink(1, { brand: 'Loved', left_swipes: 1 })
+    const modestLiked = drink(2, { brand: 'Plain', likes: 1, hates: 1, reporters: 2 })
+    const drinks = [lovedLeftOnly, modestLiked, ...brandMates('Loved', 3, 5, 0)]
+
+    const scored = scoreDrinks(drinks)
+    expect(scored.find((d) => d.id === 1)!.score).toBeGreaterThan(scored.find((d) => d.id === 2)!.score)
+    expect(hasData(lovedLeftOnly)).toBe(true)
+
+    const board = rankForLeaderboard(drinks).map((d) => d.id)
+    expect(board.indexOf(2)).toBeLessThan(board.indexOf(1))
+  })
+
+  test('left-swipe-only and untried drinks share the no-evidence group, in posterior order', () => {
+    const lovedUntried = drink(1, { brand: 'Loved' })
+    const plainLeftOnly = drink(2, { brand: 'Plain', left_swipes: 3 })
+    const plainUntried = drink(3, { brand: 'Plain' })
+    const drinks = [plainLeftOnly, plainUntried, lovedUntried, ...brandMates('Loved', 2, 4, 0)]
+
+    const noEvidence = rankForLeaderboard(drinks).filter((d) => !hasOwnEvidence(d)).map((d) => d.id)
+    // Loved brand prior first; then the two Plain drinks tie on score and appeal breaks it.
+    expect(noEvidence).toEqual([1, 3, 2])
   })
 
   test('the brand prior still orders untried drinks among themselves', () => {

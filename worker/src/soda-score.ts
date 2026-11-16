@@ -141,7 +141,15 @@ export function scoreDrinks<T extends DrinkStats>(drinks: T[]): Array<ScoredDrin
   })
 }
 
-/** True when the drink has any swipe or report. */
+/**
+ * True when the drink has its own evidence: a right swipe or a report (R + n > 0).
+ * Left swipes are not evidence, so a left-swipe-only drink has none.
+ */
+export function hasOwnEvidence(drink: Pick<DrinkStats, 'right_swipes' | 'reporters'>): boolean {
+  return drink.right_swipes + drink.reporters > 0
+}
+
+/** True when the drink has any swipe or report. Drives the "New soda to try" display only. */
 export function hasData(drink: Pick<DrinkStats, 'right_swipes' | 'left_swipes' | 'likes' | 'hates'>): boolean {
   return drink.right_swipes + drink.left_swipes + drink.likes + drink.hates > 0
 }
@@ -168,11 +176,13 @@ export function rankDrinks<T extends DrinkStats>(drinks: T[]): Array<ScoredDrink
 }
 
 /**
- * Public leaderboard order. Drinks with their own data (R + L + n > 0) come first, then drinks with
- * no data at all. Each group keeps the posterior order, so the brand prior still orders untried
- * drinks, but an untried flavor of a loved brand never outranks a drink with real evidence.
+ * Public leaderboard order. Drinks with their own evidence (R + n > 0) come first, then drinks
+ * without (untried, or left swipes only: left swipes are not evidence). Each group keeps the
+ * posterior order, so the brand prior still orders the second group, but an untried flavor of a
+ * loved brand never outranks a drink with real evidence.
  * Product decision (owner's proxy); the weekly order list does not use this.
  */
 export function rankForLeaderboard<T extends DrinkStats>(drinks: T[]): Array<ScoredDrink<T>> {
-  return scoreDrinks(drinks).sort((a, b) => Number(hasData(b)) - Number(hasData(a)) || compareDrinks(a, b))
+  return scoreDrinks(drinks)
+    .sort((a, b) => Number(hasOwnEvidence(b)) - Number(hasOwnEvidence(a)) || compareDrinks(a, b))
 }

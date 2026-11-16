@@ -10,8 +10,7 @@ import {
 
 /**
  * Per-drink counts for every active drink.
- * Swipes: one row per voter per drink already (latest wins on write).
- * Reports: the latest report day per voter per drink.
+ * Swipes and reports both keep one row per voter per drink (latest wins on write).
  */
 export const DRINK_STATS_SQL = `
   SELECT
@@ -34,15 +33,7 @@ export const DRINK_STATS_SQL = `
       SUM(CASE WHEN verdict = 'like' THEN 1 ELSE 0 END) AS likes,
       SUM(CASE WHEN verdict = 'hate' THEN 1 ELSE 0 END) AS hates,
       COUNT(*) AS reporters
-    FROM (
-      SELECT soda_id, verdict,
-        ROW_NUMBER() OVER (
-          PARTITION BY session_key, soda_id
-          ORDER BY report_day DESC, reported_at DESC
-        ) AS rn
-      FROM soda_reports
-    )
-    WHERE rn = 1
+    FROM soda_reports
     GROUP BY soda_id
   ) rp ON rp.soda_id = s.id
   WHERE s.is_active = 1

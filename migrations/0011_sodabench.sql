@@ -22,14 +22,13 @@ CREATE TABLE soda_swipes (
 
 CREATE INDEX idx_soda_swipes_soda ON soda_swipes(soda_id);
 
--- One report per voter per drink per UTC day. Scoring reads the latest day per voter per drink.
+-- Latest report per voter per drink. A newer report replaces the older one.
 CREATE TABLE soda_reports (
   session_key TEXT NOT NULL,
   soda_id INTEGER NOT NULL REFERENCES sodas(id),
-  report_day TEXT NOT NULL,
   verdict TEXT NOT NULL CHECK (verdict IN ('like', 'hate')),
   reported_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (session_key, soda_id, report_day)
+  PRIMARY KEY (session_key, soda_id)
 );
 
 CREATE INDEX idx_soda_reports_soda ON soda_reports(soda_id);

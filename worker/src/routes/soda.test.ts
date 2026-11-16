@@ -83,13 +83,14 @@ describe('soda write routes', () => {
     expect(res.status).toBe(404)
   })
 
-  test('records a report keyed by session, soda, and day', async () => {
+  test('records one report per session and soda, latest wins', async () => {
     const writes: Write[] = []
     const res = await sodaRouter.request('/reports', send('/reports', 'POST', { soda_id: 2, verdict: 'hate' }), fakeEnv(writes))
 
     expect(res.status).toBe(200)
     expect(writes[0].values).toEqual([SESSION, 'hate', 2])
-    expect(writes[0].sql).toContain('ON CONFLICT(session_key, soda_id, report_day) DO UPDATE')
+    expect(writes[0].sql).toContain('INSERT INTO soda_reports (session_key, soda_id, verdict, reported_at)')
+    expect(writes[0].sql).toContain('ON CONFLICT(session_key, soda_id) DO UPDATE')
   })
 
   test('rejects bad report verdicts', async () => {

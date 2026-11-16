@@ -12,7 +12,7 @@ const soda = new Hono<{ Bindings: Bindings }>()
 
 // Writes are keyed by client IP. An office shares one IP, so limits are generous.
 const SWIPE_LIMIT = { limit: 1200, windowSeconds: 3600 }
-const REPORT_LIMIT = { limit: 300, windowSeconds: 3600 }
+const REPORT_LIMIT = { limit: 60, windowSeconds: 3600 }
 
 type SodaRow = Pick<DrinkStats, 'id' | 'brand' | 'flavor' | 'type' | 'image_key'>
 
@@ -100,9 +100,9 @@ soda.post('/reports', async (c) => {
   if (!rl.allowed) return c.json({ error: 'Too many reports', code: 'RATE_LIMITED' }, 429)
 
   const row = await c.env.DB.prepare(
-    `INSERT INTO soda_reports (session_key, soda_id, report_day, verdict, reported_at)
-     SELECT ?, id, date('now'), ?, datetime('now') FROM sodas WHERE id = ? AND is_active = 1
-     ON CONFLICT(session_key, soda_id, report_day) DO UPDATE SET
+    `INSERT INTO soda_reports (session_key, soda_id, verdict, reported_at)
+     SELECT ?, id, ?, datetime('now') FROM sodas WHERE id = ? AND is_active = 1
+     ON CONFLICT(session_key, soda_id) DO UPDATE SET
        verdict = excluded.verdict,
        reported_at = excluded.reported_at
      RETURNING soda_id`

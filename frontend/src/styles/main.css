@@ -2496,3 +2496,6 @@ img {
 }
 
 .barcode-scan-manual { min-height: 44px; }
+
+/* .modal-close sets display; keep the hidden attribute working on the scan button. */
+.soda-report-head .soda-report-scan-open[hidden] { display: none; }

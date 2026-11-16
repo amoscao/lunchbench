@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 import { KNOWN_BARCODE, UNKNOWN_BARCODE, writeBarcodeClip } from './fixtures/barcode-video'
+import { cameraBaseURL } from './fixtures/camera-origin'
 
 const baseURL = process.env.BASE_URL ?? 'http://localhost:5173'
 
@@ -15,14 +16,14 @@ function cameraProject(name: string, clip: string, testMatch: RegExp) {
     testMatch,
     use: {
       ...devices['Pixel 5'],
+      // getUserMedia needs a secure context; see fixtures/global-setup.ts.
+      baseURL: cameraBaseURL(),
       permissions: ['camera'],
       launchOptions: {
         args: [
           '--use-fake-ui-for-media-stream',
           '--use-fake-device-for-media-stream',
           `--use-file-for-fake-video-capture=${clip}`,
-          // E2E serves the SPA from http://frontend:5173. getUserMedia needs a secure context.
-          `--unsafely-treat-insecure-origin-as-secure=${new URL(baseURL).origin}`,
         ],
       },
     },
@@ -31,6 +32,7 @@ function cameraProject(name: string, clip: string, testMatch: RegExp) {
 
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './fixtures/global-setup.ts',
   outputDir: '/tmp/pw-test-results',
   timeout: 30000,
   expect: {

@@ -16,16 +16,18 @@ const SODAS = ['soda']
 /**
  * Nicknames. Key: a normalized query phrase. Value: alternatives; a drink matches the alias when
  * all words of ANY one alternative match it. The words the user typed always count as one more
- * alternative, so an alias only ever widens a search. Longer keys win ("diet coke" over "coke").
+ * alternative, so an alias only ever widens a search. Longer keys win. While the last word is
+ * still being typed, keys that start with it count too ("cok" -> coke).
  * Extend by adding entries; keys and values use normalized text (see normalizeText).
+ * Keys that map to themselves ("root beer", "olipop", "cherry") are kept on purpose: they record
+ * the product owner's alias list, even though plain matching already finds them.
  */
 export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'coke': ['coca cola'],
   'coca cola': ['coca cola'],
   'cocacola': ['coca cola'],
-  'diet coke': ['coca cola diet'],
-  'coke zero': ['coca cola zero'],
-  'pepsi max': ['pepsi zero'],
+  // "diet coke" and "coke zero" need no keys: coke + diet/zero combine in either word order.
+  'max': ['zero'],
   'dew': ['mountain dew'],
   'mtn': ['mountain'],
   'mtn dew': ['mountain dew'],
@@ -62,11 +64,14 @@ export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'orange': ['orange', 'tangerine', 'mandarin'],
   'cherry': ['cherry'],
   'lemon lime': ['lemon lime', 'sprite original', 'sprite zero', '7up original'],
+  'creme': ['cream'],
 }
 
 export const MAX_RESULTS = 8
 const STOPWORDS = new Set(['and'])
 const MAX_ALIAS_WORDS = 3
+/** Flavors that mark a brand's flagship. They don't count toward name length, so "coke" lists Original first. */
+const FLAGSHIP_WORDS = new Set(['original', 'pure'])
 
 /** Lowercase, no accents, no apostrophes or periods, "&" and other punctuation become spaces. */
 export function normalizeText(text: string): string {
@@ -108,50 +113,93 @@ export function allowedTypos(length: number): number {
   return 0
 }
 
-const EXACT = 3
-const PREFIX = 2
+/** Match kinds, best first. */
+const EXACT = 4
+const PREFIX = 3
+const INFIX = 2
 const TYPO = 1
-const NONE = 0
+/** Typo against the start of a longer word ("lemonaid" vs "lemonl…") ranks after a whole-word typo. */
+const PARTIAL_TYPO_PENALTY = 0.5
 
-type Indexed<T> = { soda: T; order: number; words: string[]; wordCount: number }
+type WordMatch = { quality: number; distance: number }
+
+type Indexed<T> = {
+  soda: T
+  order: number
+  /** Brand and flavor words plus their compact forms ("lacroix", "drpepper", "aw"). */
+  words: string[]
+  /** Compact forms only serve spacing variants, so they never match inside a word. */
+  compact: boolean[]
+  typeWord: string
+  wordCount: number
+}
 
 function indexSoda<T extends SearchableSoda>(soda: T, order: number): Indexed<T> {
   const brand = words(soda.brand)
   const flavor = words(soda.flavor)
-  const all = new Set([
-    ...brand,
-    ...flavor,
-    brand.join(''),
-    flavor.join(''),
-    soda.type,
-  ])
-  return { soda, order, words: [...all].filter(Boolean), wordCount: brand.length + flavor.length }
+  const plain = [...new Set([...brand, ...flavor])]
+  const compacts = [brand.join(''), flavor.join('')].filter((word) => word && !plain.includes(word))
+  return {
+    soda,
+    order,
+    words: [...plain, ...new Set(compacts)],
+    compact: [...plain.map(() => false), ...[...new Set(compacts)].map(() => true)],
+    typeWord: soda.type,
+    wordCount: brand.length + flavor.filter((word) => !FLAGSHIP_WORDS.has(word)).length,
+  }
 }
 
-function matchWord(token: string, candidates: string[], allowTypo: boolean): number {
-  let best = NONE
-  const typos = allowTypo ? allowedTypos(token.length) : 0
-  for (const word of candidates) {
-    if (word === token) return EXACT
-    if (word.startsWith(token)) {
-      best = Math.max(best, PREFIX)
-      continue
-    }
-    if (best >= TYPO || typos === 0) continue
-    // A typo against the whole word, or against its start while the user is still typing.
-    if (Math.abs(word.length - token.length) <= typos && damerauDistance(token, word) <= typos) best = TYPO
-    else if (word.length > token.length && damerauDistance(token, word.slice(0, token.length)) <= typos) best = TYPO
+/**
+ * How well one query token matches one catalog word, or null.
+ * - exact, then prefix (while typing), then inside a word for tokens of 4+ letters ("berry");
+ * - typos only when `allowTypo` (the catalog has no word containing the token): a whole-word typo,
+ *   or a typo against the start of a longer word for tokens of 5+ letters with the same first letter.
+ */
+function matchWord(token: string, word: string, allowTypo: boolean, compact = false): WordMatch | null {
+  if (word === token) return { quality: EXACT, distance: 0 }
+  if (word.startsWith(token)) return { quality: PREFIX, distance: 0 }
+  if (!compact && token.length >= 4 && word.includes(token)) return { quality: INFIX, distance: 0 }
+  if (!allowTypo) return null
+  const typos = allowedTypos(token.length)
+  if (typos === 0) return null
+  if (Math.abs(word.length - token.length) <= typos) {
+    const distance = damerauDistance(token, word)
+    if (distance <= typos) return { quality: TYPO, distance }
   }
-  return best
+  if (token.length >= 5 && word.length > token.length && word[0] === token[0]) {
+    const distance = damerauDistance(token, word.slice(0, token.length))
+    if (distance <= typos) return { quality: TYPO, distance: distance + PARTIAL_TYPO_PENALTY }
+  }
+  return null
+}
+
+type Alternative = {
+  tokens: string[]
+  /** Matched as the user typed it (not via an alias). */
+  literal: boolean
+  /** Best quality this alternative may score: alias keys matched by prefix cap at PREFIX. */
+  cap: number
 }
 
 type Term = {
-  /** What the user typed for this term. */
   literal: string[]
-  /** The literal words first, then alias expansions. */
-  alternatives: string[][]
+  alternatives: Alternative[]
   /** No alias: may merge with a neighbor ("la croix" -> "lacroix"). */
   mergeable: boolean
+}
+
+function aliasAlternatives(expansions: readonly string[], cap: number): Alternative[] {
+  return expansions.map((expansion) => ({ tokens: expansion.split(' '), literal: false, cap }))
+}
+
+/** Alias keys whose words match `phrase`, with the last word allowed to be a prefix. */
+function prefixAliasKeys(phrase: string[]): string[] {
+  return Object.keys(SODA_ALIASES).filter((key) => {
+    const keyWords = key.split(' ')
+    if (keyWords.length !== phrase.length) return false
+    const last = phrase.length - 1
+    return keyWords.every((word, i) => (i === last ? word.startsWith(phrase[i]) && word !== phrase[i] : word === phrase[i]))
+  })
 }
 
 export function parseQuery(query: string): Term[] {
@@ -162,11 +210,19 @@ export function parseQuery(query: string): Term[] {
     let matched = false
     for (let length = Math.min(MAX_ALIAS_WORDS, tokens.length - i); length >= 1; length--) {
       const phrase = tokens.slice(i, i + length)
-      const expansions = SODA_ALIASES[phrase.join(' ')]
-      if (!expansions) continue
+      const exact = SODA_ALIASES[phrase.join(' ')]
+      const endsQuery = i + length === tokens.length
+      // The user may still be typing the last word: "cok", "doctor p", "fizzy w".
+      const partialKeys = endsQuery ? prefixAliasKeys(phrase) : []
+      if (!exact && partialKeys.length === 0) continue
+      // The typed words always stay an alternative ("cok" may also be a brand prefix).
       terms.push({
         literal: phrase,
-        alternatives: [phrase, ...expansions.map((expansion) => expansion.split(' '))],
+        alternatives: [
+          { tokens: phrase, literal: true, cap: EXACT },
+          ...(exact ? aliasAlternatives(exact, EXACT) : []),
+          ...partialKeys.flatMap((key) => aliasAlternatives(SODA_ALIASES[key], PREFIX)),
+        ],
         mergeable: false,
       })
       i += length
@@ -174,7 +230,7 @@ export function parseQuery(query: string): Term[] {
       break
     }
     if (!matched) {
-      terms.push({ literal: [tokens[i]], alternatives: [[tokens[i]]], mergeable: true })
+      terms.push({ literal: [tokens[i]], alternatives: [{ tokens: [tokens[i]], literal: true, cap: EXACT }], mergeable: true })
       i += 1
     }
   }
@@ -182,86 +238,146 @@ export function parseQuery(query: string): Term[] {
 }
 
 /**
- * Typos are only forgiven for words the catalog does not know. A real word such as "diet" or
- * "cola" must match as typed, so it never drags in look-alikes ("dirty", "coca").
+ * Query variants: adjacent plain words may merge into one ("la croix" -> "lacroix",
+ * "a w" -> "aw"). Each variant is scored and the best one counts.
  */
-type TypoPolicy = (token: string) => boolean
-
-function matchAlternative(alternative: string[], candidates: string[], allowTypo: TypoPolicy): number {
-  let quality = EXACT
-  for (const token of alternative) {
-    quality = Math.min(quality, matchWord(token, candidates, allowTypo(token)))
-    if (quality === NONE) return NONE
+function variants(terms: Term[]): Term[][] {
+  const out: Term[][] = [terms]
+  for (let i = 0; i < terms.length; i++) {
+    for (let span = 2; span <= 3 && i + span <= terms.length; span++) {
+      const group = terms.slice(i, i + span)
+      if (!group.every((term) => term.mergeable)) continue
+      const merged = group.map((term) => term.literal[0]).join('')
+      const term: Term = { literal: [merged], alternatives: [{ tokens: [merged], literal: true, cap: EXACT }], mergeable: false }
+      out.push([...terms.slice(0, i), term, ...terms.slice(i + span)])
+    }
   }
-  return quality
+  return out
 }
 
-type Match = { typos: number; literalHits: number; quality: number }
+type Score = {
+  typeOnly: number
+  typos: number
+  distance: number
+  literalHits: number
+  quality: number
+}
 
-const NO_TYPOS: TypoPolicy = () => false
+function better(a: Score, b: Score): boolean {
+  return (a.typeOnly - b.typeOnly || a.typos - b.typos || a.distance - b.distance
+    || b.literalHits - a.literalHits || b.quality - a.quality) < 0
+}
 
-function matchSoda(terms: Term[], candidates: string[], allowTypo: TypoPolicy): Match | null {
-  let typos = 0
-  let literalHits = 0
-  let quality = 0
-  let i = 0
-  while (i < terms.length) {
-    // "la croix", "a and w": two or three typed words that together exact- or prefix-match one word.
-    let merged = 0
-    for (let span = 3; span >= 2 && merged === 0; span--) {
-      const group = terms.slice(i, i + span)
-      if (group.length < span || !group.every((term) => term.mergeable)) continue
-      const q = matchWord(group.map((term) => term.literal[0]).join(''), candidates, false)
-      if (q >= PREFIX) {
-        merged = span
-        literalHits += span
-        quality += q * span
-      }
-    }
-    if (merged > 0) {
-      i += merged
-      continue
-    }
+type Slot = { tokens: string[]; literal: boolean; cap: number; termIndex: number; typoFree: boolean }
 
-    const term = terms[i]
-    // The typed words may carry typos; alias expansions are canonical and must match as written.
-    const best = Math.max(...term.alternatives.map((alternative, index) =>
-      matchAlternative(alternative, candidates, index === 0 ? allowTypo : NO_TYPOS)
-    ))
-    if (best === NONE) return null
-    if (best === TYPO) typos += 1
-    if (matchAlternative(term.literal, candidates, NO_TYPOS) >= PREFIX) literalHits += 1
-    quality += best
-    i += 1
+/**
+ * Best way to give every query word its OWN catalog word (one catalog word cannot satisfy two
+ * query words: "coka cola" must not match "Zevia Cola" twice). The type word ("soda"/"seltzer")
+ * is a last resort that any number of words may share, and it ranks below brand/flavor matches.
+ */
+function scoreTerms(terms: Term[], entry: Indexed<SearchableSoda>, allowTypo: (token: string) => boolean): Score | null {
+  let best: Score | null = null
+  const used = new Set<number>()
+  const literalHit = new Array<boolean>(terms.length).fill(false)
+
+  const tokenOptions = (token: string, cap: number): Array<{ word: number; match: WordMatch }> => {
+    const typo = allowTypo(token)
+    const options: Array<{ word: number; match: WordMatch }> = []
+    entry.words.forEach((word, index) => {
+      const match = matchWord(token, word, typo, entry.compact[index])
+      if (match) options.push({ word: index, match: { ...match, quality: Math.min(match.quality, cap) } })
+    })
+    return options
   }
-  return { typos, literalHits, quality }
+
+  const searchTerm = (termIndex: number, acc: Score): void => {
+    if (termIndex === terms.length) {
+      const final = { ...acc, literalHits: literalHit.filter(Boolean).length }
+      if (!best || better(final, best)) best = final
+      return
+    }
+    for (const alternative of terms[termIndex].alternatives) {
+      searchTokens({ tokens: alternative.tokens, literal: alternative.literal, cap: alternative.cap, termIndex, typoFree: true }, 0, acc)
+    }
+  }
+
+  const searchTokens = (slot: Slot, tokenIndex: number, acc: Score): void => {
+    if (tokenIndex === slot.tokens.length) {
+      const before = literalHit[slot.termIndex]
+      // Counts as "matched as typed" only through the typed words themselves, with no typo.
+      if (slot.literal && slot.typoFree) literalHit[slot.termIndex] = true
+      searchTerm(slot.termIndex + 1, acc)
+      literalHit[slot.termIndex] = before
+      return
+    }
+    const token = slot.tokens[tokenIndex]
+    const options = tokenOptions(token, slot.cap)
+    for (const option of options) {
+      if (used.has(option.word)) continue
+      used.add(option.word)
+      const next = option.match.quality === TYPO ? { ...slot, typoFree: false } : slot
+      searchTokens(next, tokenIndex + 1, {
+        ...acc,
+        typos: acc.typos + (option.match.quality === TYPO ? 1 : 0),
+        distance: acc.distance + option.match.distance,
+        quality: acc.quality + option.match.quality,
+      })
+      used.delete(option.word)
+    }
+    // The type word: "s" or "selt" can still match, but ranks below any brand/flavor match.
+    if (entry.typeWord.startsWith(token)) {
+      searchTokens(slot, tokenIndex + 1, { ...acc, typeOnly: acc.typeOnly + 1 })
+    }
+  }
+
+  searchTerm(0, { typeOnly: 0, typos: 0, distance: 0, literalHits: 0, quality: 0 })
+  return best
 }
 
 /**
  * Every typed word (or alias) must match the drink's brand, flavor, combined name or type.
- * Ranking: fewer typo matches first (exact, prefix and alias hits beat typos), then more words
- * matched as typed, then higher match quality, then shorter names, then catalog order.
+ * Ranking, in order:
+ * 1. fewer words matched only by the type word ("soda"/"seltzer");
+ * 2. fewer typo matches (exact, prefix, inside-a-word and alias hits beat typos);
+ * 3. smaller total edit distance;
+ * 4. more words matched as typed (not via an alias);
+ * 5. better match quality (exact > prefix > inside a word);
+ * 6. shorter names, not counting "Original"/"Pure", so a brand query lists its flagship first;
+ * 7. catalog order.
  */
 export function searchSodas<T extends SearchableSoda>(query: string, sodas: T[], limit = MAX_RESULTS): T[] {
   const terms = parseQuery(query)
   if (terms.length === 0) return []
   const indexed = sodas.map((soda, order) => indexSoda(soda, order))
-  const vocabulary = [...new Set(indexed.flatMap((entry) => entry.words))]
+  const vocabulary = [...new Set(indexed.flatMap((entry) => entry.words.filter((_, i) => !entry.compact[i])))]
   const known = new Map<string, boolean>()
-  const allowTypo: TypoPolicy = (token) => {
-    if (!known.has(token)) known.set(token, vocabulary.some((word) => word.startsWith(token)))
+  // Typos are only forgiven for words no catalog word contains: "diet" and "cola" must match
+  // as typed, so they never drag in look-alikes ("dirty", "coca").
+  const allowTypo = (token: string): boolean => {
+    if (!known.has(token)) known.set(token, vocabulary.some((word) => word.includes(token)))
     return !known.get(token)
   }
+  const queryVariants = variants(terms)
+
   return indexed
-    .map((entry) => ({ indexed: entry, match: matchSoda(terms, entry.words, allowTypo) }))
-    .filter((entry): entry is { indexed: Indexed<T>; match: Match } => entry.match !== null)
+    .map((entry) => {
+      let best: Score | null = null
+      for (const variant of queryVariants) {
+        const score = scoreTerms(variant, entry as Indexed<SearchableSoda>, allowTypo)
+        if (score && (!best || better(score, best))) best = score
+      }
+      return { entry, score: best }
+    })
+    .filter((result): result is { entry: Indexed<T>; score: Score } => result.score !== null)
     .sort((a, b) =>
-      a.match.typos - b.match.typos
-      || b.match.literalHits - a.match.literalHits
-      || b.match.quality - a.match.quality
-      || a.indexed.wordCount - b.indexed.wordCount
-      || a.indexed.order - b.indexed.order
+      a.score.typeOnly - b.score.typeOnly
+      || a.score.typos - b.score.typos
+      || a.score.distance - b.score.distance
+      || b.score.literalHits - a.score.literalHits
+      || b.score.quality - a.score.quality
+      || a.entry.wordCount - b.entry.wordCount
+      || a.entry.order - b.entry.order
     )
     .slice(0, limit)
-    .map((entry) => entry.indexed.soda)
+    .map((result) => result.entry.soda)
 }

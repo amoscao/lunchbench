@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import app from './index'
+import { app } from './index'
 import type { Bindings } from './types'
 
 const env: Bindings = {
@@ -104,5 +104,21 @@ describe('CORS', () => {
 
     expect(res.status).toBe(403)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+  })
+
+  test('allows PUT preflight for soda swipes from the frontend origin', async () => {
+    const res = await preflight('/api/soda/swipes', 'https://lunchbench.pages.dev', 'PUT')
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://lunchbench.pages.dev')
+    expect(res.headers.get('Access-Control-Allow-Methods')).toContain('PUT')
+  })
+
+  test('does not allow arbitrary origins on soda writes', async () => {
+    const swipe = await preflight('/api/soda/swipes', 'https://evil.example', 'PUT')
+    const report = await preflight('/api/soda/reports', 'https://evil.example', 'POST')
+
+    expect(swipe.status).toBe(403)
+    expect(report.status).toBe(403)
   })
 })

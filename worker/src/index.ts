@@ -8,12 +8,14 @@ import { voteRouter } from './routes/vote'
 import { imagesRouter } from './routes/images'
 import { handleImageUpload } from './routes/images'
 import { adminRouter } from './routes/admin'
+import { sodaRouter } from './routes/soda'
+import { writeWeeklyOrder } from './soda-data'
 import { allowedCorsOrigin, restrictBrowserOrigins, securityHeaders } from './middleware'
 
-const app = new Hono<{ Bindings: Bindings }>()
+export const app = new Hono<{ Bindings: Bindings }>()
 const corsOptions = {
   origin: allowedCorsOrigin,
-  allowMethods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Authorization', 'Content-Type', 'X-Lunchbench-Session'],
   maxAge: 600,
 }
@@ -33,6 +35,7 @@ app.route('/api/matchup', matchupRouter)
 app.route('/api/vote', voteRouter)
 app.route('/api/images', imagesRouter)
 app.route('/api/admin', adminRouter)
+app.route('/api/soda', sodaRouter)
 
 // Image upload route (needs raw request access)
 app.post('/api/lunches/:id/image', async (c) => {
@@ -41,4 +44,16 @@ app.post('/api/lunches/:id/image', async (c) => {
   return handleImageUpload(c.req.raw, id, c.env.DB, c.env.IMAGES)
 })
 
-export default app
+// Weekly cron (wrangler.toml [triggers]). INSERT OR IGNORE, so a repeat firing keeps the frozen snapshot.
+export async function scheduled(
+  controller: ScheduledController,
+  env: Bindings,
+  ctx: ExecutionContext
+): Promise<void> {
+  ctx.waitUntil(writeWeeklyOrder(env.DB, new Date(controller.scheduledTime), 'keep'))
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled,
+}

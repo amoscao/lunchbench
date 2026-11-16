@@ -220,7 +220,23 @@ export async function uploadImage(lunchId: number, file: File, token: string): P
   }
 }
 
-export async function verifyAdminToken(password: string): Promise<string> {
+export type SessionRole = 'admin' | 'lunch' | 'purchaser'
+
+/**
+ * Logs in and returns the token only if the session role is one of `allowed`.
+ * Any other role is revoked at once and reported as an invalid password,
+ * so a purchaser password never works as a lunch login and vice versa.
+ */
+export async function verifySessionForRoles(password: string, allowed: SessionRole[]): Promise<string> {
+  const { token, role } = await verifySession(password)
+  if (!allowed.includes(role)) {
+    await revokeSession(token).catch(() => undefined)
+    throw new Error('Invalid password')
+  }
+  return token
+}
+
+export async function verifySession(password: string): Promise<{ token: string; role: SessionRole }> {
   const res = await fetch(`${BASE}/admin/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -230,8 +246,7 @@ export async function verifyAdminToken(password: string): Promise<string> {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as any).error ?? `Admin verification failed: ${res.status}`)
   }
-  const body = await res.json() as { token: string }
-  return body.token
+  return await res.json() as { token: string; role: SessionRole }
 }
 
 export type SodaType = 'soda' | 'seltzer'

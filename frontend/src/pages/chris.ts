@@ -1,4 +1,4 @@
-import { ApiError, getSodaOrder, revokeSession, verifyAdminToken, type SodaOrder } from '../api'
+import { ApiError, getSodaOrder, revokeSession, verifySessionForRoles, type SodaOrder } from '../api'
 import {
   clearStoredSessionToken,
   getStoredSessionToken,
@@ -42,7 +42,7 @@ export function renderChris(container: HTMLElement): () => void {
       button.disabled = true
       error.hidden = true
       try {
-        const token = await verifyAdminToken(password)
+        const token = await verifySessionForRoles(password, ['purchaser', 'admin'])
         if (destroyed) return
         setStoredSessionToken(token, PURCHASER_SESSION_KEY)
         await loadOrder(token, true)
@@ -131,8 +131,8 @@ export function renderChris(container: HTMLElement): () => void {
       if (destroyed) return
       if (e instanceof ApiError && e.status === 401) {
         clearStoredSessionToken(PURCHASER_SESSION_KEY)
-        // A lunch password signs in but is not a purchaser; an expired session just asks again.
-        renderLogin(afterLogin ? 'Not authorized' : undefined)
+        // An expired or revoked session just asks again.
+        renderLogin(afterLogin ? 'Invalid password' : undefined)
         return
       }
       content.innerHTML = `

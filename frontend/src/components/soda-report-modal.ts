@@ -117,12 +117,35 @@ export function openSodaReportModal(catalog: Soda[], onClose: () => void): Repor
     }
   }
 
-  function onKeydown(event: KeyboardEvent): void {
+  function focusable(): HTMLElement[] {
+    return [...modal.querySelectorAll<HTMLElement>('input, button:not([disabled]):not([tabindex="-1"])')]
+  }
+
+  // Document-level while open: Escape closes from anywhere, Tab cycles inside the dialog.
+  function onDocumentKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault()
+      event.stopPropagation()
       close()
       return
     }
+    if (event.key !== 'Tab') return
+    const items = focusable()
+    if (items.length === 0) return
+    const first = items[0]
+    const last = items[items.length - 1]
+    const active = document.activeElement
+    const inside = active instanceof HTMLElement && modal.contains(active)
+    if (event.shiftKey && (!inside || active === first)) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && (!inside || active === last)) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
+  function onKeydown(event: KeyboardEvent): void {
     if (event.target !== input) return
     if (event.key === 'ArrowDown') {
       event.preventDefault()
@@ -139,6 +162,7 @@ export function openSodaReportModal(catalog: Soda[], onClose: () => void): Repor
   function close(): void {
     if (closed) return
     closed = true
+    document.removeEventListener('keydown', onDocumentKeydown, true)
     backdrop.remove()
     document.body.style.overflow = ''
     opener?.focus()
@@ -163,6 +187,7 @@ export function openSodaReportModal(catalog: Soda[], onClose: () => void): Repor
     if (event.target === backdrop) close()
   })
   modal.addEventListener('keydown', onKeydown)
+  document.addEventListener('keydown', onDocumentKeydown, true)
 
   document.body.appendChild(backdrop)
   document.body.style.overflow = 'hidden'

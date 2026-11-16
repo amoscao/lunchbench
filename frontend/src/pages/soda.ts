@@ -27,6 +27,7 @@ export function renderSoda(container: HTMLElement): () => void {
       <div class="soda-progress-track"><div class="soda-progress-fill"></div></div>
       <span class="soda-progress-label"></span>
     </div>
+    <div class="alert alert-error soda-alert" role="alert" hidden>Swipe not saved</div>
     <div class="soda-stage">
       <div class="soda-stage-back soda-stage-back-1" aria-hidden="true"></div>
       <div class="soda-stage-back soda-stage-back-2" aria-hidden="true"></div>
@@ -45,6 +46,7 @@ export function renderSoda(container: HTMLElement): () => void {
   const leftBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-left')!
   const rightBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-right')!
   const reportBtn = content.querySelector<HTMLButtonElement>('.soda-report-open')!
+  const alertEl = content.querySelector<HTMLElement>('.soda-alert')!
 
   let deck: Soda[] = []
   let index = 0
@@ -177,12 +179,26 @@ export function renderSoda(container: HTMLElement): () => void {
     }
   }
 
+  // Retries once. A final failure shows the error alert; the next saved swipe clears it.
+  async function recordSwipe(sodaId: number, direction: Direction): Promise<void> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await submitSodaSwipe(sodaId, direction)
+        if (!destroyed) alertEl.hidden = true
+        return
+      } catch {
+        // Retry once below.
+      }
+    }
+    if (!destroyed) alertEl.hidden = false
+  }
+
   function swipe(direction: Direction): void {
     const card = currentCard
     if (busy || !card || index >= deck.length) return
     busy = true
     setButtons()
-    void submitSodaSwipe(deck[index].id, direction).catch(() => undefined)
+    void recordSwipe(deck[index].id, direction)
 
     const advance = (): void => {
       if (destroyed) return

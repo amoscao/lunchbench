@@ -13,10 +13,9 @@ export const SWIPE = {
   flickVelocity: 0.5,
   /** Release velocity is measured over the last this-many ms of moves. */
   velocityWindowMs: 100,
-  minFlingMs: 200,
-  maxFlingMs: 400,
-  /** Fling duration is this many ms·px/ms divided by the release speed: faster flick, shorter exit. */
-  flingTimeScale: 600,
+  /** Fling duration bounds. Inside them the card exits at exactly the release speed. */
+  minFlingMs: 100,
+  maxFlingMs: 600,
   /** Slowest exit speed, px/ms, so a barely-past-threshold release still leaves briskly. */
   minFlingSpeed: 1.2,
   /** Cap on vertical drift during a fling, px. */
@@ -93,7 +92,7 @@ export type FlingInput = {
   rotation: number
   vx: number
   vy: number
-  /** Card box at rest, in viewport px. */
+  /** Left edge of the card at rest (no translate, no rotation), in viewport px. */
   cardLeft: number
   cardWidth: number
   cardHeight: number
@@ -103,29 +102,32 @@ export type FlingInput = {
 export type FlingPlan = { toX: number; toY: number; toRotation: number; durationMs: number }
 
 /**
- * Fling target and duration. The card keeps its momentum: it travels until its rotated box is
- * fully off-screen, keeps its vertical drift, and keeps spinning. Duration comes from the release
- * speed (faster flick, shorter exit), clamped to 200-400 ms, on a decelerating ease-out curve.
+ * Fling target and duration. The card keeps its momentum: it moves at constant velocity, starting
+ * at the release speed, until its rotated box is fully off-screen (it is gone before a decelerating
+ * tail would show). It keeps its vertical velocity and keeps spinning. Duration = distance / speed,
+ * clamped to 100-600 ms, so faster flicks exit sooner and a slow release still leaves briskly.
  */
 export function planFling(input: FlingInput): FlingPlan {
   const sign = input.direction === 'right' ? 1 : -1
   const reach = Math.hypot(input.cardWidth, input.cardHeight) / 2
   const targetCenterX = sign > 0 ? input.viewportWidth + reach : -reach
+  const toX = targetCenterX - (input.cardLeft + input.cardWidth / 2)
+  const distance = Math.abs(toX - input.dx)
   const speed = Math.max(Math.abs(input.vx), SWIPE.minFlingSpeed)
-  const durationMs = clamp(SWIPE.flingTimeScale / speed, SWIPE.minFlingMs, SWIPE.maxFlingMs)
-  const drift = clamp((input.vy * durationMs) / 3, -SWIPE.maxFlingDriftY, SWIPE.maxFlingDriftY)
+  const durationMs = clamp(distance / speed, SWIPE.minFlingMs, SWIPE.maxFlingMs)
+  const drift = clamp(input.vy * durationMs, -SWIPE.maxFlingDriftY, SWIPE.maxFlingDriftY)
   const spinSign = input.rotation === 0 ? sign : Math.sign(input.rotation)
   return {
-    toX: targetCenterX - (input.cardLeft + input.cardWidth / 2),
+    toX,
     toY: input.dy + drift,
     toRotation: input.rotation + spinSign * SWIPE.flingSpin,
     durationMs,
   }
 }
 
-export function easeOutCubic(t: number): number {
-  const u = 1 - clamp(t, 0, 1)
-  return 1 - u * u * u
+/** Start x-speed of a planned fling, px/ms (the motion is constant-velocity). */
+export function flingStartSpeed(plan: FlingPlan, fromX: number): number {
+  return Math.abs(plan.toX - fromX) / plan.durationMs
 }
 
 export type SpringState = { position: number; velocity: number }

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   commitDirection,
   dragProgress,
-  easeOutCubic,
+  flingStartSpeed,
   planFling,
   rotationFor,
   springSettled,
@@ -76,16 +76,38 @@ describe('fling', () => {
     const endCenter = base.cardLeft + WIDTH / 2 + plan.toX
     expect(endCenter - reach).toBeGreaterThanOrEqual(base.viewportWidth)
 
-    const left = planFling({ ...base, dx: -150, vx: -1, direction: 'left' })
+    const left = planFling({ ...base, dx: -150, rotation: -10, vx: -1, direction: 'left' })
     expect(base.cardLeft + WIDTH / 2 + left.toX + reach).toBeLessThanOrEqual(0)
   })
 
-  test('faster flicks exit sooner, within 200-400 ms', () => {
+  test('faster flicks exit sooner, within 100-600 ms', () => {
     const slow = planFling({ ...base, vx: 1.3, direction: 'right' })
     const fast = planFling({ ...base, vx: 4, direction: 'right' })
     expect(fast.durationMs).toBeLessThan(slow.durationMs)
     expect(fast.durationMs).toBeGreaterThanOrEqual(SWIPE.minFlingMs)
     expect(slow.durationMs).toBeLessThanOrEqual(SWIPE.maxFlingMs)
+  })
+
+  test.each([
+    ['desktop', 1280, 450],
+    ['phone', 390, 5],
+  ])('keeps the hand\'s momentum on %s: start speed within 20%% of the release speed', (_, viewportWidth, cardLeft) => {
+    const width = Math.min(WIDTH, viewportWidth - 10)
+    for (const vx of [1.5, 2, 3, 4]) {
+      for (const direction of ['right', 'left'] as const) {
+        const sign = direction === 'right' ? 1 : -1
+        const input = { ...base, dx: sign * 120, rotation: sign * 8, vx: sign * vx, cardLeft, cardWidth: width, viewportWidth, direction }
+        const plan = planFling(input)
+        const speed = flingStartSpeed(plan, input.dx)
+        expect(speed / vx, `${direction} ${vx}`).toBeGreaterThan(0.8)
+        expect(speed / vx, `${direction} ${vx}`).toBeLessThan(1.2)
+      }
+    }
+  })
+
+  test('a slow release still leaves within the max duration', () => {
+    const plan = planFling({ ...base, vx: 0.2, direction: 'right' })
+    expect(plan.durationMs).toBeLessThanOrEqual(SWIPE.maxFlingMs)
   })
 
   test('keeps vertical drift and keeps spinning', () => {
@@ -100,11 +122,6 @@ describe('fling', () => {
     expect(plan.toRotation).toBeGreaterThan(0)
   })
 
-  test('the curve decelerates', () => {
-    expect(easeOutCubic(0)).toBe(0)
-    expect(easeOutCubic(1)).toBe(1)
-    expect(easeOutCubic(0.5)).toBeGreaterThan(0.5)
-  })
 })
 
 describe('snap-back spring', () => {

@@ -13,6 +13,7 @@ function renderSodaCard(soda: Soda, image: HTMLImageElement | null): HTMLElement
   const card = document.createElement('article')
   card.className = 'soda-card'
   card.dataset.sodaId = String(soda.id)
+  card.setAttribute('aria-label', soda.name)
   card.innerHTML = `
     <div class="soda-stamp soda-stamp-like" aria-hidden="true">LIKE</div>
     <div class="soda-stamp soda-stamp-nope" aria-hidden="true">NOPE</div>
@@ -41,6 +42,7 @@ export function renderSoda(container: HTMLElement): () => void {
       <button type="button" class="btn btn-primary soda-report-open">${PLUS}Report a soda</button>
     </div>
     <div class="alert alert-error soda-alert" role="alert" hidden>Swipe not saved</div>
+    <div class="visually-hidden soda-announce" aria-live="polite" aria-atomic="true"></div>
     <div class="soda-stage">
       <div class="soda-feed"></div>
       <div class="soda-card-skeleton skeleton"></div>
@@ -60,6 +62,7 @@ export function renderSoda(container: HTMLElement): () => void {
   const rightBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-right')!
   const reportBtn = content.querySelector<HTMLButtonElement>('.soda-report-open')!
   const alertEl = content.querySelector<HTMLElement>('.soda-alert')!
+  const announcer = content.querySelector<HTMLElement>('.soda-announce')!
 
   let destroyed = false
   let catalog: Soda[] = []
@@ -71,11 +74,12 @@ export function renderSoda(container: HTMLElement): () => void {
     rightBtn.disabled = !enabled
   }
 
-  function showState(title: string, icon?: string, retry?: () => void): void {
+  function showState(title: string, icon?: string, retry?: () => void): HTMLElement {
     stage.querySelector('.soda-end')?.remove()
     const state = document.createElement('div')
     state.className = 'soda-end'
-    state.innerHTML = `${icon ? `<div class="state-icon">${icon}</div>` : ''}<div class="soda-end-title">${escapeHtml(title)}</div>`
+    state.setAttribute('role', 'status')
+    state.innerHTML = `${icon ? `<div class="state-icon">${icon}</div>` : ''}<div class="soda-end-title" tabindex="-1">${escapeHtml(title)}</div>`
     if (retry) {
       const btn = document.createElement('button')
       btn.type = 'button'
@@ -85,6 +89,24 @@ export function renderSoda(container: HTMLElement): () => void {
       state.appendChild(btn)
     }
     stage.appendChild(state)
+    return state
+  }
+
+  /** End of the feed. An empty catalog says so instead of claiming everything is rated. */
+  async function showEnd(): Promise<void> {
+    const focusWasHere = content.contains(document.activeElement) || document.activeElement === document.body
+    setButtons(false)
+    let catalogEmpty = false
+    try {
+      catalogEmpty = (await loadCatalog()).length === 0
+    } catch {
+      // Unknown: assume the voter rated everything.
+    }
+    if (destroyed) return
+    announcer.textContent = ''
+    const state = showState(catalogEmpty ? 'No drinks yet' : "You've rated everything")
+    // The swipe buttons just got disabled; keep focus on the page instead of letting it fall to body.
+    if (focusWasHere) state.querySelector<HTMLElement>('.soda-end-title')?.focus()
   }
 
   // Retries once. A final failure shows the error alert; the next saved swipe clears it.
@@ -106,9 +128,9 @@ export function renderSoda(container: HTMLElement): () => void {
     imageUrl: (soda) => soda.image_url,
     renderCard: renderSodaCard,
     onSwipe: (soda, direction) => void recordSwipe(soda.id, direction),
-    onEmpty: () => {
-      setButtons(false)
-      showState("You've rated everything")
+    onEmpty: () => void showEnd(),
+    onTop: (soda) => {
+      announcer.textContent = soda.name
     },
   })
 
@@ -143,6 +165,11 @@ export function renderSoda(container: HTMLElement): () => void {
   // Scoped to this page: added on render, removed by the router cleanup.
   function onKeydown(event: KeyboardEvent): void {
     if (modal || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+    // Holding an arrow key auto-repeats; one press is one vote.
+    if (event.repeat && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+      event.preventDefault()
+      return
+    }
     const active = document.activeElement
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
     if (event.key === 'ArrowRight') {

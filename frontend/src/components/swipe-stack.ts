@@ -1,7 +1,6 @@
 import {
   commitDirection,
   dragProgress,
-  easeOutCubic,
   planFling,
   rotationFor,
   springSettled,
@@ -27,6 +26,8 @@ export type SwipeStackOptions<T> = {
   renderCard: (item: T, image: HTMLImageElement | null) => HTMLElement
   onSwipe: (item: T, direction: Direction) => void
   onEmpty: () => void
+  /** Called whenever a new card becomes the top card (for a screen-reader announcement). */
+  onTop?: (item: T) => void
 }
 
 type Card<T> = { item: T; el: HTMLElement; likeStamp: HTMLElement | null; nopeStamp: HTMLElement | null }
@@ -70,6 +71,7 @@ export class SwipeStack<T> {
     options.container.addEventListener('pointermove', this.onPointerMove)
     options.container.addEventListener('pointerup', this.onPointerUp)
     options.container.addEventListener('pointercancel', this.onPointerCancel)
+    options.container.addEventListener('lostpointercapture', this.onPointerCancel)
   }
 
   setItems(items: T[]): void {
@@ -79,6 +81,7 @@ export class SwipeStack<T> {
     this.fill()
     this.layout(0)
     if (this.cards.length === 0) this.options.onEmpty()
+    else this.options.onTop?.(this.cards[0].item)
   }
 
   get top(): T | null {
@@ -107,6 +110,7 @@ export class SwipeStack<T> {
     container.removeEventListener('pointermove', this.onPointerMove)
     container.removeEventListener('pointerup', this.onPointerUp)
     container.removeEventListener('pointercancel', this.onPointerCancel)
+    container.removeEventListener('lostpointercapture', this.onPointerCancel)
   }
 
   // ---- Stack building ----
@@ -186,7 +190,8 @@ export class SwipeStack<T> {
       card.nopeStamp.style.opacity = pose.x < 0 ? String(progress) : '0'
       card.nopeStamp.style.transform = `rotate(${12 + tilt}deg) scale(${0.9 + 0.1 * progress})`
     }
-    this.layout(progress)
+    // Reduced motion: the cards underneath stay put instead of scaling with the drag.
+    this.layout(reducedMotion() ? 0 : progress)
   }
 
   // ---- Pointer input ----
@@ -218,6 +223,11 @@ export class SwipeStack<T> {
   private onPointerMove = (event: PointerEvent): void => {
     const drag = this.drag
     if (!drag || event.pointerId !== drag.pointerId) return
+    // The mouse button came up somewhere we never heard about: end the drag instead of sticking.
+    if (event.pointerType === 'mouse' && event.buttons === 0) {
+      this.onPointerCancel(event)
+      return
+    }
     const x = event.clientX - drag.startX
     const y = event.clientY - drag.startY
     drag.pose = { x, y, rotation: rotationFor(x, drag.grabbedTopHalf) }
@@ -277,6 +287,7 @@ export class SwipeStack<T> {
     if (this.cards[0]) this.resetPose(this.cards[0].el)
     this.options.onSwipe(card.item, direction)
     if (this.cards.length === 0) this.options.onEmpty()
+    else this.options.onTop?.(this.cards[0].item)
 
     if (reducedMotion()) {
       card.el.classList.add('fading')
@@ -286,8 +297,10 @@ export class SwipeStack<T> {
 
     const stamp = direction === 'right' ? card.likeStamp : card.nopeStamp
     if (stamp) stamp.style.opacity = '1'
+    // The bounding box of a rotated card is wider than the card, so use its center (rotation does
+    // not move the center) to find where the card sits at rest.
     const rect = card.el.getBoundingClientRect()
-    const restLeft = rect.left - release.pose.x
+    const restLeft = rect.left + rect.width / 2 - release.pose.x - card.el.offsetWidth / 2
     const plan = planFling({
       direction,
       dx: release.pose.x,
@@ -303,8 +316,9 @@ export class SwipeStack<T> {
     const from = release.pose
     const start = performance.now()
     const step = (now: number): void => {
+      // Constant velocity: the card leaves at the speed the hand released it.
       const t = Math.min(1, (now - start) / plan.durationMs)
-      const e = easeOutCubic(t)
+      const e = t
       this.setPose(card.el, {
         x: from.x + (plan.toX - from.x) * e,
         y: from.y + (plan.toY - from.y) * e,

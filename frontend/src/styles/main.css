@@ -1973,6 +1973,19 @@ img {
 
 body.soda-route { overflow-x: clip; }
 
+/* Screen-reader-only text (live announcements). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .soda-feed {
   position: relative;
   height: 100%;
@@ -2013,6 +2026,10 @@ body.soda-route { overflow-x: clip; }
 /* Cards moving up one depth after a swipe (SETTLE_MS in swipe-stack.ts). */
 .soda-card.settling { transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.3, 1); }
 .soda-card.fading { opacity: 0; transition: opacity 0.12s linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  .soda-card.settling { transition: none; }
+}
 
 .soda-stamp {
   position: absolute;
@@ -2114,6 +2131,7 @@ body.soda-route { overflow-x: clip; }
 }
 
 .soda-end-title {
+  outline: none;
   font-size: var(--text-lg);
   font-weight: 700;
   color: var(--text-primary);

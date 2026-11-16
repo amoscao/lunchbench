@@ -382,11 +382,11 @@ Mockups live outside the repo; this section is the source of truth.
 
 **Rule: no subtitles or helper text.** Only titles, labels, and controls. No explanatory lines such as "swipe right on sodas you like".
 
-**Nav:** Arena · Sodabench (`/soda`) · Leaderboard. `/chris` is not in the nav.
+**Nav:** LunchArena (`/`) · SodaArena (`/soda`) · Leaderboard. `/chris` is not in the nav. Internally the feature is still called Sodabench (code, routes, API, tables).
 
 ### Swipe deck (`/soda`)
 - Max content width 640px.
-- Header row: page heading "Sodabench" left, primary button "+ Report a soda" right.
+- Header row: page heading "SodaArena" left, primary button "+ Report a soda" right.
 - Progress row: 6px pill track (`--border`) with `--accent` fill, then `n / total` in `--text-sm`, tabular numbers. A session is 20 cards (fewer if the catalog is smaller).
 - Card: 380px max, `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px tall on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700).
 - Two decorative cards sit behind the current card, rotated -3° and 2°.
@@ -432,7 +432,7 @@ Mockups live outside the repo; this section is the source of truth.
 ### Purchaser page (`/chris`)
 - Logged out: heading "Purchaser Login", password field, "Log in". The token is kept in localStorage (`lb_purchaser_session_token`), separate from the Add Lunch token.
 - Logged in: heading "This Week's Order" with "Week of Mon D" beside it; secondary buttons "Export lunch PDF" and "Log out".
-- One ranked table, read-only: #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`), Backup (outlined). Backup rows sit on `--bg-primary` with secondary text so they read as optional.
+- One ranked table, read-only, 10 rows: 4 sodas, 4 seltzers, one soda trial, one seltzer trial. Columns #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`).
 - No quantities, no summary tiles, no substitutions text.
 
 ---

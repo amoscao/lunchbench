@@ -46,4 +46,9 @@ test.describe('Navigation', () => {
     await page.goto('/add')
     await expect(page.locator('.page-heading')).toHaveText('Add Lunch')
   })
+
+  test('nav labels read LunchArena, SodaArena and Leaderboard', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('.nav-link')).toHaveText(['LunchArena', 'SodaArena', 'Leaderboard'])
+  })
 })

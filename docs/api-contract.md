@@ -512,20 +512,30 @@ Left swipes are not evidence, so a left swipe alone does not move a drink into g
 
 Returns the latest frozen weekly order list. If no snapshot exists for the current week (fresh deploy, or before Monday's cron), it generates one first with `INSERT OR IGNORE`.
 
-The list is, in order:
-1. top 3 sodas (`slot: "top"`);
-2. top 3 seltzers (`slot: "top"`);
-3. 3 trials (`slot: "trial"`): Thompson-sampled from drinks with fewer than 3 reporters that are not favorites, seeded by `week_start`, avoiding trials from the previous 2 weeks when possible;
-4. backups (`slot: "backup"`): the next 2 sodas and 2 seltzers, in rank order.
+The list has 10 rows, in order:
+1. top 4 sodas (`slot: "top"`);
+2. top 4 seltzers (`slot: "top"`);
+3. one soda trial, then one seltzer trial (`slot: "trial"`).
 
-Favorites (top and backup) fill in tiers, each in rank order:
+Each type's trial is picked from that type's drinks that are not already listed, falling through these tiers so the trial changes every week:
+
+1. trial-eligible drinks (fewer than 3 reporters) not trialed in the previous 2 weeks;
+2. any drink not trialed in the previous 2 weeks (the eligible pool is exhausted);
+3. trial-eligible drinks trialed recently;
+4. the best-scored drink left.
+
+Tiers 1-3 are Thompson-sampled with the RNG seeded by `week_start`, so a given week is reproducible. A type never gets two trials; if it has no drink left at all, its trial row is omitted.
+
+There are no backup rows. Snapshots stored before backups were removed may still contain `slot: "backup"` items. They were the last ranks, so this endpoint drops them on read and ranks stay contiguous. Such a snapshot keeps its old 3 + 3 + 3 shape until the next Monday cron. To switch the current week right away, an admin can call `POST /api/admin/soda/regenerate`.
+
+Favorites fill in tiers, each in rank order:
 
 1. Backed drinks: own evidence (`R + n > 0`), posterior mean at least the type mean `m_type`, and own evidence mean `a/(a+b)` at least `min(m_type, 0.5)`. The own-evidence check stops a strong brand from carrying a drink whose only evidence is a hate into a top slot. It is capped at 0.5 because people tend to report what they liked, which can push `m_type` above 0.75, the own mean of a swipe-only drink.
 2. Every other drink except known-bad ones: untried drinks, and drinks with decent own evidence whose posterior sits below `m_type`.
 3. Known-bad drinks: own evidence mean below `min(m_type, 0.5)`, such as a drink with only hates.
 
 The bar is the type mean, not the drink's own brand prior: a favorite should beat an average soda (or seltzer), and a strong brand should not hold its own good drinks to a higher bar. Exact score ties use the week-seeded shuffle.
-Fewer rows come back when the catalog is too small to fill every slot.
+Fewer rows come back when the catalog is too small to fill every slot. `params_json` records the counts (`topPerType: 4`, `trialsPerType: 1`).
 There is no inventory or purchase tracking.
 
 **Response 200:**

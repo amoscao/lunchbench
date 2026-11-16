@@ -66,27 +66,26 @@ test.describe('Purchaser page /chris', () => {
     await expect(page.getByRole('button', { name: 'Export lunch PDF' })).toBeVisible()
 
     const rows = page.locator('.order-table tbody tr')
-    await expect(rows).toHaveCount(13)
+    await expect(rows).toHaveCount(10)
     const tags = await rows.locator('.soda-tag').allTextContents()
     expect(tags).toEqual([
-      'Soda', 'Soda', 'Soda',
-      'Seltzer', 'Seltzer', 'Seltzer',
-      'Trial', 'Trial', 'Trial',
-      'Backup', 'Backup', 'Backup', 'Backup',
+      'Soda', 'Soda', 'Soda', 'Soda',
+      'Seltzer', 'Seltzer', 'Seltzer', 'Seltzer',
+      'Trial', 'Trial',
     ])
     expect(await rows.locator('.order-rank').allTextContents())
-      .toEqual(Array.from({ length: 13 }, (_, i) => String(i + 1)))
-    for (let i = 0; i < 13; i++) {
+      .toEqual(Array.from({ length: 10 }, (_, i) => String(i + 1)))
+    for (let i = 0; i < 10; i++) {
       const row = rows.nth(i)
       const counts = await row.locator('.swipe-counts').count()
       const fresh = await row.locator('.soda-new').count()
       expect(counts + fresh).toBe(1)
       if (fresh) await expect(row.locator('.soda-new')).toHaveText(/^New (soda|seltzer) to try$/)
     }
-    await expect(page.locator('.order-row-backup')).toHaveCount(4)
+    await expect(page.locator('body')).not.toContainText('Backup')
 
     await page.reload()
-    await expect(page.locator('.order-table tbody tr')).toHaveCount(13)
+    await expect(page.locator('.order-table tbody tr')).toHaveCount(10)
 
     await page.getByRole('button', { name: 'Log out' }).click()
     await expect(page.locator('.page-heading')).toHaveText('Purchaser Login')
@@ -112,8 +111,10 @@ test.describe('Purchaser page /chris', () => {
     const auth = { Authorization: `Bearer ${token}` }
 
     const order = await getOrder(token)
-    expect(order.items.map((item) => item.slot)).toEqual([
-      'top', 'top', 'top', 'top', 'top', 'top', 'trial', 'trial', 'trial', 'backup', 'backup', 'backup', 'backup',
+    expect(order.items.map((item) => `${item.slot}:${item.type}`)).toEqual([
+      'top:soda', 'top:soda', 'top:soda', 'top:soda',
+      'top:seltzer', 'top:seltzer', 'top:seltzer', 'top:seltzer',
+      'trial:soda', 'trial:seltzer',
     ])
     const trialIds = order.items.filter((item) => item.slot === 'trial').map((item) => item.soda_id)
     const favoriteIds = order.items.filter((item) => item.slot !== 'trial').map((item) => item.soda_id)

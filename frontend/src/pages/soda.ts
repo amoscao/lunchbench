@@ -38,7 +38,7 @@ export function renderSoda(container: HTMLElement): () => void {
   content.className = 'page-content soda-page'
   content.innerHTML = `
     <div class="soda-header">
-      <h1 class="page-heading">Sodabench</h1>
+      <h1 class="page-heading">SodaArena</h1>
       <button type="button" class="btn btn-primary soda-report-open">${PLUS}Report a soda</button>
     </div>
     <div class="alert alert-error soda-alert" role="alert" hidden>Swipe not saved</div>

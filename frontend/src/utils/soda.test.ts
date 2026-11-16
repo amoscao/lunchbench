@@ -13,7 +13,6 @@ describe('soda display helpers', () => {
     expect(orderTag({ slot: 'top', type: 'soda' })).toBe('Soda')
     expect(orderTag({ slot: 'top', type: 'seltzer' })).toBe('Seltzer')
     expect(orderTag({ slot: 'trial', type: 'seltzer' })).toBe('Trial')
-    expect(orderTag({ slot: 'backup', type: 'soda' })).toBe('Backup')
   })
 
   test('formats the week start without a zone shift', () => {

@@ -273,7 +273,7 @@ export type SodaLeaderboardRow = Soda & {
 
 export type SodaOrderItem = {
   rank: number
-  slot: 'top' | 'trial' | 'backup'
+  slot: 'top' | 'trial'
   soda_id: number
   brand: string
   flavor: string

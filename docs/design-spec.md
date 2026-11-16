@@ -382,11 +382,11 @@ Mockups live outside the repo; this section is the source of truth.
 
 **Rule: no subtitles or helper text.** Only titles, labels, and controls. No explanatory lines such as "swipe right on sodas you like".
 
-**Nav:** Arena · Sodabench (`/soda`) · Leaderboard. `/chris` is not in the nav.
+**Nav:** LunchArena (`/`) · SodaArena (`/soda`) · Leaderboard. `/chris` is not in the nav. Internally the feature is still called Sodabench (code, routes, API, tables).
 
 ### Swipe deck (`/soda`)
 - Max content width 640px.
-- Header row: page heading "Sodabench" left, primary button "+ Report a soda" right.
+- Header row: page heading "SodaArena" left, primary button "+ Report a soda" right.
 - One continuous feed. There are no decks, no progress counter and no "Start over". It shows the next drink until the voter has swiped every active drink.
 - Card: 380px max, 440px tall (380px under 640px wide), `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px (260px) on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700, two lines max).
 - Card stack (`frontend/src/components/swipe-stack.ts`): the top card plus two real cards underneath, fully rendered. Each card's `<img>` is created and decoded ahead of time, and images for the next four drinks are decoded beyond that. When the top card leaves, the next card is promoted in place (same element, no re-render) and a new card is appended at the bottom.
@@ -429,7 +429,7 @@ Mockups live outside the repo; this section is the source of truth.
 ### Purchaser page (`/chris`)
 - Logged out: heading "Purchaser Login", password field, "Log in". The token is kept in localStorage (`lb_purchaser_session_token`), separate from the Add Lunch token.
 - Logged in: heading "This Week's Order" with "Week of Mon D" beside it; secondary buttons "Export lunch PDF" and "Log out".
-- One ranked table, read-only: #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`), Backup (outlined). Backup rows sit on `--bg-primary` with secondary text so they read as optional.
+- One ranked table, read-only, 10 rows: 4 sodas, 4 seltzers, one soda trial, one seltzer trial. Columns #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`).
 - No quantities, no summary tiles, no substitutions text.
 
 ---

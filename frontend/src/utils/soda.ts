@@ -8,11 +8,10 @@ export function newDrinkText(type: SodaType): string {
   return type === 'seltzer' ? 'New seltzer to try' : 'New soda to try'
 }
 
-export type OrderTag = 'Soda' | 'Seltzer' | 'Trial' | 'Backup'
+export type OrderTag = 'Soda' | 'Seltzer' | 'Trial'
 
 export function orderTag(item: Pick<SodaOrderItem, 'slot' | 'type'>): OrderTag {
   if (item.slot === 'trial') return 'Trial'
-  if (item.slot === 'backup') return 'Backup'
   return sodaTypeLabel(item.type)
 }
 

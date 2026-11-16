@@ -2339,7 +2339,6 @@ body.soda-route { overflow-x: clip; }
 .soda-tag-soda { background: var(--bg-hover); color: var(--text-primary); }
 .soda-tag-seltzer { background: var(--tag-seltzer-bg); color: var(--tag-seltzer-text); }
 .soda-tag-trial { background: var(--accent-subtle); color: var(--accent-hover); }
-.soda-tag-backup { background: var(--bg-surface); color: var(--text-secondary); border-color: var(--border-accent); }
 
 .swipe-counts {
   display: inline-flex;
@@ -2372,9 +2371,6 @@ body.soda-route { overflow-x: clip; }
   color: var(--text-primary);
 }
 
-.order-row-backup td { background: var(--bg-primary); }
-.order-row-backup .order-rank,
-.order-row-backup .lunch-name-row { color: var(--text-secondary); }
 
 .chris-header {
   display: flex;

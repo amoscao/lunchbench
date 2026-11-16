@@ -55,7 +55,7 @@ test.describe('Sodabench report a soda', () => {
     await dialog.getByRole('button', { name: 'Like' }).click()
 
     await expect(dialog).toBeHidden()
-    await expect(page.locator('.alert')).toHaveCount(0)
+    await expect(page.locator('.alert:visible')).toHaveCount(0)
     await expect.poll(async () => (await getSodaRow(id)).likes).toBe(before.likes + 1)
   })
 
@@ -109,5 +109,25 @@ test.describe('Sodabench report a soda', () => {
     await page.keyboard.press('ArrowLeft')
     await page.keyboard.press('Escape')
     await expect(label).toHaveText(/^1 \//)
+  })
+
+  test('Tab stays inside the dialog and Escape closes it from any control', async ({ page }) => {
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    await pick(page, 'sprite', 'Sprite Original')
+
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab')
+      expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    }
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Shift+Tab')
+      expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    }
+
+    await dialog.getByRole('button', { name: 'Hate' }).focus()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Report a soda' })).toBeFocused()
   })
 })

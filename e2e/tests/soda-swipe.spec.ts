@@ -131,4 +131,26 @@ test.describe('Sodabench swipe deck', () => {
 
     expect(swipeRequests).toBe(0)
   })
+
+  test('a swipe that fails twice shows an error instead of dropping silently', async ({ page }) => {
+    const total = await deckSize()
+    let attempts = 0
+    await page.route('**/api/soda/swipes', async (route) => {
+      attempts += 1
+      await route.fulfill({ status: 500, json: { error: 'boom', code: 'SERVER_ERROR' } })
+    })
+
+    await page.goto('/soda')
+    await expectCard(page, 1, total)
+    await expect(page.locator('.soda-alert')).toBeHidden()
+    await page.getByRole('button', { name: 'Swipe right' }).click()
+
+    await expect(page.locator('.soda-alert')).toBeVisible()
+    await expect(page.locator('.soda-alert')).toHaveText('Swipe not saved')
+    expect(attempts).toBe(2)
+
+    await page.unroute('**/api/soda/swipes')
+    await page.getByRole('button', { name: 'Swipe left' }).click()
+    await expect(page.locator('.soda-alert')).toBeHidden()
+  })
 })

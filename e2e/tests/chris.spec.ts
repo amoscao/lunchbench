@@ -34,9 +34,27 @@ test.describe('Purchaser page /chris', () => {
     await expect(page.locator('.chris-login-error')).toBeVisible()
     await expect(page.locator('.order-table')).toHaveCount(0)
 
+    const revoke = page.waitForRequest((request) =>
+      request.url().endsWith('/api/admin/session') && request.method() === 'DELETE'
+    )
     await login(page, ADMIN_TOKEN)
-    await expect(page.locator('.chris-login-error')).toHaveText('Not authorized')
+    await revoke
+    await expect(page.locator('.chris-login-error')).toHaveText('Invalid password')
     await expect(page.locator('.order-table')).toHaveCount(0)
+    expect(await page.evaluate(() => localStorage.getItem('lb_purchaser_session_token'))).toBeNull()
+  })
+
+  test('the purchaser password is not a lunch login on /add', async ({ page }) => {
+    const name = `Purchaser Should Not Add ${Date.now()}`
+    await page.goto('/add')
+    await page.fill('input[type="text"]', name)
+    await page.fill('input[type="password"]', PURCHASER_PASSWORD)
+    await page.locator('button.btn-primary').click()
+
+    await expect(page.locator('.alert-error')).toHaveText('Invalid password')
+    expect(await page.evaluate(() => localStorage.getItem('lb_admin_session_token'))).toBeNull()
+    const lunches = await (await fetch(`${API_URL}/api/lunches`)).json() as { lunches: { name: string }[] }
+    expect(lunches.lunches.some((lunch) => lunch.name === name)).toBe(false)
   })
 
   test('shows this week\'s order list in slot order and stays logged in', async ({ page }) => {

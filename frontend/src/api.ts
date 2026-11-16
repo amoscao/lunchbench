@@ -316,13 +316,39 @@ export async function submitSodaSwipe(sodaId: number, direction: 'right' | 'left
   if (!res.ok) throw new ApiError(`Swipe failed: ${res.status}`, res.status)
 }
 
-export async function submitSodaReport(sodaId: number, verdict: 'like' | 'hate'): Promise<void> {
+/**
+ * `barcode` is the unknown code this voter scanned before picking the drink manually.
+ * The response then says which drink that code maps to now (null when it stays unmapped).
+ */
+export async function submitSodaReport(
+  sodaId: number,
+  verdict: 'like' | 'hate',
+  barcode?: string
+): Promise<{ barcode_soda_id?: number | null }> {
   const res = await fetch(`${BASE}/soda/reports`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
-    body: JSON.stringify({ soda_id: sodaId, verdict }),
+    body: JSON.stringify(barcode ? { soda_id: sodaId, verdict, barcode } : { soda_id: sodaId, verdict }),
   })
   if (!res.ok) throw new ApiError(`Report failed: ${res.status}`, res.status)
+  return await res.json().catch(() => ({})) as { barcode_soda_id?: number | null }
+}
+
+export async function getSodaBarcodes(): Promise<{ code: string; soda_id: number }[]> {
+  const res = await fetch(`${BASE}/soda/barcodes`)
+  if (!res.ok) throw new Error(`Soda barcodes fetch failed: ${res.status}`)
+  const data = await res.json() as { barcodes: { code: string; soda_id: number }[] }
+  return data.barcodes
+}
+
+/** Logs a scanned code that matched no drink. Only the decoded string and its symbology are sent. */
+export async function logUnknownScan(barcode: string, format: string): Promise<void> {
+  const res = await fetch(`${BASE}/soda/unknown-scans`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
+    body: JSON.stringify({ barcode, format }),
+  })
+  if (!res.ok) throw new ApiError(`Unknown scan log failed: ${res.status}`, res.status)
 }
 
 export async function getSodaLeaderboard(): Promise<SodaLeaderboardRow[]> {

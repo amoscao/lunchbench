@@ -424,6 +424,7 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 - Prior `α0 = k·m_B(−i)`, `β0 = k·(1 − m_B(−i))`. Posterior `α = α0 + a_i`, `β = β0 + b_i`. With no data anywhere this is Beta(1, 1).
 - Constants: `c = 4` (`SODA_MEAN_SHRINK`), `k = 2` (`SODA_BRAND_PRIOR_STRENGTH`). Each weekly snapshot records them in `params_json`.
 - The ranking key, the Thompson trial draws and the favorites rule all use this posterior.
+- Inactive drinks (`sodas.is_active = 0`) are excluded everywhere, including the type and brand means.
 - Rank key: posterior mean α/(α+β) desc, then appeal desc. The public leaderboard breaks remaining ties by name, then id. The weekly order list breaks them with a shuffle seeded by `week_start`, so a fresh catalog (all tied) does not buy alphabetically.
 
 ### GET /api/soda/catalog
@@ -474,7 +475,12 @@ Records that the voter had the drink and liked or hated it. One report per voter
 **Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND`, `429 RATE_LIMITED`
 
 ### GET /api/soda/leaderboard
-Every active drink (sodas and seltzers together) ranked by the scoring model.
+Every active drink (sodas and seltzers together), ranked in two groups:
+
+1. drinks with their own data (`R + L + n > 0`), in posterior order;
+2. drinks with no data at all, in posterior order.
+
+The brand prior still orders the untried drinks among themselves, but an untried flavor of a loved brand never outranks a drink with real evidence. This grouping is a product decision (made by the owner's proxy, open to revisit) and applies to this endpoint only; the weekly order list uses the plain posterior order.
 
 **Response 200:**
 ```json
@@ -512,7 +518,13 @@ The list is, in order:
 3. 3 trials (`slot: "trial"`): Thompson-sampled from drinks with fewer than 3 reporters that are not favorites, seeded by `week_start`, avoiding trials from the previous 2 weeks when possible;
 4. backups (`slot: "backup"`): the next 2 sodas and 2 seltzers, in rank order.
 
-Favorites (top and backup) prefer drinks with some evidence (`R + n > 0`) whose posterior mean is at least their type mean `m_type`, then fill by score. The bar is the type mean, not the drink's own brand prior: a favorite should beat an average soda (or seltzer), and a strong brand should not hold its own good drinks to a higher bar. Exact score ties use the week-seeded shuffle.
+Favorites (top and backup) fill in tiers, each in rank order:
+
+1. Backed drinks: some evidence (`R + n > 0`), posterior mean at least the type mean `m_type`, and own evidence mean `a/(a+b)` at least `m_type`. The own-evidence check stops a strong brand from carrying a drink whose only evidence is a hate into a top slot. A swipe-only drink has an own mean of 0.75.
+2. Every other drink except known-bad ones: untried drinks, and drinks with positive evidence that the brand prior pulls below `m_type`.
+3. Known-bad drinks: own evidence mean below `m_type`.
+
+The bar is the type mean, not the drink's own brand prior: a favorite should beat an average soda (or seltzer), and a strong brand should not hold its own good drinks to a higher bar. Exact score ties use the week-seeded shuffle.
 Fewer rows come back when the catalog is too small to fill every slot.
 There is no inventory or purchase tracking.
 

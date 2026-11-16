@@ -98,3 +98,44 @@ describe('soda write routes', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('order list snapshots', () => {
+  test('drops legacy backup rows from snapshots written before backups were removed', async () => {
+    const legacyItems = [
+      { rank: 1, slot: 'top', soda_id: 1, brand: 'A', flavor: 'One', type: 'soda', image_key: null, right_swipes: 0, left_swipes: 0, has_data: false },
+      { rank: 2, slot: 'trial', soda_id: 2, brand: 'B', flavor: 'Two', type: 'seltzer', image_key: null, right_swipes: 0, left_swipes: 0, has_data: false },
+      { rank: 3, slot: 'backup', soda_id: 3, brand: 'C', flavor: 'Three', type: 'soda', image_key: null, right_swipes: 0, left_swipes: 0, has_data: false },
+    ]
+    const row = { week_start: '2026-11-16', generated_at: '2026-11-16T12:00:00Z', items_json: JSON.stringify(legacyItems), params_json: '{}' }
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement
+          },
+          async all() {
+            if (sql.includes('FROM admin_sessions')) {
+              return { results: [{ token: 'purchaser-token', role: 'purchaser', expires_at: '2999-01-01T00:00:00Z' }] }
+            }
+            return { results: [] }
+          },
+          async first() {
+            if (sql.includes('FROM soda_buy_lists WHERE week_start = ?')) return { week_start: row.week_start }
+            if (sql.includes('FROM soda_buy_lists')) return row
+            return null
+          },
+          async run() {
+            return { success: true, meta: { changes: 1 } }
+          },
+        }
+        return statement
+      },
+    } as unknown as D1Database
+    const env: Bindings = { DB: db, IMAGES: undefined, VOTE_PASSWORD: '', ADMIN_MANAGER_PASSWORD: '', SENTRY_DSN: '' }
+
+    const res = await sodaRouter.request('/order/latest', { headers: { Authorization: 'Bearer purchaser-token' } }, env)
+    expect(res.status).toBe(200)
+    const body = await res.json() as { items: { slot: string; rank: number }[] }
+    expect(body.items.map((item) => [item.slot, item.rank])).toEqual([['top', 1], ['trial', 2]])
+  })
+})

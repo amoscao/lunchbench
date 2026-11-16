@@ -1,6 +1,6 @@
 import { compareByScore, hasData, hasOwnEvidence, ownEvidence, SODA_SCORE_PARAMS, scoreDrinks, type DrinkStats, type ScoredDrink, type SodaType } from './soda-score'
 
-export type OrderSlot = 'top' | 'trial' | 'backup'
+export type OrderSlot = 'top' | 'trial'
 
 export type OrderItem = {
   rank: number
@@ -19,9 +19,10 @@ export type OrderItem = {
 export const OWN_EVIDENCE_BAR_CAP = 0.5
 
 export const ORDER_PARAMS = {
-  topPerType: 3,
-  backupsPerType: 2,
-  trials: 3,
+  /** Favorites per type: 4 sodas, then 4 seltzers. */
+  topPerType: 4,
+  /** Trials per type: exactly one soda trial and one seltzer trial. */
+  trialsPerType: 1,
   /** Trial-eligible when the drink has fewer distinct reporters than this. */
   trialMaxReporters: 3,
   /** Weeks of past trials to avoid repeating. */
@@ -127,7 +128,7 @@ function isKnownBad(drink: ScoredDrink): boolean {
 }
 
 /**
- * Picks favorites for one type: the top and backup slots. Fills in tiers, each in rank order:
+ * Picks favorites for one type (the top slots). Fills in tiers, each in rank order:
  * 1. backed drinks;
  * 2. the rest, except known-bad drinks: untried drinks, and drinks with decent own evidence whose
  *    posterior sits below the type mean;
@@ -170,38 +171,63 @@ function thompsonOrder(candidates: ScoredDrink[], rng: () => number): ScoredDrin
 }
 
 /**
- * Builds the weekly order list:
- * top 3 sodas, top 3 seltzers, 3 Thompson-sampled trials, then 2 soda and 2 seltzer backups.
- * Trials are low-data drinks (n < 3) that are not favorites, avoiding recent trials when possible.
+ * One type's trial, deterministic per week. Falls through, so the trial rotates week to week:
+ * 1. a fresh eligible drink (n < 3, not trialed recently), Thompson-sampled;
+ * 2. any unlisted drink of the type not trialed recently, Thompson-sampled with the same week RNG
+ *    (the eligible pool is exhausted, but the trial must still change every week);
+ * 3. a recent eligible drink, Thompson-sampled;
+ * 4. the best-scored unlisted drink.
+ * Returns null only when the type has nothing left to list.
+ */
+function pickTrial(
+  ranked: ScoredDrink[],
+  type: SodaType,
+  listed: Set<number>,
+  recent: Set<number>,
+  rng: () => number
+): ScoredDrink | null {
+  const unlisted = ranked.filter((drink) => drink.type === type && !listed.has(drink.id))
+  const isEligible = (drink: ScoredDrink) => drink.reporters < ORDER_PARAMS.trialMaxReporters
+  const tiers = [
+    unlisted.filter((drink) => isEligible(drink) && !recent.has(drink.id)),
+    unlisted.filter((drink) => !recent.has(drink.id)),
+    unlisted.filter((drink) => isEligible(drink) && recent.has(drink.id)),
+  ]
+  for (const tier of tiers) {
+    if (tier.length > 0) return thompsonOrder(tier, rng)[0]
+  }
+  return unlisted[0] ?? null
+}
+
+/**
+ * Builds the weekly order list (10 rows when the catalog allows):
+ * top 4 sodas, top 4 seltzers, then one soda trial and one seltzer trial.
+ * Trials are Thompson-sampled per type from low-data drinks (n < 3) that are not favorites,
+ * avoiding the previous weeks' trials when possible.
  */
 export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): OrderItem[] {
   const p = ORDER_PARAMS
   const ranked = rankForWeek(drinks, options.seed)
-  const position = new Map(ranked.map((drink, index) => [drink.id, index]))
-  const favoritesPerType = p.topPerType + p.backupsPerType
-  const sodas = pickFavorites(ranked, 'soda', favoritesPerType)
-  const seltzers = pickFavorites(ranked, 'seltzer', favoritesPerType)
-  const favoriteIds = new Set([...sodas, ...seltzers].map((drink) => drink.id))
+  const sodas = pickFavorites(ranked, 'soda', p.topPerType)
+  const seltzers = pickFavorites(ranked, 'seltzer', p.topPerType)
+  const listed = new Set([...sodas, ...seltzers].map((drink) => drink.id))
 
   const recent = new Set(options.recentTrialIds ?? [])
-  const eligible = ranked.filter((drink) =>
-    !favoriteIds.has(drink.id) && drink.reporters < p.trialMaxReporters
-  )
   const rng = seededRandom(options.seed)
-  const fresh = thompsonOrder(eligible.filter((drink) => !recent.has(drink.id)), rng)
-  const repeats = thompsonOrder(eligible.filter((drink) => recent.has(drink.id)), rng)
-  const trials = [...fresh, ...repeats].slice(0, p.trials)
-
-  const backups = [
-    ...sodas.slice(p.topPerType),
-    ...seltzers.slice(p.topPerType),
-  ].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0))
+  const trials: ScoredDrink[] = []
+  for (const type of ['soda', 'seltzer'] as const) {
+    for (let i = 0; i < p.trialsPerType; i++) {
+      const trial = pickTrial(ranked, type, listed, recent, rng)
+      if (!trial) break
+      trials.push(trial)
+      listed.add(trial.id)
+    }
+  }
 
   const slots: Array<[OrderSlot, DrinkStats]> = [
-    ...sodas.slice(0, p.topPerType).map((drink): [OrderSlot, DrinkStats] => ['top', drink]),
-    ...seltzers.slice(0, p.topPerType).map((drink): [OrderSlot, DrinkStats] => ['top', drink]),
+    ...sodas.map((drink): [OrderSlot, DrinkStats] => ['top', drink]),
+    ...seltzers.map((drink): [OrderSlot, DrinkStats] => ['top', drink]),
     ...trials.map((drink): [OrderSlot, DrinkStats] => ['trial', drink]),
-    ...backups.map((drink): [OrderSlot, DrinkStats] => ['backup', drink]),
   ]
 
   return slots.map(([slot, drink], index) => ({
@@ -220,7 +246,7 @@ export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): Ord
 
 export function orderParams(seed: string, recentTrialIds: number[]): Record<string, unknown> {
   return {
-    model: 'beta-brand-prior-v3',
+    model: 'beta-brand-prior-v4',
     seed,
     score: SODA_SCORE_PARAMS,
     order: ORDER_PARAMS,

@@ -18,12 +18,16 @@ Authorization: Bearer <SESSION_TOKEN>
 Create a session with `POST /api/admin/verify`.
 Sessions expire 1 year after issuance.
 
-Two session roles exist:
+Three session roles exist:
 - `admin` — password from `ADMIN_MANAGER_PASSWORD`. Can access every protected route.
 - `lunch` — password from `VOTE_PASSWORD`. Can create lunches and upload lunch images only.
+- `purchaser` — password from `PURCHASER_PASSWORD`. Can read the weekly soda order list (`GET /api/soda/order/latest`) only.
 
 Routes that require `lunch` accept either `admin` or `lunch` sessions.
-Routes that require `admin` reject `lunch` sessions.
+Routes that require `purchaser` accept either `admin` or `purchaser` sessions.
+Routes that require `admin` reject `lunch` and `purchaser` sessions.
+
+`POST /api/admin/verify` checks the admin password first, then the lunch password, then the purchaser password. It returns `{ "token": "<uuid>", "role": "admin" | "lunch" | "purchaser" }`.
 
 Returns `401` if missing or invalid.
 
@@ -378,3 +382,166 @@ Send current session token in `Authorization: Bearer <token>` to revoke it from 
 
 **Errors:**
 - `401 UNAUTHORIZED` — missing or invalid session token
+
+---
+
+## Sodabench
+
+Sodabench ranks the canned sodas and seltzers stocked at Walmart Branford CT #2232.
+Voters swipe drinks and report drinks they had. The purchaser reads a frozen weekly order list.
+
+Voter identity is the browser-local `lb_session_id` UUID sent as `X-Lunchbench-Session`. There is no voter login.
+Writes require a valid session header and return `400 BAD_REQUEST` without one.
+Writes are rate-limited per client IP: swipes 1200 per hour, reports 300 per hour (`429 RATE_LIMITED`).
+Writes come only from allowed browser origins (see `docs/13-environment-and-deployment-config.md`).
+
+### Soda Object Shape
+
+```typescript
+type Soda = {
+  id: number
+  brand: string
+  flavor: string
+  name: string               // "<brand> <flavor>"
+  type: "soda" | "seltzer"
+  image_url: string | null   // "/api/images/<image_key>"
+}
+```
+
+### Scoring
+
+Pure functions in `worker/src/soda-score.ts`. Per drink:
+
+- `R` / `L`: voters whose latest swipe is right / left.
+- `likes` / `hates`: voters whose latest report is like / hate. `n` = distinct reporters.
+- Posterior on θ (chance a drinker is glad it was bought): prior Beta(1, 1). Each like adds 1 to α, each hate adds 1 to β.
+- Right swipes: κ = min(3, 0.2·R) · 3/(3+n). Add 0.75κ to α and 0.25κ to β. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
+- Left swipes are not negative evidence ("not a like" includes "haven't had it"). They only lower the tiebreak `appeal = (R+1)/(R+L+2)`.
+- Rank key: posterior mean α/(α+β) desc, then appeal desc, then name, then id.
+
+### GET /api/soda/catalog
+Every active drink, ordered by brand then flavor. Used by the report autocomplete.
+
+**Response 200:**
+```json
+{ "sodas": [ { "id": 1, "brand": "7UP", "flavor": "Original", "name": "7UP Original", "type": "soda", "image_url": "/api/images/images/<uuid>.jpg" } ] }
+```
+
+### GET /api/soda/deck
+Up to 20 drinks for this voter's swipe session.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
+
+Order: drinks this voter has not swiped come first, least evidence first (`R + L + 5·n`), ties shuffled. Swiped drinks only follow once the unswiped pool is used up, oldest swipe first.
+
+**Response 200:** `{ "sodas": [Soda] }`
+
+### PUT /api/soda/swipes
+Records the voter's swipe. A later swipe on the same drink replaces the earlier one.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (required)
+
+**Request body:**
+```json
+{ "soda_id": 12, "direction": "right" }
+```
+`direction` is `"right"` (like) or `"left"` (not a like).
+
+**Response 200:** `{ "ok": true }`
+
+**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `429 RATE_LIMITED`
+
+### POST /api/soda/reports
+Records that the voter had the drink and liked or hated it. One report per voter per drink per UTC day: a second report the same day replaces the first. Scoring uses each voter's latest report per drink.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (required)
+
+**Request body:**
+```json
+{ "soda_id": 12, "verdict": "like" }
+```
+`verdict` is `"like"` or `"hate"`.
+
+**Response 200:** `{ "ok": true }`
+
+**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND`, `429 RATE_LIMITED`
+
+### GET /api/soda/leaderboard
+Every active drink (sodas and seltzers together) ranked by the scoring model.
+
+**Response 200:**
+```json
+{
+  "sodas": [
+    {
+      "rank": 1,
+      "id": 12,
+      "brand": "Dr Pepper",
+      "flavor": "Original",
+      "name": "Dr Pepper Original",
+      "type": "soda",
+      "image_url": "/api/images/images/<uuid>.jpg",
+      "right_swipes": 3,
+      "left_swipes": 0,
+      "likes": 1,
+      "hates": 0,
+      "reporters": 1,
+      "score": 0.66,
+      "has_data": true
+    }
+  ]
+}
+```
+`has_data` is false when the drink has no swipes and no reports. The UI then shows "New soda to try" or "New seltzer to try".
+
+### GET /api/soda/order/latest
+**Requires purchaser auth** (`admin` or `purchaser` session).
+
+Returns the latest frozen weekly order list. If no snapshot exists for the current week (fresh deploy, or before Monday's cron), it generates one first with `INSERT OR IGNORE`.
+
+The list is, in order:
+1. top 3 sodas (`slot: "top"`);
+2. top 3 seltzers (`slot: "top"`);
+3. 3 trials (`slot: "trial"`): Thompson-sampled from drinks with fewer than 3 reporters that are not favorites, seeded by `week_start`, avoiding trials from the previous 2 weeks when possible;
+4. backups (`slot: "backup"`): the next 2 sodas and 2 seltzers, in rank order.
+
+Favorites (top and backup) prefer drinks with some evidence (`R + n > 0`) whose score is at least the prior mean, then fill by score.
+Fewer rows come back when the catalog is too small to fill every slot.
+There is no inventory or purchase tracking.
+
+**Response 200:**
+```json
+{
+  "week_start": "2026-11-16",
+  "generated_at": "2026-11-16T12:00:03.120Z",
+  "items": [
+    {
+      "rank": 1,
+      "slot": "top",
+      "soda_id": 12,
+      "brand": "Dr Pepper",
+      "flavor": "Original",
+      "name": "Dr Pepper Original",
+      "type": "soda",
+      "image_key": "images/<uuid>.jpg",
+      "image_url": "/api/images/images/<uuid>.jpg",
+      "right_swipes": 3,
+      "left_swipes": 0,
+      "has_data": true
+    }
+  ]
+}
+```
+`week_start` is the Monday of the week in America/New_York.
+
+**Errors:** `401 UNAUTHORIZED`
+
+### POST /api/admin/soda/regenerate
+**Requires admin auth.** Recomputes the current week's order list and replaces the stored snapshot. Same week and same data give the same list.
+
+**Response 200:** `{ "week_start": "2026-11-16" }`
+
+**Errors:** `401 UNAUTHORIZED`
+
+### Weekly cron
+`worker/wrangler.toml` triggers the Worker `scheduled` handler at `0 12 * * 1` (Monday 12:00 UTC, 7–8 am Eastern). It writes the week's snapshot to `soda_buy_lists` with `INSERT OR IGNORE`, so a repeat firing keeps the frozen list.

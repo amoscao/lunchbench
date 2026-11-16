@@ -7,6 +7,12 @@
 - **Add to `.dev.vars`**: `ADMIN_TOKEN=<value>` (never commit this file)
 - **Do NOT share** this value publicly
 
+## PURCHASER_PASSWORD
+- **Purpose**: Password for the purchaser page `/chris`. Mints `purchaser` sessions that can read the weekly soda order list only.
+- **Value**: chosen by the owner. Never write it into code, docs, tests, commits, PRs, or logs.
+- **Add as Worker secret**: `npx wrangler secret put PURCHASER_PASSWORD` (enter value when prompted)
+- **Add to `.dev.vars`**: `PURCHASER_PASSWORD=<any local value>` (never commit this file)
+
 ## CLOUDFLARE_API_TOKEN
 - **Purpose**: Allows CI/CD (GitHub Actions) to deploy the Worker and Pages
 - **Create at**: https://dash.cloudflare.com/profile/api-tokens

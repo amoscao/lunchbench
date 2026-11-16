@@ -59,6 +59,22 @@ Generate with:
 openssl rand -hex 32
 ```
 
+### `PURCHASER_PASSWORD`
+
+Password for the purchaser page `/chris`.
+
+- `POST /api/admin/verify` with this password mints a 1-year `purchaser` session.
+- A `purchaser` session can read `GET /api/soda/order/latest` only. It has no admin or lunch powers.
+
+Local value lives in `worker/.dev.vars`. E2E uses the placeholder `test-purchaser-password` from `docker-compose.e2e.yml`.
+
+The production value is chosen by the owner. Never write it into code, docs, tests, commits, PRs, or logs. Set it as a Cloudflare Worker secret:
+
+```bash
+cd worker
+npx wrangler secret put PURCHASER_PASSWORD
+```
+
 ### `CLOUDFLARE_API_TOKEN`
 
 Used by GitHub Actions to deploy Worker and Pages.
@@ -99,7 +115,9 @@ Worker deployment config lives in:
 worker/wrangler.toml
 ```
 
-That file owns Worker name, compatibility date, D1 binding, and R2 binding configuration.
+That file owns Worker name, compatibility date, D1 binding, R2 binding, and cron trigger configuration.
+
+The `[triggers]` cron `0 12 * * 1` (Monday 12:00 UTC) runs the Worker `scheduled` handler, which writes the weekly Sodabench order snapshot. `wrangler deploy` registers the trigger. Locally, run `npx wrangler dev --test-scheduled` and request `/__scheduled?cron=0+12+*+*+1` to fire it.
 
 Do not duplicate binding definitions in docs when `wrangler.toml` is the direct source of truth. Link to it or name the resource only.
 

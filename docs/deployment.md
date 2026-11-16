@@ -26,7 +26,27 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0005_glicko.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0006_glicko_defaults.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0007_session_roles.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0009_matchup_sessions.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0011_sodabench.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0012_soda_catalog.sql
 ```
+
+### Sodabench launch steps
+Run once, in this order, before or right after the first deploy that includes Sodabench:
+
+1. Apply `0011_sodabench.sql` and `0012_soda_catalog.sql` (above).
+2. Upload the catalog images to the production bucket:
+   ```bash
+   node scripts/import-sodas.mjs upload --remote
+   ```
+   It downloads each image from its Walmart URL (or reads `--images-dir <dir>` files named `<walmart_item_id>.jpeg|png`) and puts it at the key the migration uses.
+3. Set the purchaser password (value chosen by the owner; never paste it anywhere else):
+   ```bash
+   cd worker
+   npx wrangler secret put PURCHASER_PASSWORD
+   ```
+4. `npx wrangler deploy` registers the Monday cron from `worker/wrangler.toml`. Until it first fires, `/chris` generates the current week's list on demand.
+
+`seed.sql` is for local dev and E2E only. Do not apply it to production.
 
 ## Automated Deployment (GitHub Actions)
 

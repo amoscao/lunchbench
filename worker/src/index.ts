@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { sentry } from '@sentry/hono/cloudflare'
+import { withSentry } from '@sentry/cloudflare'
 import type { Bindings } from './types'
 import { lunchesRouter } from './routes/lunches'
 import { matchupRouter } from './routes/matchup'
@@ -45,13 +46,23 @@ app.post('/api/lunches/:id/image', async (c) => {
 })
 
 // Weekly cron (wrangler.toml [triggers]). INSERT OR IGNORE, so a repeat firing keeps the frozen snapshot.
-export async function scheduled(
-  controller: ScheduledController,
-  env: Bindings,
-  ctx: ExecutionContext
-): Promise<void> {
-  ctx.waitUntil(writeWeeklyOrder(env.DB, new Date(controller.scheduledTime), 'keep'))
+// Errors are logged and rethrown so the cron run shows as failed; withSentry reports them.
+export async function runWeeklyOrder(controller: ScheduledController, env: Bindings): Promise<void> {
+  try {
+    await writeWeeklyOrder(env.DB, new Date(controller.scheduledTime), 'keep')
+  } catch (error) {
+    console.error('Weekly soda order failed', controller.cron, error)
+    throw error
+  }
 }
+
+// The Hono middleware above only instruments fetch, so Sentry wraps the scheduled handler alone.
+const scheduledHandler = withSentry<Bindings>(
+  (env) => ({ dsn: env.SENTRY_DSN, tracesSampleRate: 0 }),
+  { scheduled: (controller, env) => runWeeklyOrder(controller, env) }
+)
+
+export const scheduled = scheduledHandler.scheduled!
 
 export default {
   fetch: app.fetch,

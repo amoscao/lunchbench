@@ -55,7 +55,8 @@ cd worker
 npx wrangler d1 execute lunchbench --local --file=../migrations/0012_soda_catalog.sql
 # Re-run the barcode seed so the newly loaded drinks get their codes.
 npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
-# 0012 still inserts the 9 OLIPOP drinks it shipped with; 0015 deactivates them again (issue #296).
+# 0012 and 0014 still insert the OLIPOP drinks and barcodes they shipped with. Any re-run of either must be
+# followed by 0015, which deactivates them again (issue #296).
 npx wrangler d1 execute lunchbench --local --file=../migrations/0015_remove_olipop.sql
 cd ..
 # Downloads each image from its Walmart URL, or reads <walmart_item_id>.(jpeg|png) from --images-dir.

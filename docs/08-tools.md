@@ -46,7 +46,7 @@ Run Dockerized E2E:
 Sodabench catalog import (see `docs/12-database-migrations.md`):
 
 ```bash
-node scripts/import-sodas.mjs sql                 # regenerate migrations/0012_soda_catalog.sql
+node scripts/import-sodas.mjs sql                 # refuses: 0012 has shipped (--force only for a reviewed rebuild)
 node scripts/import-sodas.mjs upload --local      # images into local R2
 node scripts/import-sodas.mjs upload --remote     # deploy step: images into production R2
 ```

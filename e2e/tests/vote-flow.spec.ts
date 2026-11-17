@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures'
 import { ADMIN_TOKEN, API_URL, addLunchViaAPI, getAdminSessionToken } from './helpers'
 
 type LunchEntry = {

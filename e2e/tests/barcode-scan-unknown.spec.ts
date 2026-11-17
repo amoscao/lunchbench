@@ -18,9 +18,11 @@ test.describe('Barcode scan mode: unknown code', () => {
     await page.goto('/soda')
     let dialog = await openReport(page)
 
-    // Unknown: straight to manual search, camera off, code logged.
+    // Unknown: manual search with a "not found" notice, camera off, code logged.
     const combobox = dialog.getByRole('combobox')
     await expect(combobox).toBeFocused()
+    await expect(dialog.getByRole('status')).toHaveText('Barcode not found. Try searching for the drink instead.')
+    await expect(dialog.getByRole('status')).toBeVisible()
     await expect(dialog.getByRole('heading')).toHaveText('Report a soda')
     await expectCameraOff(page)
     await expect.poll(() => network.requests.filter((r) => r.url().endsWith('/api/soda/unknown-scans')).length).toBe(1)

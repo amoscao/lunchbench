@@ -2286,6 +2286,21 @@ body.soda-route { overflow-x: clip; }
 
 .soda-report-error { margin: 0; }
 
+/* "Barcode not found" after an unknown scan. Empty (and collapsed) the rest of the time. */
+.soda-report-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.soda-report-notice:empty { display: none; }
+
+[data-theme="dark"] .soda-report-notice { background: hsl(38, 70%, 14%); color: #fcd34d; }
+
 .soda-report-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

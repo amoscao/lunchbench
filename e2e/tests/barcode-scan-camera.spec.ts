@@ -54,6 +54,8 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
 
     await dialog.getByRole('button', { name: 'Select manually' }).click()
     await expect(dialog.getByRole('combobox')).toBeFocused()
+    // No scan result, so no "not found" notice.
+    await expect(dialog.locator('.soda-report-notice')).toBeHidden()
     await expect(dialog.getByRole('heading')).toHaveText('Report a soda')
     await expect(dialog.getByLabel('Camera')).toHaveCount(0)
     await expectCameraOff(page)
@@ -156,6 +158,7 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
     await expect(dialog.getByLabel('Camera')).toHaveCount(0)
     await expect(dialog.getByRole('button', { name: 'Scan barcode' })).toBeHidden()
     await expect(page.locator('.alert:visible')).toHaveCount(0)
+    await expect(dialog.locator('.soda-report-notice')).toBeHidden()
 
     await dialog.getByRole('combobox').fill('sprite')
     await dialog.locator('.soda-suggest-item', { hasText: 'Sprite Original' }).click()

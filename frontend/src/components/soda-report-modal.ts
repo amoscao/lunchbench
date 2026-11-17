@@ -11,6 +11,8 @@ const CAMERA_ICON = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0
 /** Dialog title while the camera is scanning; manual search and a scanned match use REPORT_TITLE. */
 const SCAN_TITLE = 'Scan the soda barcode'
 const REPORT_TITLE = 'Report a soda'
+/** Shown above the search after a scanned barcode matched no drink. */
+const NOT_FOUND_NOTICE = 'Barcode not found. Try searching for the drink instead.'
 
 /**
  * Report a soda: type-ahead over the catalog, then "I like" or Hate.
@@ -37,6 +39,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
         </button>
       </div>
       <div class="soda-report-scan" hidden></div>
+      <p class="soda-report-notice" role="status"></p>
       <div class="soda-report-search">
         <input class="form-input soda-report-input" type="text" autocomplete="off" spellcheck="false"
           placeholder="Soda or seltzer" aria-label="Soda or seltzer"
@@ -55,6 +58,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
   const input = backdrop.querySelector<HTMLInputElement>('.soda-report-input')!
   const list = backdrop.querySelector<HTMLUListElement>('.soda-suggest')!
   const error = backdrop.querySelector<HTMLElement>('.soda-report-error')!
+  const notice = backdrop.querySelector<HTMLElement>('.soda-report-notice')!
   const likeBtn = backdrop.querySelector<HTMLButtonElement>('.soda-report-like')!
   const hateBtn = backdrop.querySelector<HTMLButtonElement>('.soda-report-hate')!
   const search = backdrop.querySelector<HTMLElement>('.soda-report-search')!
@@ -68,6 +72,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
   function enterScanMode(): void {
     picked = null
     unknownScan = null
+    notice.textContent = ''
     input.value = ''
     hideSuggestions()
     error.hidden = true
@@ -102,6 +107,9 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
     scanOpenBtn.hidden = cameraFailed || !cameraSupported()
     picked = null
     unknownScan = unknown
+    // A scan that matched nothing lands here; say so, or dropping into search looks like a glitch.
+    // The status region stays in the DOM (empty when idle) so screen readers announce the change.
+    notice.textContent = unknown ? NOT_FOUND_NOTICE : ''
     setButtons()
     if (!closed) input.focus()
   }

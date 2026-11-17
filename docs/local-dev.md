@@ -40,6 +40,7 @@ npx wrangler d1 execute lunchbench --local --file=../migrations/0013_soda_barcod
 npx wrangler d1 execute lunchbench --local --file=../migrations/seed.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0015_remove_olipop.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0016_soda_ban_overrides.sql
 ```
 
 `seed.sql` adds 14 sample sodas and seltzers. Their images live in local R2 only after an upload. To load the placeholder images used by E2E:

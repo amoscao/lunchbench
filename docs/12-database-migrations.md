@@ -35,6 +35,7 @@ Current files include:
 - `0013_soda_barcodes.sql`
 - `0014_soda_barcodes_seed.sql`
 - `0015_remove_olipop.sql`
+- `0016_soda_ban_overrides.sql`
 - `seed.sql`
 
 `0006_glicko_defaults.sql` repairs the schema defaults for new lunches, resets invalid-only self-match histories to the unrated Glicko baseline, drops copied self-match votes, and shifts obvious valid old-default `1000` starts onto the `1500` scale. It does not replay mixed historical Glicko games. Exact historical replay requires an explicitly approved repair command because the Glicko update is application logic, not SQL.
@@ -54,6 +55,8 @@ Current files include:
 - it sets `is_active = 0` and `image_key = NULL` on their `sodas` rows.
 
 Swipe and report history stays in place but is never shown, because every soda read path filters `is_active = 1`. Apply it after 0012 and 0014, including locally after loading the full catalog. Its R2 images are deleted separately (`docs/deployment.md`, "Remove OLIPOP").
+
+`0016_soda_ban_overrides.sql` adds `soda_ban_overrides` (`soda_id` primary key referencing `sodas(id)`, `hates_at_override`, `created_at`): one row per drink an admin unbanned (#298). The auto-ban itself is computed from `soda_reports`; this table only raises a drink's threshold to `5 + hates_at_override`. Additive and schema only. Apply it before the Worker that reads it deploys: every soda read path joins it, so without the table they return 500.
 
 0012 and 0014 have shipped, but `scripts/data/sodas.json` and `scripts/data/soda-barcodes.json` no longer list OLIPOP. So `import-sodas.mjs sql` and `import-barcodes.mjs sql` now refuse to overwrite their migration (`--force` overrides, for a deliberate, reviewed rebuild only). Catalog changes go in a new migration, like 0015. `worker/src/soda-catalog.test.ts` checks that each shipped migration, minus the drinks 0015 removes, still matches its JSON source.
 

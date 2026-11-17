@@ -48,7 +48,7 @@ Code:
 
 Data:
 
-- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), `soda_buy_lists` (frozen weekly order snapshots), `soda_barcodes` (code to drink) and `soda_unknown_scans` (scans that matched no code).
+- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), `soda_buy_lists` (frozen weekly order snapshots), `soda_barcodes` (code to drink), `soda_unknown_scans` (scans that matched no code) and `soda_ban_overrides` (admin unbans of auto-banned drinks, #298).
 - `scripts/data/sodas.json`: cleaned catalog with Walmart image URLs. Images are not committed. Drinks taken off later (OLIPOP, issue #296) are removed here and deactivated by a migration.
 - `scripts/import-sodas.mjs`: generated `migrations/0012_soda_catalog.sql` (its `sql` command now refuses to overwrite the shipped file; `--force` only for a reviewed rebuild) and uploads images to R2 (`--local` or `--remote`). Image keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, so the migration and the uploads agree.
 - `scripts/import-barcodes.mjs`: one-off import of retail barcodes from Open Food Facts into `scripts/data/soda-barcodes.json`, and generated `migrations/0014_soda_barcodes_seed.sql` (its `sql` command now refuses to overwrite it; `--force` only for a reviewed rebuild). Catalog or barcode changes go in a new migration, like 0015.

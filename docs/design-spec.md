@@ -441,12 +441,17 @@ Mockups live outside the repo; this section is the source of truth.
   - Unknown code: the code is logged, the camera stops, and the modal switches to manual search with the field focused. The code goes with the manual report so the next scan matches.
   - Permission denied, no camera, no camera API, or no decoder: straight to manual search. No error screen. The "Scan barcode" button hides.
   - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors, including while the decoder is still loading. A camera that ends on its own drops to manual search.
-  - Admin "Unknown scans" tab: the Mapped column shows the drink and its source, e.g. "Sprite Original (voter)". Dismiss removes the code's scans and a voter mapping; seed and admin mappings stay.
+  - Admin "Unknown scans" tab: the Mapped column shows the drink and its source, e.g. "Sprite Original (voter)". Dismiss removes the code's scans and a voter mapping; seed and admin mappings stay. A removed drink is named "<name> (removed)" and a banned one "<name> (banned)". Mapping to a drink that was banned after the tab loaded shows "That drink is banned, so codes cannot be mapped to it. Pick another or unban it first." and reloads the tab.
+  - No helper text: only the preview, the frame and labelled controls.
 
 ### Auto-ban (#298)
 - A drink whose latest report from 5 or more distinct voters is Hate disappears on its own, with no admin step: from the swipe feed, report search, the soda leaderboard, the weekly order list and barcode matches. A scanned banned can goes to manual search.
-- Admin "Banned drinks" tab: a read-only table with Drink, Hates and Likes, most hated first; "No banned drinks" when empty. There is no unban button; the ban lifts on its own if reports change.
-  - No helper text: only the preview, the frame and labelled controls.
+- The current week's order list on `/chris` loses the drink at once, without a regenerate. The rows below move up one rank; no replacement is added until the next weekly list.
+- A ban does not lift on its own: reports on a banned drink are rejected, so they cannot change. Only an admin unban brings it back.
+- Admin "Banned drinks" tab: a table with Drink, Hates, Likes and an **Unban** button per row (secondary, small), most hated first; "No banned drinks" when empty. Unban shows "Unbanned!" and reloads the list. An unbanned drink is shown again until it gets 5 new Hates, then it is banned again and returns to the list.
+- Pages opened before the ban:
+  - Swiping a card of a drink that was banned since the feed loaded counts as done: no "Swipe not saved" alert.
+  - Reporting it shows "This drink has been removed" in the modal's error slot, clears the pick and drops the drink from that page's search and scan matches.
 
 ### Leaderboard tabs
 - Both leaderboards show a tab row above the heading: **Lunch** (`/leaderboard`) and **Soda** (`/leaderboard/soda`). Active tab: `--text-primary` with a 2px `--accent` underline.

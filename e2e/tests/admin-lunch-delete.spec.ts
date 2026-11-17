@@ -43,9 +43,11 @@ async function presentEveryVeganPair(): Promise<string[]> {
   throw new Error('vegan matchups never exhausted')
 }
 
+let adminToken: string | null = null
+
 async function adminDelete(id: number): Promise<number> {
-  const token = await verifyPassword(ADMIN_MANAGER_PASSWORD)
-  const res = await fetch(`${API_URL}/api/admin/lunches/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+  adminToken ??= await verifyPassword(ADMIN_MANAGER_PASSWORD)
+  const res = await fetch(`${API_URL}/api/admin/lunches/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminToken}` } })
   return res.status
 }
 
@@ -56,9 +58,11 @@ async function openAdmin(page: Page): Promise<void> {
 }
 
 test.describe('Admin lunch delete', () => {
-  // Deleting an id that is already gone also answers 200.
+  // Deleting an id that is already gone also answers 200. Every delete runs before the assert.
   test.afterEach(async () => {
-    for (const id of created.splice(0)) expect(await adminDelete(id)).toBe(200)
+    const statuses: number[] = []
+    for (const id of created.splice(0)) statuses.push(await adminDelete(id))
+    expect(statuses.filter((status) => status !== 200)).toEqual([])
   })
 
   test('deletes a lunch that has been shown in matchups and shows success', async ({ page }) => {

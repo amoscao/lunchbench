@@ -49,22 +49,15 @@ test.describe('Auto-ban after 5 Hate reports', () => {
     await expect(dialog.locator('.soda-suggest-item', { hasText: NAME })).toHaveCount(0)
     await page.keyboard.press('Escape')
 
-    // Swipe feed: swipe through every card; the banned drink never shows up.
-    const seen: number[] = []
-    page.on('request', (request) => {
-      if (request.url().includes('/api/soda/swipes') && request.method() === 'PUT') {
-        seen.push((JSON.parse(request.postData() ?? '{}') as { soda_id: number }).soda_id)
-      }
-    })
-    const top = page.locator('.soda-card[data-depth="0"]')
-    while (await top.count() > 0) {
-      const shown = Number(await top.getAttribute('data-soda-id'))
-      await page.keyboard.press('ArrowLeft')
-      await expect(page.locator(`.soda-card[data-depth="0"][data-soda-id="${shown}"]`)).toHaveCount(0)
-    }
-    await expect(page.locator('.soda-end-title')).toHaveText("You've rated everything")
-    expect(seen.length).toBeGreaterThan(0)
-    expect(seen).not.toContain(id)
+    // Swipe feed: the page's whole feed (all unswiped drinks for its session) leaves the drink out,
+    // and no rendered card shows it. No swiping here, so later specs still see untouched drinks.
+    await expect(page.locator('.soda-card[data-depth="0"]')).toBeVisible()
+    const session = await page.evaluate(() => localStorage.getItem('lb_session_id') ?? '')
+    const feed = await fetch(`${API_URL}/api/soda/deck`, { headers: { 'X-Lunchbench-Session': session } })
+    const feedIds = (await feed.json() as { sodas: { id: number }[] }).sodas.map((soda) => soda.id)
+    expect(feedIds.length).toBeGreaterThan(0)
+    expect(feedIds).not.toContain(id)
+    await expect(page.locator(`.soda-card[data-soda-id="${id}"]`)).toHaveCount(0)
 
     // A further report on the banned drink is rejected with a clear code.
     const rejected = await fetch(`${API_URL}/api/soda/reports`, {

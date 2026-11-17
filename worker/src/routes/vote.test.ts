@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { voteRouter } from './vote'
 import type { Bindings, LunchRow } from '../types'
+import { createTestD1 } from '../../test/sqlite-d1'
 
 function lunchRow(id: number, isVegan: number): LunchRow {
   return {
@@ -136,5 +137,30 @@ describe('POST /api/vote legacy lunches (#286)', () => {
     const rows = [legacy(1)]
     const res = await voteRouter.request('/', voteBody(1, 99), testEnv(rows))
     expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /api/vote legacy lunches on real SQLite (#286)', () => {
+  test('a legacy lunch on either side gets 409 and writes nothing', async () => {
+    const { db, sqlite } = createTestD1()
+    sqlite.prepare("INSERT INTO lunches (id, name, is_vegan, is_legacy) VALUES (1, 'Legacy', 0, 1), (2, 'Current', 0, 0)").run()
+    const before = sqlite.prepare('SELECT * FROM lunches ORDER BY id').all()
+
+    for (const [left, right] of [[1, 2], [2, 1]]) {
+      const res = await voteRouter.request('/', voteBody(left, right), testEnv(ROWS, db))
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({ error: 'Legacy lunches cannot be voted on', code: 'LEGACY_LUNCH' })
+    }
+
+    expect(sqlite.prepare('SELECT * FROM lunches ORDER BY id').all()).toEqual(before)
+    expect(Number(sqlite.prepare('SELECT COUNT(*) AS n FROM votes').get()!.n)).toBe(0)
+  })
+
+  test('two current lunches still vote', async () => {
+    const { db, sqlite } = createTestD1()
+    sqlite.prepare("INSERT INTO lunches (id, name, is_vegan, is_legacy) VALUES (1, 'A', 0, 0), (2, 'B', 0, 0)").run()
+    const res = await voteRouter.request('/', voteBody(1, 2), testEnv(ROWS, db))
+    expect(res.status).toBe(200)
+    expect(Number(sqlite.prepare('SELECT COUNT(*) AS n FROM votes').get()!.n)).toBe(1)
   })
 })

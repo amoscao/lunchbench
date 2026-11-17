@@ -36,7 +36,8 @@ type MatchupTokenRow = PresentedPairRow & {
 // needs every pair in the window, so it never fires early. A session that has seen more pairs
 // than the cap cycles back to its oldest ones; POST /seen refreshes presented_at, so a re-served
 // pair moves back into the window and the next-oldest pair drops out.
-export const MATCHUP_HISTORY_LIMIT = 500
+// Matches the client's seen-pairs memory (frontend/src/utils/seen-pairs.ts MAX).
+export const MATCHUP_HISTORY_LIMIT = 2000
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 

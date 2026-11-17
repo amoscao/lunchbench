@@ -4,8 +4,11 @@ import { resetRateLimitReports } from './rate-limit'
 import type { Bindings } from './types'
 
 // #262: a 429 on POST /api/admin/verify goes to Sentry through the real app and SDK. The event must not
-// carry the raw IP, the request body (the typed password), the Authorization header or the voter session.
+// carry any client IP header, the request body (the typed password), the Authorization header or the
+// voter session.
 const RAW_IP = '203.0.113.42'
+const RAW_IPV6 = '2001:db8::42'
+const PSEUDO_IP = '240.1.2.3'
 const PASSWORD = 'typed-password-attempt'
 const BEARER = 'bearer-token-value'
 const SESSION = '550e8400-e29b-41d4-a716-446655440000'
@@ -42,6 +45,11 @@ async function blockedVerify(dsn: string): Promise<{ status: number; sent: strin
       'Content-Type': 'application/json',
       'CF-Connecting-IP': RAW_IP,
       'X-Forwarded-For': RAW_IP,
+      'CF-Connecting-IPv6': RAW_IPV6,
+      'CF-Pseudo-IPv4': PSEUDO_IP,
+      'X-Real-IP': RAW_IP,
+      'X-Original-Forwarded-For': RAW_IP,
+      'User-Agent': 'probe-agent',
       Authorization: `Bearer ${BEARER}`,
       'X-Lunchbench-Session': SESSION,
       Cookie: 'a=b',
@@ -72,7 +80,8 @@ describe('rate-limit Sentry event through the real app', () => {
     expect(envelope).toContain('"route":"POST /api/admin/verify"')
     expect(envelope).toMatch(/"ip_hash":"[0-9a-f]{16}"/)
     expect(envelope).toContain('"limit":5')
-    for (const secret of [RAW_IP, PASSWORD, BEARER, SESSION, 'a=b']) {
+    expect(envelope).toContain('probe-agent')
+    for (const secret of [RAW_IP, RAW_IPV6, PSEUDO_IP, PASSWORD, BEARER, SESSION, 'a=b']) {
       expect(envelope).not.toContain(secret)
     }
   })

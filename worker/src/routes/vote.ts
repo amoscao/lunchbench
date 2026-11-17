@@ -124,7 +124,6 @@ export async function recordVoteWithRetry(
             SELECT 1 FROM lunches
             WHERE id = ?
               AND is_vegan = ?
-              AND is_legacy = 0
               AND rating = ?
               AND glicko_rd = ?
               AND glicko_volatility = ?
@@ -134,7 +133,6 @@ export async function recordVoteWithRetry(
             SELECT 1 FROM lunches
             WHERE id = ?
               AND is_vegan = ?
-              AND is_legacy = 0
               AND rating = ?
               AND glicko_rd = ?
               AND glicko_volatility = ?

@@ -442,6 +442,10 @@ Mockups live outside the repo; this section is the source of truth.
   - Permission denied, no camera, no camera API, or no decoder: straight to manual search. No error screen. The "Scan barcode" button hides.
   - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors, including while the decoder is still loading. A camera that ends on its own drops to manual search.
   - Admin "Unknown scans" tab: the Mapped column shows the drink and its source, e.g. "Sprite Original (voter)". Dismiss removes the code's scans and a voter mapping; seed and admin mappings stay.
+
+### Auto-ban (#298)
+- A drink whose latest report from 5 or more distinct voters is Hate disappears on its own, with no admin step: from the swipe feed, report search, the soda leaderboard, the weekly order list and barcode matches. A scanned banned can goes to manual search.
+- Admin "Banned drinks" tab: a read-only table with Drink, Hates and Likes, most hated first; "No banned drinks" when empty. There is no unban button; the ban lifts on its own if reports change.
   - No helper text: only the preview, the frame and labelled controls.
 
 ### Leaderboard tabs

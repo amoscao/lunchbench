@@ -425,6 +425,12 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 - Constants: `c = 4` (`SODA_MEAN_SHRINK`), `k = 2` (`SODA_BRAND_PRIOR_STRENGTH`). Each weekly snapshot records them in `params_json`.
 - The ranking key, the Thompson trial draws and the favorites rule all use this posterior.
 - Inactive drinks (`sodas.is_active = 0`) are excluded everywhere, including the type and brand means.
+- **Auto-ban (#298).** A drink is **banned** when at least `SODA_BAN_HATES = 5` distinct voters' latest report on it is a Hate. Reports from barcode scans and from manual search count alike; likes do not offset hates.
+  - The ban is computed from `soda_reports` on every read and never stored, so a voter changing a Hate to a Like (before the ban) or an admin data fix lifts it at once.
+  - A banned drink disappears everywhere an inactive one does: the swipe feed, catalog and report search, leaderboard, weekly order selection (favorites, trials and the type mean), and `/api/soda/barcodes`. A scanned banned can therefore falls through to manual search and is logged as an unknown scan.
+  - Its own evidence still counts toward **its brand's prior**, so a bad brand keeps paying for it.
+  - The threshold is recorded in the weekly snapshot's `params_json` as `score.banHates`.
+  - Swipe and report history is kept.
 - Rank key: posterior mean α/(α+β) desc, then appeal desc. The public leaderboard breaks remaining ties by name, then id. The weekly order list breaks them with a shuffle seeded by `week_start`, so a fresh catalog (all tied) does not buy alphabetically.
 
 ### GET /api/soda/catalog
@@ -457,7 +463,7 @@ Records the voter's swipe. A later swipe on the same drink replaces the earlier 
 
 **Response 200:** `{ "ok": true }`
 
-**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `429 RATE_LIMITED`
+**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `409 SODA_BANNED` (the drink is banned), `429 RATE_LIMITED`
 
 ### POST /api/soda/reports
 Records that the voter had the drink and liked or hated it. One report per voter per drink: a newer report replaces the older one (latest verdict wins).
@@ -479,7 +485,7 @@ With `barcode`, after the report is saved:
 
 **Response 200:** `{ "ok": true }`. With `barcode`: `{ "ok": true, "barcode_soda_id": 12 }`, the drink the code maps to now (`null` if it stays unmapped). The client adds it to its local lookup so a re-scan matches.
 
-**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND`, `429 RATE_LIMITED`
+**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `409 SODA_BANNED` (the drink is banned; the report is rejected, not stored), `429 RATE_LIMITED`
 
 ### Barcodes
 
@@ -640,7 +646,17 @@ There is no inventory or purchase tracking.
 
 **Response 200:** `{ "code": "0012345678905", "soda_id": 12 }`
 
-**Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`, `404 NOT_FOUND` (unknown or inactive drink)
+**Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`, `404 NOT_FOUND` (unknown or inactive drink), `409 SODA_BANNED` (banned drink)
+
+### GET /api/admin/soda/banned
+**Requires admin auth.** Drinks currently auto-banned (5+ distinct voters reporting Hate), most hated first. Read-only: the ban is computed from reports.
+
+**Response 200:**
+```json
+{ "banned": [ { "id": 12, "name": "Coca-Cola Original", "hates": 5, "likes": 2 } ] }
+```
+
+**Errors:** `401 UNAUTHORIZED`
 
 ### DELETE /api/admin/soda/unknown-scans/:code
 **Requires admin auth.** Dismisses a code (for example a non-soda barcode a voter then "reported" as a drink): deletes its rows from the log and its `voter` mapping, if any. The next scan of the code is unknown again, so it is logged again. `seed` and `admin` mappings stay; to change one, map the code to another drink.

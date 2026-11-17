@@ -12,10 +12,14 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
     await page.goto('/soda')
     const dialog = await openReport(page)
 
+    await expect(dialog.getByRole('heading')).toHaveText('Scan the soda barcode')
     await expect(dialog.getByLabel('Camera')).toBeVisible()
+    // Square scan area, so a barcode fits held either way.
+    const view = await dialog.locator('.barcode-scan-view').boundingBox()
+    expect(Math.abs(view!.width - view!.height)).toBeLessThanOrEqual(1)
     await expect(dialog.getByRole('button', { name: 'Select manually' })).toBeVisible()
     await expect(dialog.getByRole('combobox')).toBeHidden()
-    await expect(dialog.getByRole('button', { name: 'Like' })).toBeDisabled()
+    await expect(dialog.getByRole('button', { name: 'I like' })).toBeDisabled()
     await expect.poll(() => liveTracks(page)).toBeGreaterThan(0)
     const constraints = await page.evaluate(() => window.__lbConstraints[0])
     expect(constraints.video).toMatchObject({ facingMode: { ideal: 'environment' } })
@@ -49,6 +53,7 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
 
     await dialog.getByRole('button', { name: 'Select manually' }).click()
     await expect(dialog.getByRole('combobox')).toBeFocused()
+    await expect(dialog.getByRole('heading')).toHaveText('Report a soda')
     await expect(dialog.getByLabel('Camera')).toHaveCount(0)
     await expectCameraOff(page)
 
@@ -66,7 +71,7 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
       history.pushState(null, '', '/leaderboard')
       window.dispatchEvent(new PopStateEvent('popstate'))
     })
-    await expect(page.getByRole('dialog', { name: 'Report a soda' })).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     await expectCameraOff(page)
   })
 
@@ -153,7 +158,7 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
 
     await dialog.getByRole('combobox').fill('sprite')
     await dialog.locator('.soda-suggest-item', { hasText: 'Sprite Original' }).click()
-    await expect(dialog.getByRole('button', { name: 'Like' })).toBeEnabled()
+    await expect(dialog.getByRole('button', { name: 'I like' })).toBeEnabled()
   })
 
   test('no camera API lands in manual search', async ({ page }) => {

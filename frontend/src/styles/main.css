@@ -37,6 +37,11 @@
   --text-logo: 20px;
   --product-bg: #ffffff;
   --hate: #1d4ed8;
+  /* Report buttons: solid green "I like", solid red "Hate". White text passes AA on both, in both themes. */
+  --report-like: #15803d;
+  --report-like-hover: #166534;
+  --report-hate: #b91c1c;
+  --report-hate-hover: #991b1b;
   --tag-seltzer-bg: #dbeafe;
   --tag-seltzer-text: #1e3a8a;
   --modal-scrim: rgba(17, 17, 16, 0.4);
@@ -2294,13 +2299,16 @@ body.soda-route { overflow-x: clip; }
   border-radius: 12px;
 }
 
-.soda-report-hate {
-  background: var(--bg-surface);
-  color: var(--hate);
-  border: 1px solid var(--hate);
+.soda-report-hate,
+.soda-report-like {
+  color: #ffffff;
+  border: 1px solid transparent;
 }
 
-.soda-report-hate:hover { background: var(--bg-hover); }
+.soda-report-hate { background: var(--report-hate); }
+.soda-report-like { background: var(--report-like); }
+.soda-report-hate:hover:not(:disabled) { background: var(--report-hate-hover); }
+.soda-report-like:hover:not(:disabled) { background: var(--report-like-hover); }
 
 /* =====================
    Sodabench: leaderboard and order list
@@ -2457,7 +2465,8 @@ body.soda-route { overflow-x: clip; }
 
 .barcode-scan-view {
   position: relative;
-  aspect-ratio: 4 / 3;
+  /* Square, so a barcode fits held horizontally or vertically. */
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: #000;
@@ -2472,10 +2481,7 @@ body.soda-route { overflow-x: clip; }
 
 .barcode-scan-frame {
   position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 32%;
-  bottom: 32%;
+  inset: 14%;
   border: 3px solid var(--accent);
   border-radius: var(--radius-md);
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);

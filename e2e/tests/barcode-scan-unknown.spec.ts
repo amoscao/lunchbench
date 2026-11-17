@@ -28,7 +28,7 @@ test.describe('Barcode scan mode: unknown code', () => {
 
     await combobox.fill('olipop vintage')
     await dialog.locator('.soda-suggest-item', { hasText: 'OLIPOP Vintage Cola' }).click()
-    await dialog.getByRole('button', { name: 'Like' }).click()
+    await dialog.getByRole('button', { name: 'I like' }).click()
     await expect(dialog).toBeHidden()
 
     const report = network.requests.find((r) => r.url().endsWith('/api/soda/reports'))!

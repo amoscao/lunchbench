@@ -444,7 +444,8 @@ function renderDashboard(container: HTMLElement): void {
     return true
   }
 
-  // Drinks hidden by 5+ Hate reports from distinct voters. Read-only: the ban is computed from reports.
+  // Drinks hidden by 5+ Hate reports from distinct voters. The ban is computed from reports; Unban
+  // exempts a drink until it gets 5 new Hates (POST /admin/soda/banned/:id/unban).
   async function loadBanned(): Promise<void> {
     tabContent.innerHTML = `<div class="skeleton" style="height:120px;border-radius:var(--radius-md)"></div>`
     let banned: BannedDrink[]
@@ -462,18 +463,37 @@ function renderDashboard(container: HTMLElement): void {
     }
     tabContent.innerHTML = `
       <table class="leaderboard-table banned-drinks-table" style="font-size:13px">
-        <thead><tr><th>Drink</th><th>Hates</th><th>Likes</th></tr></thead>
+        <thead><tr><th>Drink</th><th>Hates</th><th>Likes</th><th>Actions</th></tr></thead>
         <tbody>
           ${banned.map((drink) => `
             <tr data-soda-id="${drink.id}">
               <td>${escapeHtml(drink.name)}</td>
               <td style="font-variant-numeric:tabular-nums">${drink.hates}</td>
               <td style="font-variant-numeric:tabular-nums">${drink.likes}</td>
+              <td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" data-action="unban" aria-label="Unban ${escapeHtml(drink.name)}">Unban</button></td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     `
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="unban"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        btn.disabled = true
+        try {
+          const res = await adminFetch(`/admin/soda/banned/${row.dataset.sodaId}/unban`, { method: 'POST' })
+          // 404: no longer banned (unbanned in another tab, or a Hate changed to Like). The reload shows it.
+          if (!res.ok && res.status !== 404) throw new Error('Unban failed')
+          showAlert(res.ok ? 'Unbanned!' : 'Already not banned', 'success')
+          await loadBanned()
+        } catch (e: unknown) {
+          if (sessionExpired(e)) return
+          btn.disabled = false
+          showAlert('Unban failed', 'error')
+        }
+      })
+    })
   }
 
   async function loadScans(): Promise<void> {
@@ -549,6 +569,12 @@ function renderDashboard(container: HTMLElement): void {
             method: 'POST',
             body: JSON.stringify({ code: row.dataset.code, soda_id: sodaId }),
           })
+          if (res.status === 409) {
+            // The drink was auto-banned (#298) after this tab loaded; the reload drops it from the list.
+            showAlert('That drink is banned, so codes cannot be mapped to it. Pick another or unban it first.', 'error')
+            await loadScans()
+            return
+          }
           if (!res.ok) throw new Error('Map failed')
           showAlert('Mapped!', 'success')
           await loadScans()

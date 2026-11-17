@@ -82,10 +82,22 @@ export type MatchupResult = Matchup | MatchupExhausted | null
 const BASE = '/api'
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  /** `code` is the API's error code (e.g. 'SODA_BANNED') when the response carried one. */
+  constructor(message: string, readonly status: number, readonly code?: string) {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+/** Reads the `code` field of a JSON error response, if any. */
+async function errorCode(res: Response): Promise<string | undefined> {
+  const body = await res.json().catch(() => null) as { code?: unknown } | null
+  return typeof body?.code === 'string' ? body.code : undefined
+}
+
+/** True when the drink was auto-banned (#298) after this page loaded it. */
+export function isSodaBannedError(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 409 && e.code === 'SODA_BANNED'
 }
 
 function resolveImageUrl(imageUrl: string | null): string | null {
@@ -313,7 +325,7 @@ export async function submitSodaSwipe(sodaId: number, direction: 'right' | 'left
     headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
     body: JSON.stringify({ soda_id: sodaId, direction }),
   })
-  if (!res.ok) throw new ApiError(`Swipe failed: ${res.status}`, res.status)
+  if (!res.ok) throw new ApiError(`Swipe failed: ${res.status}`, res.status, await errorCode(res))
 }
 
 /**
@@ -330,7 +342,7 @@ export async function submitSodaReport(
     headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
     body: JSON.stringify(barcode ? { soda_id: sodaId, verdict, barcode } : { soda_id: sodaId, verdict }),
   })
-  if (!res.ok) throw new ApiError(`Report failed: ${res.status}`, res.status)
+  if (!res.ok) throw new ApiError(`Report failed: ${res.status}`, res.status, await errorCode(res))
   return await res.json().catch(() => ({})) as { barcode_soda_id?: number | null }
 }
 

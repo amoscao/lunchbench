@@ -34,6 +34,7 @@
   ```bash
   RUN_ID="$(gh run list --workflow=deploy.yml --branch=main --limit 1 --json databaseId -q '.[0].databaseId')"
   gh run rerun "$RUN_ID"
+  sleep 10   # let GitHub queue the re-run, so watch does not see the old attempt
   gh run watch "$RUN_ID" --exit-status
   ```
   The Worker secret changes at once. Until the new Pages deployment is live (a few minutes on rotation), the values differ and limits are site-wide. Nothing errors.

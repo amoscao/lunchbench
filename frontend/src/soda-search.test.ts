@@ -204,6 +204,8 @@ describe('aliases', () => {
     'orange': (d) => /orange|tangerine|mandarin/i.test(d.flavor),
     'cherry': (d) => /cherry/i.test(d.flavor),
     'creme': (d) => /cream/i.test(d.flavor),
+    'grapefruit': (d) => /grapefruit/i.test(d.flavor),
+    'grapefruits': (d) => /grapefruit|original citrus|pamplemousse/i.test(`${d.brand} ${d.flavor}`),
   }
 
   test('covers every alias key', () => {
@@ -249,6 +251,39 @@ describe('aliases', () => {
 
   test('creme soda finds cream sodas', () => {
     expect(names('creme soda')[0]).toBe('poppi Cream Soda')
+  })
+
+  // Grapefruit drinks without the word in their name (#301): Fresca's flagship ("Original Citrus") and
+  // LaCroix Pamplemousse. The alias adds them after the literal matches; type words still split soda from seltzer.
+  test('grapefruit finds every grapefruit drink, literal names first', () => {
+    expect(all('grapefruit')).toEqual([
+      'bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'Fresca Original Citrus', 'LaCroix Pamplemousse',
+    ])
+    // The plural ranks Fresca first: its two-word alias match outscores the exact "grapefruit" hits.
+    expect(all('grapefruits')).toEqual([
+      'Fresca Original Citrus', 'bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'LaCroix Pamplemousse',
+    ])
+  })
+
+  test.each(['fresca grapefruit', 'grapefruit fresca', 'grapefruit soda', 'grapefruit pop', 'fresca grape', 'fresca'])(
+    '%s finds only Fresca Original Citrus',
+    (query) => {
+      expect(all(query)).toEqual(['Fresca Original Citrus'])
+    }
+  )
+
+  test.each(['lacroix grapefruit', 'la croix grapefruit', 'grapefruit lacroix'])('%s finds LaCroix Pamplemousse', (query) => {
+    expect(all(query)).toEqual(['LaCroix Pamplemousse'])
+  })
+
+  test.each(['grapefruit seltzer', 'grapefruits seltzer'])('%s leaves Fresca out', (query) => {
+    expect(all(query)).toEqual(['bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'LaCroix Pamplemousse'])
+  })
+
+  test('grapef lists Fresca and Pamplemousse after the literal matches while typing grapefruit', () => {
+    expect(all('grapef')).toEqual([
+      'bubly Grapefruit', 'Bloom Nutrition Grape Freeze', 'Polar Ruby Red Grapefruit', 'Fresca Original Citrus', 'LaCroix Pamplemousse',
+    ])
   })
 
   test('diet cherry ranks Coca-Cola Diet Cherry first', () => {

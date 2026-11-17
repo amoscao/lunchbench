@@ -39,6 +39,7 @@ npx wrangler d1 execute lunchbench --local --file=../migrations/0011_sodabench.s
 npx wrangler d1 execute lunchbench --local --file=../migrations/0013_soda_barcodes.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/seed.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0015_remove_olipop.sql
 ```
 
 `seed.sql` adds 14 sample sodas and seltzers. Their images live in local R2 only after an upload. To load the placeholder images used by E2E:
@@ -47,17 +48,22 @@ npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcod
 node scripts/import-sodas.mjs upload --local --images-dir scripts/data/seed-images --skip-missing
 ```
 
-To load the full 124-drink catalog with real images locally:
+To load the full catalog (115 active drinks) with real images locally:
 
 ```bash
 cd worker
 npx wrangler d1 execute lunchbench --local --file=../migrations/0012_soda_catalog.sql
 # Re-run the barcode seed so the newly loaded drinks get their codes.
 npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
+# 0012 and 0014 still insert the OLIPOP drinks and barcodes they shipped with. Any re-run of either must be
+# followed by 0015, which deactivates them again (issue #296).
+npx wrangler d1 execute lunchbench --local --file=../migrations/0015_remove_olipop.sql
 cd ..
 # Downloads each image from its Walmart URL, or reads <walmart_item_id>.(jpeg|png) from --images-dir.
 node scripts/import-sodas.mjs upload --local
 ```
+
+If your local R2 still holds OLIPOP images from an older upload, delete them with the `--local` form of the commands in `docs/deployment.md` ("Remove OLIPOP").
 
 Barcode scanning needs a secure context for the camera. `http://localhost:5173` counts; a phone on the LAN does not, so test scan mode on a phone through an HTTPS tunnel or a Pages preview.
 

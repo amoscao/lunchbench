@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test'
 import { ADMIN_MANAGER_PASSWORD, API_URL } from './helpers'
 
 // Issue #298: Hate reports from 5 distinct voters ban a drink everywhere.
-const NAME = 'Waterloo Summer Berry'
+const NAME = 'Polar Orange Vanilla'
+// Same brand, not reported: the ban hides one drink, not its brand.
+const BRAND_MATE = 'Polar Original'
 
 async function sodaId(): Promise<number> {
   const res = await fetch(`${API_URL}/api/soda/catalog`)
@@ -44,8 +46,9 @@ test.describe('Auto-ban after 5 Hate reports', () => {
     await page.goto('/soda')
     await page.getByRole('button', { name: 'Report a soda' }).click()
     const dialog = page.getByRole('dialog', { name: 'Report a soda' })
-    await dialog.getByRole('combobox').fill('waterloo summer')
-    await page.waitForTimeout(300)
+    await dialog.getByRole('combobox').fill('polar')
+    // Waiting for the brand-mate proves the suggestions rendered before checking the banned drink is absent.
+    await expect(dialog.locator('.soda-suggest-item', { hasText: BRAND_MATE })).toHaveCount(1)
     await expect(dialog.locator('.soda-suggest-item', { hasText: NAME })).toHaveCount(0)
     await page.keyboard.press('Escape')
 
@@ -69,7 +72,7 @@ test.describe('Auto-ban after 5 Hate reports', () => {
     expect(await rejected.json()).toMatchObject({ code: 'SODA_BANNED' })
   })
 
-  test('the admin page lists banned drinks with hate and like counts', async ({ page }) => {
+  test('the admin page lists banned drinks with hate and like counts, and Unban brings one back', async ({ page }) => {
     const id = await sodaId().catch(() => null)
     // The drink is banned by the previous test, so it is gone from the catalog.
     expect(id).toBeNull()
@@ -81,5 +84,12 @@ test.describe('Auto-ban after 5 Hate reports', () => {
     await expect(row).toHaveCount(1)
     await expect(row.locator('td').nth(1)).toHaveText('5')
     await expect(row.locator('td').nth(2)).toHaveText('0')
+
+    await row.getByRole('button', { name: `Unban ${NAME}` }).click()
+    await expect(page.locator('.banned-drinks-table tbody tr', { hasText: NAME })).toHaveCount(0)
+    expect(await sodaId()).toBeGreaterThan(0)
+    // The unban holds until 5 new Hates, so leave it unbanned for later specs: 4 more stay shown.
+    for (let i = 0; i < 4; i++) expect(await hate(await sodaId())).toBe(200)
+    expect(await sodaId()).toBeGreaterThan(0)
   })
 })

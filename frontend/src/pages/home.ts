@@ -9,7 +9,7 @@ import {
   type VoteResult,
 } from '../api'
 import { isVeganMode } from '../vegan-mode'
-import { hasSeen, markSeen } from '../utils/seen-pairs'
+import { fetchUnseenMatchup, markSeen } from '../utils/seen-pairs'
 import { animateCountUp } from '../utils/count-up'
 import { escapeHtml } from '../utils/escape-html'
 import { isNewLunch } from '../utils/new-lunch'
@@ -332,18 +332,9 @@ export function renderHome(
   }
 
   async function getUnseenMatchup(veganOnly: boolean): Promise<MatchupResult> {
-    const matchup = await fetchUnseenMatchup(veganOnly)
+    const matchup = await fetchUnseenMatchup(() => getMatchup(veganOnly))
     await preloadMatchupImages(matchup)
     return matchup
-  }
-
-  async function fetchUnseenMatchup(veganOnly: boolean): Promise<MatchupResult> {
-    for (let i = 0; i < 3; i++) {
-      const matchup = await getMatchup(veganOnly)
-      if (!matchup || matchup.status !== 'ok') return matchup
-      if (!hasSeen(matchup.left.id, matchup.right.id)) return matchup
-    }
-    return getMatchup(veganOnly)
   }
 
   const castVote = async (result: 'left_win' | 'right_win' | 'tie'): Promise<void> => {

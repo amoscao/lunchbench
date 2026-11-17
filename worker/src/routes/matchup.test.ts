@@ -84,7 +84,7 @@ function fakeDb(rows: LunchRow[] = ALL_ROWS): D1Database & {
               low_lunch_id: lowLunchId,
               high_lunch_id: highLunchId,
             })
-          } else if (sql.includes('INSERT OR IGNORE INTO matchup_presentations')) {
+          } else if (sql.includes('INSERT INTO matchup_presentations')) {
             const [sessionKey, veganOnly, lowLunchId, highLunchId] = bound as [string, number, number, number]
             const exists = db.presentations.some((row) =>
               row.session_key === sessionKey &&

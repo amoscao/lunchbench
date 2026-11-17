@@ -125,6 +125,7 @@ Both lunches in the pair always share the same `is_vegan` value.
 Legacy lunches (`is_legacy = 1`, Paula Legacy Lunch) are never served. Only non-legacy lunches enter the matchup pool. They still appear on the leaderboard and count toward `rank`. The admin PDF export leaves them out and renumbers ranks.
 Selection weights the anchor lunch by `glicko_rd`, excludes session-seen pairs, avoids recent voted pairs when possible, then samples an opponent with a score based on rating proximity, opponent uncertainty, session presentation freshness, and small random jitter. Left/right sides are assigned randomly.
 If the requested group has fewer than 2 lunches, the endpoint returns 204. If the requested session and vegan mode has seen every available pair, the endpoint returns 200 with `{ "status": "exhausted" }`.
+Session history is capped (#249): selection reads only the 2000 most recent acknowledged pairs for the session and vegan mode (the size of the frontend's local seen-pairs list). Older pairs can be served again. So `exhausted` stays exact up to 63 lunches in a category (1953 pairs). With more lunches, a session that has seen more than 2000 pairs never gets `exhausted`; it cycles back to its oldest pairs. Acknowledging a pair again (`POST /api/matchup/seen`) refreshes its presentation time, so it moves back into the window and the next-oldest pair drops out.
 Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.
 `matchup_token` is an opaque token for the served pair. The client sends it to `POST /api/matchup/seen` only after the matchup renders; prefetching a matchup does not mark it seen.
 
@@ -171,7 +172,7 @@ Records that a rendered matchup was presented to the user.
 { "token": "550e8400-e29b-41d4-a716-446655440000" }
 ```
 
-The token must come from a prior successful `GET /api/matchup` response. Duplicate acknowledgements for the same token are treated as success.
+The token must come from a prior successful `GET /api/matchup` response. Duplicate acknowledgements for the same token are treated as success. Acknowledging a pair the session has seen before updates its presentation time (see the history cap above).
 
 **Response 200:**
 ```json
@@ -197,6 +198,7 @@ Submit a vote for a matchup.
 
 `result` must be one of: `"left_win"`, `"right_win"`, `"tie"`
 `left_lunch_id` and `right_lunch_id` must be different and must share the same `is_vegan` value. A vote between a vegan and non-vegan lunch returns 400 `BAD_REQUEST`.
+Neither lunch may be legacy (`is_legacy = 1`). `GET /api/matchup` never serves them, so such a vote comes from a stale tab or a direct API call. It returns 409 `LEGACY_LUNCH` and changes nothing. The current frontend does not retry it or show an error; it moves on to the next matchup. (A tab still running a bundle from before this change retries once and logs a frontend Sentry exception, then also moves on.)
 
 **Response 200:**
 ```json
@@ -221,6 +223,7 @@ The frontend prefetches the next full matchup with `GET /api/matchup`; the vote 
 **Errors:**
 - `400 BAD_REQUEST` — invalid or missing fields, or same lunch on both sides
 - `404 NOT_FOUND` — lunch id(s) not found
+- `409 LEGACY_LUNCH` — either lunch is legacy (`is_legacy = 1`)
 - `409 CONFLICT` — concurrent vote conflict after retries
 
 Vote writes retry from a fresh rating snapshot when another vote updates either lunch first. Counters are incremented in SQL so concurrent vote requests do not overwrite W/L/T totals.
@@ -292,6 +295,23 @@ Cache-Control: public, max-age=31536000, immutable
 ```
 
 **Response 404:** Image not found.
+
+---
+
+## Rate Limit Monitoring
+
+Every `429 RATE_LIMITED` response (Sodabench writes and `POST /api/admin/verify`) is sent to Sentry as a `warning` event, "Rate limit exceeded" (#262). It is built in one place, `rateLimitedResponse` in `worker/src/rate-limit.ts`, so a new limited route gets it by using that helper.
+
+- Tags: `route` (method and route pattern, e.g. `PUT /api/soda/swipes`), `rate_limit_action` (e.g. `soda_swipe`), `ip_hash`.
+- Extra: `count` (requests in the current window), `limit`.
+- Grouped per action (fingerprint `rate-limited` + action).
+- Throttled: at most one event per action and `ip_hash` per minute in each Worker isolate, so a client looping on a limited route cannot use up the Sentry event quota. Every request still gets its 429. For Sodabench writes `count` keeps rising with each blocked request, so it shows how far over the limit the window is. For `admin_verify` it is the failed-password count, which stops at the limit (blocked attempts are not counted).
+- `ip_hash` is the first 16 hex chars of HMAC-SHA-256(client IP, `IP_HASH_KEY`), or `unknown` when the request has no IP header. The raw IP is never sent. If `IP_HASH_KEY` is unset, a random key per Worker isolate is used, so hashes only match within one isolate.
+- The Worker Sentry client keeps `sendDefaultPii` off, so Sentry also strips IP headers from request data.
+- `beforeSend` (`worker/src/sentry.ts`) scrubs every Worker event: it drops the request body, cookies, `user.ip_address`, and every request header except `Content-Type` and `User-Agent`. Without it the SDK attaches the JSON body (a 429 on `POST /api/admin/verify` would carry the typed password) and keeps headers outside its own IP list, such as `Authorization`, `X-Lunchbench-Session` and `CF-Connecting-IPv6`.
+- With `SENTRY_DSN` empty (tests, local dev) the capture is a no-op. A failed report never changes the 429.
+
+The lunch routes have no rate limits (#264).
 
 ---
 
@@ -392,7 +412,7 @@ Voters swipe drinks and report drinks they had. The purchaser reads a frozen wee
 
 Voter identity is the browser-local `lb_session_id` UUID sent as `X-Lunchbench-Session`. There is no voter login.
 Writes require a valid session header and return `400 BAD_REQUEST` without one.
-Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour, unknown scans 60 per hour (`429 RATE_LIMITED`). Voter-learned barcode mappings are capped separately at 20 per hour; over that cap the report still counts but the mapping is skipped.
+Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour, unknown scans 60 per hour (`429 RATE_LIMITED`). Voter-learned barcode mappings are capped separately at 20 per hour; over that cap the report still counts but the mapping is skipped (no 429, not reported to Sentry).
 
 **Accepted risk: ballot stuffing.** Voters have no login. The session UUID is client-generated, so one person can clear localStorage (or script fresh UUIDs) and swipe or report the same drink many times. The per-IP rate limits cap the damage, but a shared office IP means they must stay loose. Lunchbench accepts this for an internal office tool. The order list is advisory and Chris can skip any row.
 Stuffing also reaches the auto-ban (#298): 5 Hate reports from fresh UUIDs ban a drink for everyone, and it drops off Chris's list at once, mid-week included. The mitigation is the admin "Banned drinks" tab: an admin sees every ban with its hate and like counts, and Unban (`POST /api/admin/soda/banned/:id/unban`) brings the drink back. An unbanned drink stays shown until its Hate count reaches the count at unban + 5 (at least 5 more Hates), so the same stuffing has to be repeated in full.

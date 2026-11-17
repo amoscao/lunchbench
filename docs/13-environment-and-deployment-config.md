@@ -75,6 +75,25 @@ cd worker
 npx wrangler secret put PURCHASER_PASSWORD
 ```
 
+### `IP_HASH_KEY`
+
+Optional. HMAC key for the `ip_hash` tag on rate-limit Sentry warnings (#262, see `docs/api-contract.md` "Rate Limit Monitoring"). Lets the hash group one IP across Worker isolates without being reversible by hashing every IPv4 address. Unset means a random key per isolate.
+
+Production value is a Cloudflare Worker secret:
+
+```bash
+cd worker
+npx wrangler secret put IP_HASH_KEY
+```
+
+Generate with:
+
+```bash
+openssl rand -hex 32
+```
+
+Rotating it changes every hash. Not needed locally.
+
 ### `CLOUDFLARE_API_TOKEN`
 
 Used by GitHub Actions to deploy Worker and Pages.

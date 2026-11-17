@@ -91,6 +91,9 @@ describe('checkRateLimit', () => {
     await expect(checkRateLimit(db, 'ip', 'vote', 1, 3600)).resolves.toEqual({
       allowed: false,
       retryAfter: 3000,
+      action: 'vote',
+      count: 2,
+      limit: 1,
     })
   })
 
@@ -144,6 +147,9 @@ describe('checkRateLimit', () => {
     await expect(peekRateLimit(db, 'ip', 'admin_verify', 1, 3600)).resolves.toEqual({
       allowed: false,
       retryAfter: 3000,
+      action: 'admin_verify',
+      count: 1,
+      limit: 1,
     })
   })
 

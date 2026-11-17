@@ -108,6 +108,7 @@ The frontend proxies `/api/*` requests to the worker using a Cloudflare Pages Fu
 |--------|-------|---------|
 | `ADMIN_TOKEN` | Worker secret + `.dev.vars` | Protects lunch creation and image upload routes |
 | `PURCHASER_PASSWORD` | Worker secret + `.dev.vars` | Mints `purchaser` sessions for `/chris` and `GET /api/soda/order/latest` |
+| `IP_HASH_KEY` | Worker secret (optional) | HMAC key for the IP hash in rate-limit Sentry warnings |
 | `CLOUDFLARE_API_TOKEN` | GitHub Actions secret | Allows CI to deploy worker and pages |
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret | Identifies Cloudflare account in CI |
 

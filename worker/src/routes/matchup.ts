@@ -31,6 +31,14 @@ type MatchupTokenRow = PresentedPairRow & {
   vegan_only: number
 }
 
+// #249: bound the per-session history read on every GET. Only the most recent rows are kept.
+// Truncation can only shrink the seen set: older pairs become eligible again and "exhausted"
+// needs every pair in the window, so it never fires early. A session that has seen more pairs
+// than the cap cycles back to its oldest ones; POST /seen refreshes presented_at, so a re-served
+// pair moves back into the window and the next-oldest pair drops out.
+// Matches the client's seen-pairs memory (frontend/src/utils/seen-pairs.ts MAX).
+export const MATCHUP_HISTORY_LIMIT = 2000
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export function parseSessionKey(value: string | null): string | null {
@@ -102,8 +110,10 @@ matchup.get('/', async (c) => {
       ? c.env.DB.prepare(
         `SELECT low_lunch_id, high_lunch_id
          FROM matchup_presentations
-         WHERE session_key = ? AND vegan_only = ?`
-      ).bind(sessionKey, veganFlag).all<PresentedPairRow>()
+         WHERE session_key = ? AND vegan_only = ?
+         ORDER BY presented_at DESC, rowid DESC
+         LIMIT ?`
+      ).bind(sessionKey, veganFlag, MATCHUP_HISTORY_LIMIT).all<PresentedPairRow>()
       : Promise.resolve({ results: [] as PresentedPairRow[] }),
   ])
 
@@ -307,10 +317,14 @@ matchup.post('/seen', async (c) => {
   }
 
   await upsertMatchupSession(c.env.DB, tokenRow.session_key)
+  // A repeat acknowledgement refreshes presented_at, so a pair served again after falling out of
+  // the history window re-enters it. Millisecond time keeps the newest-first order exact.
   await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO matchup_presentations
-       (session_key, vegan_only, low_lunch_id, high_lunch_id)
-     VALUES (?, ?, ?, ?)`
+    `INSERT INTO matchup_presentations
+       (session_key, vegan_only, low_lunch_id, high_lunch_id, presented_at)
+     VALUES (?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+     ON CONFLICT(session_key, vegan_only, low_lunch_id, high_lunch_id)
+     DO UPDATE SET presented_at = excluded.presented_at`
   ).bind(
     tokenRow.session_key,
     tokenRow.vegan_only,

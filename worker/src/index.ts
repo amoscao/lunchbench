@@ -11,6 +11,7 @@ import { handleImageUpload } from './routes/images'
 import { adminRouter } from './routes/admin'
 import { sodaRouter } from './routes/soda'
 import { writeWeeklyOrder } from './soda-data'
+import { sentryOptions } from './sentry'
 import { allowedCorsOrigin, restrictBrowserOrigins, securityHeaders } from './middleware'
 
 export const app = new Hono<{ Bindings: Bindings }>()
@@ -21,10 +22,7 @@ const corsOptions = {
   maxAge: 600,
 }
 
-app.use(sentry(app, (env) => ({
-  dsn: env.SENTRY_DSN,
-  tracesSampleRate: 0,
-})))
+app.use(sentry(app, sentryOptions))
 app.use('*', securityHeaders)
 app.use('/api/*', restrictBrowserOrigins)
 app.use('/api/*', cors(corsOptions))
@@ -63,7 +61,7 @@ export async function runWeeklyOrder(controller: ScheduledController, env: Bindi
 
 // The Hono middleware above only instruments fetch, so Sentry wraps the scheduled handler alone.
 const scheduledHandler = withSentry<Bindings>(
-  (env) => ({ dsn: env.SENTRY_DSN, tracesSampleRate: 0 }),
+  sentryOptions,
   { scheduled: (controller, env) => runWeeklyOrder(controller, env) }
 )
 

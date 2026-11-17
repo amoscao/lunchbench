@@ -5,6 +5,8 @@ export type Bindings = {
   ADMIN_MANAGER_PASSWORD: string
   PURCHASER_PASSWORD?: string
   SENTRY_DSN: string
+  // HMAC key for the IP hash in rate-limit Sentry events (#262). Optional.
+  IP_HASH_KEY?: string
 }
 
 export type Lunch = {

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
-import { checkRateLimit, getClientIp } from '../rate-limit'
+import { checkRateLimit, getClientIp, rateLimitedResponse } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildFeed, sessionTieKey } from '../soda-deck'
 import { hasData, rankForLeaderboard, scoreDrinks, sodaName, type DrinkStats } from '../soda-score'
@@ -99,7 +99,7 @@ soda.put('/swipes', async (c) => {
   }
 
   const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_swipe', SWIPE_LIMIT.limit, SWIPE_LIMIT.windowSeconds)
-  if (!rl.allowed) return c.json({ error: 'Too many swipes', code: 'RATE_LIMITED' }, 429)
+  if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many swipes')
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_swipes (session_key, soda_id, direction, swiped_at)
@@ -132,7 +132,7 @@ soda.post('/reports', async (c) => {
   }
 
   const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_report', REPORT_LIMIT.limit, REPORT_LIMIT.windowSeconds)
-  if (!rl.allowed) return c.json({ error: 'Too many reports', code: 'RATE_LIMITED' }, 429)
+  if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many reports')
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_reports (session_key, soda_id, verdict, reported_at)
@@ -206,7 +206,7 @@ soda.post('/unknown-scans', async (c) => {
   if (!code) return c.json({ error: 'Invalid barcode', code: 'BAD_REQUEST' }, 400)
 
   const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_unknown_scan', UNKNOWN_SCAN_LIMIT.limit, UNKNOWN_SCAN_LIMIT.windowSeconds)
-  if (!rl.allowed) return c.json({ error: 'Too many scans', code: 'RATE_LIMITED' }, 429)
+  if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many scans')
 
   await c.env.DB.prepare(
     'INSERT INTO soda_unknown_scans (code, format, session_key) VALUES (?, ?, ?)'

@@ -8,7 +8,7 @@ import {
   validateAdminSession,
   type SessionRole,
 } from '../helpers'
-import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
+import { incrementRateLimit, getClientIp, peekRateLimit, rateLimitedResponse } from '../rate-limit'
 import { bannedSodaSql, isSodaBanned, shownSodaSql, writeWeeklyOrder } from '../soda-data'
 import { normalizeBarcode } from '../barcode'
 import { sodaName } from '../soda-score'
@@ -22,9 +22,7 @@ const admin = new Hono<{ Bindings: Bindings }>()
 admin.post('/verify', async (c) => {
   const ip = getClientIp(c.req.raw)
   const rl = await peekRateLimit(c.env.DB, ip, 'admin_verify', 5, 3600)
-  if (!rl.allowed) {
-    return c.json({ error: 'Too many attempts', code: 'RATE_LIMITED' }, 429)
-  }
+  if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many attempts')
 
   const body = await c.req.json<{ password?: string }>().catch((): { password?: string } => ({}))
   if (!body.password) {

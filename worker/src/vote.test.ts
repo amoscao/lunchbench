@@ -29,7 +29,10 @@ type FakeStatement = {
   first: () => Promise<LunchRow | null>
 }
 
-function fakeDb(batchVoteIds: Array<number | null>): D1Database & { writeBatchCalls: number } {
+function fakeDb(
+  batchVoteIds: Array<number | null>,
+  onWrite?: (rows: Map<number, LunchRow>) => void
+): D1Database & { writeBatchCalls: number } {
   const rows = new Map<number, LunchRow>([
     [1, lunchRow(1)],
     [2, lunchRow(2)],
@@ -60,6 +63,7 @@ function fakeDb(batchVoteIds: Array<number | null>): D1Database & { writeBatchCa
 
       const voteId = batchVoteIds[this.writeBatchCalls] ?? null
       this.writeBatchCalls += 1
+      onWrite?.(rows)
       return [
         { results: [{ id: 1 }, { id: 2 }] },
         { results: voteId === null ? [] : [{ id: voteId }] },
@@ -70,6 +74,17 @@ function fakeDb(batchVoteIds: Array<number | null>): D1Database & { writeBatchCa
 }
 
 describe('recordVoteWithRetry', () => {
+  test('stops with legacy when a retry re-reads a lunch that became legacy (#286)', async () => {
+    const db = fakeDb([null, 42], (rows) => {
+      rows.set(1, { ...rows.get(1)!, is_legacy: 1 })
+    })
+
+    const result = await recordVoteWithRetry(db, 1, 2, 'left_win', 'test-voter')
+
+    expect(result).toEqual({ status: 'legacy' })
+    expect(db.writeBatchCalls).toBe(1)
+  })
+
   test('retries stale guarded writes before reporting conflict', async () => {
     const db = fakeDb(Array.from({ length: MAX_VOTE_WRITE_ATTEMPTS }, () => null))
 

@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/browser'
 import {
   acknowledgeMatchupSeen,
   getMatchup,
+  isLegacyLunchError,
   submitVote,
   type Lunch,
   type Matchup,
@@ -379,6 +380,9 @@ export function renderHome(
         wasRateLimited = true
         return
       }
+      // A stale matchup with a legacy lunch: retrying cannot succeed and it is not a failure to report.
+      // Fall through to the next matchup like a skip.
+      if (isLegacyLunchError(firstErr)) return
       try {
         return await submitVote(votedLeft.id, votedRight.id, result)
       } catch (secondErr: unknown) {

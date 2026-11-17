@@ -87,7 +87,7 @@ Run with the owner's go-ahead, from `worker/`, in this order. 0015 only touches 
    ```bash
    npx wrangler d1 time-travel info lunchbench
    ```
-   Keep the bookmark it prints. `wrangler d1 time-travel restore lunchbench --bookmark=<bookmark>` undoes the step if needed.
+   Keep the bookmark it prints. `wrangler d1 time-travel restore lunchbench --bookmark=<bookmark>` undoes the step if needed, but it restores the whole database: every write made after the bookmark (lunch votes, soda swipes and reports) is lost.
 2. Deactivate the drinks and drop their barcodes:
    ```bash
    npx wrangler d1 execute lunchbench --remote --file=../migrations/0015_remove_olipop.sql

@@ -636,7 +636,7 @@ There is no inventory or purchase tracking.
   ]
 }
 ```
-`first_seen` / `last_seen` are SQLite UTC timestamps. `picks` counts scans that voters resolved by reporting a drink manually; admin mappings are not picks. `mapped_source` is `seed`, `voter` or `admin` (null when unmapped). The admin tab shows it next to the drink.
+`first_seen` / `last_seen` are SQLite UTC timestamps. `picks` counts scans that voters resolved by reporting a drink manually; admin mappings are not picks. `mapped_source` is `seed`, `voter` or `admin` (null when unmapped). The admin tab shows it next to the drink. A drink that is no longer active (`is_active = 0`) is named with a ` (removed)` suffix in `picks[].name` and `mapped_name`, and the admin tab never preselects it.
 
 **Errors:** `401 UNAUTHORIZED`
 

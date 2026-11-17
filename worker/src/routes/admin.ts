@@ -156,7 +156,12 @@ admin.delete('/lunches/:id', requireAdminSession, async (c) => {
   const id = Number(c.req.param('id'))
   if (isNaN(id)) return c.json({ error: 'Invalid id', code: 'BAD_REQUEST' }, 400)
 
+  // One transaction. Every row naming the lunch goes before the lunch row: votes and
+  // matchup_presentations reference lunches(id) and foreign keys are on in D1. matchup_tokens has
+  // no foreign key, but /seen copies a token's pair into matchup_presentations.
   await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM matchup_presentations WHERE low_lunch_id = ? OR high_lunch_id = ?').bind(id, id),
+    c.env.DB.prepare('DELETE FROM matchup_tokens WHERE low_lunch_id = ? OR high_lunch_id = ?').bind(id, id),
     c.env.DB.prepare('DELETE FROM votes WHERE left_lunch_id = ? OR right_lunch_id = ?').bind(id, id),
     c.env.DB.prepare('DELETE FROM lunches WHERE id = ?').bind(id),
   ])

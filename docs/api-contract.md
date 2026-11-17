@@ -418,7 +418,7 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 - `likes` / `hates`: voters whose report is like / hate (one report row per voter per drink). `n` = distinct reporters.
 - θ is the chance a drinker is glad the drink was bought. Some brands are just worse, so each drink's prior comes from its brand.
 - Own evidence `(a_i, b_i)`, no prior: each like adds 1 to `a`, each hate adds 1 to `b`. Right swipes: κ = min(3, 0.2·R) · 3/(3+n), add 0.75κ to `a` and 0.25κ to `b`. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
-- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing in scoring or ranking: not the score, not the brand or type means, not the tiebreak. They still count as "seen" for the swipe feed order and are shown as a count.
+- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing in scoring or ranking: not the score, not the brand or type means, not the tiebreak. They are shown as a count, and a voter's own left swipe removes that drink from their feed.
 - A hate report is a full negative: it adds 1 to `b`, exactly as a like adds 1 to `a`.
 - Type mean: `m_type = (Σ_type a + c·0.5) / (Σ_type (a+b) + c)`.
 - Brand mean, leaving drink i out so its evidence is not counted twice: `m_B(−i) = (Σ_{j∈B, j≠i} a_j + c·m_type) / (Σ_{j∈B, j≠i} (a_j+b_j) + c)`. A single-drink brand gets exactly `m_type`. Brands are keyed by the catalog `brand` string as-is.
@@ -441,7 +441,15 @@ The voter's whole swipe feed: every active drink this voter has not swiped yet. 
 
 **Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
 
-Order: least evidence first (`R + L + 5·n`). Ties are broken by a per-drink key: `"<session key>:<drink id>"` is hashed and passed through a PRNG finalizer, so tied drinks spread evenly across voters. Each drink therefore keeps its place relative to the others, as long as evidence doesn't change, across swipes and reloads. Without a session header, ties are random. Swiped drinks never come back. Once every drink is swiped, the list is empty.
+Order: a random order weighted toward drinks people like, so voters mostly see promising drinks instead of wading through ones the office dislikes (`worker/src/soda-deck.ts`).
+
+- Weight = brand factor × own factor, capped to `[1/8, 16]` (`deckWeight`).
+- Brand factor: `odds(m_B(−i)) / odds(m_type)`, with `odds(x) = x/(1−x)`, the drink's brand prior mean `m_B(−i)` and its type mean `m_type` from the scoring model below. A drink is compared with its own category, so reports on one brand do not reshuffle every other brand or the other type. An untried flavor of a loved brand comes early; one of a hated brand comes late.
+- Own factor: `((1 + a)/(1 + b))^2` (`DECK_BIAS_POWER = 2`), where `(a, b)` is the drink's own evidence (`ownEvidence`: reports, plus right swipes as weak likes). It is 1 with no evidence, rises with every like or right swipe and falls with every hate. Raw counts are used rather than the posterior, because the posterior pulls toward the right-swipe mean (0.75): in an office that mostly reports likes, right swipes would otherwise lower a drink's feed weight. Left swipes do not count.
+- The caps (`DECK_MIN_WEIGHT`, `DECK_MAX_WEIGHT`) keep the extremes 128x apart, so a hated drink is rare near the top but still turns up early for some voters and can still collect right swipes.
+- With no ratings anywhere, every weight is 1 and the order is a uniform shuffle.
+- Weighted sampling without replacement (Efraimidis–Spirakis): key `u^(1/w)`, sorted largest first, with `u` from `"<session key>:<drink id>"` hashed and passed through a PRNG finalizer.
+- The order is stable across reloads while ratings don't change. The voter's own right swipes and reports count as ratings, so they can shift the rest of their feed a little. Without a session header, the order is random per request. Swiped drinks never come back. Once every drink is swiped, the list is empty.
 
 **Response 200:** `{ "sodas": [Soda] }`
 

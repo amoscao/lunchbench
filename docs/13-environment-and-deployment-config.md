@@ -94,6 +94,46 @@ openssl rand -hex 32
 
 Rotating it changes every hash. Not needed locally.
 
+### `PROXY_SECRET`
+
+Optional. Shared secret between the Pages Function proxy and the Worker, so the Worker can trust the visitor IP the proxy forwards (#307).
+
+Why: the proxy (`frontend/functions/api/[[path]].ts`) re-fetches the Worker at its `workers.dev` URL. The Worker's own `CF-Connecting-IP` is then a Cloudflare egress address shared by every visitor, so per-IP rate limits, barcode learning and the 429 `ip_hash` would be site-wide.
+
+How it works:
+
+- The proxy drops any client-sent `X-Lunchbench-Client-IP` and `X-Lunchbench-Proxy-Secret` headers.
+- If the Pages project has `PROXY_SECRET`, the proxy sets `X-Lunchbench-Client-IP` to the `CF-Connecting-IP` it sees (the visitor) and `X-Lunchbench-Proxy-Secret` to the secret.
+- `getClientIp` (`worker/src/rate-limit.ts`) uses `X-Lunchbench-Client-IP` only when the Worker has `PROXY_SECRET` and the header matches it (constant-time compare). Otherwise it uses `CF-Connecting-IP`, as before.
+- A direct caller of the `workers.dev` URL does not know the secret, so it cannot choose its IP.
+
+It must be set in both places, with the same value:
+
+| Where | Name | Takes effect |
+| --- | --- | --- |
+| Worker `lunchbench-api` | `PROXY_SECRET` | at once (`wrangler secret put` deploys a new version) |
+| Pages project `lunchbench`, production | `PROXY_SECRET` | on the next Pages deployment only |
+
+Missing on either side, or the values differ: the Worker falls back to `CF-Connecting-IP`. Nothing errors and nothing locks out; limits are just site-wide again. So deploy order does not matter.
+
+Set both from one generated value. The value is never printed, never stored in a file, and never goes in docs, PRs or logs:
+
+```bash
+# From the repo root, with CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID exported.
+PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
+printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
+printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
+unset PROXY_SECRET_VALUE
+```
+
+Then redeploy Pages so the new deployment picks up the secret. Re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run rerun <run-id>`), or push to `main`.
+
+Rotation: run the same steps. Between the Worker update and the Pages redeploy the values differ, so limits are site-wide for that window.
+
+Pages preview deployments do not get the secret (`wrangler pages secret put` sets production only), so previews keep site-wide limits.
+
+Not needed locally. Local dev and E2E have no Pages Function: Vite proxies `/api` straight to `wrangler dev`, and the Worker uses `CF-Connecting-IP` there.
+
 ### `CLOUDFLARE_API_TOKEN`
 
 Used by GitHub Actions to deploy Worker and Pages.
@@ -156,6 +196,8 @@ Production uses Cloudflare Pages and the Pages Function proxy in:
 frontend/functions/api/[[path]].ts
 ```
 
+The proxy forwards the visitor IP to the Worker when the Pages project has `PROXY_SECRET` (see Runtime Variables).
+
 ### `VITE_DISABLE_VEGAN_TOGGLE`
 
 Build-time flag. When set to `true`:
@@ -204,5 +246,5 @@ When adding or changing an environment variable:
 1. Update this file.
 2. Update `worker/.dev.vars.example` if it affects local development.
 3. Update `worker/wrangler.toml` if bindings change.
-4. Update GitHub Actions secrets or Cloudflare Worker secrets if deployment needs them.
+4. Update GitHub Actions secrets, Cloudflare Worker secrets, or Pages project secrets if deployment needs them.
 5. Update `docs/secrets.md` if the variable is secret.

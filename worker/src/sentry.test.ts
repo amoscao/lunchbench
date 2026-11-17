@@ -12,6 +12,9 @@ const PSEUDO_IP = '240.1.2.3'
 const PASSWORD = 'typed-password-attempt'
 const BEARER = 'bearer-token-value'
 const SESSION = '550e8400-e29b-41d4-a716-446655440000'
+// #307: the Pages proxy's forwarded visitor IP and shared secret must not reach Sentry either.
+const FORWARDED_IP = '198.51.100.77'
+const PROXY_SECRET = 'proxy-secret-value'
 
 function env(dsn: string): Bindings {
   return {
@@ -26,6 +29,7 @@ function env(dsn: string): Bindings {
     ADMIN_MANAGER_PASSWORD: 'admin-password',
     SENTRY_DSN: dsn,
     IP_HASH_KEY: 'test-ip-hash-key',
+    PROXY_SECRET,
   }
 }
 
@@ -53,6 +57,8 @@ async function blockedVerify(dsn: string): Promise<{ status: number; sent: strin
       Authorization: `Bearer ${BEARER}`,
       'X-Lunchbench-Session': SESSION,
       Cookie: 'a=b',
+      'X-Lunchbench-Client-IP': FORWARDED_IP,
+      'X-Lunchbench-Proxy-Secret': PROXY_SECRET,
     },
     body: JSON.stringify({ password: PASSWORD }),
   }), env(dsn), ctx as unknown as ExecutionContext)
@@ -69,7 +75,7 @@ describe('rate-limit Sentry event through the real app', () => {
     vi.restoreAllMocks()
   })
 
-  test('sends one warning with the tags and no IP, body, credentials or session', async () => {
+  test('sends one warning with the tags and no IP, body, credentials, session or proxy secret', async () => {
     const { status, sent } = await blockedVerify('https://abc123@o1.ingest.sentry.io/1')
     expect(status).toBe(429)
 
@@ -81,7 +87,7 @@ describe('rate-limit Sentry event through the real app', () => {
     expect(envelope).toMatch(/"ip_hash":"[0-9a-f]{16}"/)
     expect(envelope).toContain('"limit":5')
     expect(envelope).toContain('probe-agent')
-    for (const secret of [RAW_IP, RAW_IPV6, PSEUDO_IP, PASSWORD, BEARER, SESSION, 'a=b']) {
+    for (const secret of [RAW_IP, RAW_IPV6, PSEUDO_IP, PASSWORD, BEARER, SESSION, 'a=b', FORWARDED_IP, PROXY_SECRET]) {
       expect(envelope).not.toContain(secret)
     }
   })

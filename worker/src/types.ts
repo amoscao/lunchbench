@@ -7,6 +7,8 @@ export type Bindings = {
   SENTRY_DSN: string
   // HMAC key for the IP hash in rate-limit Sentry events (#262). Optional.
   IP_HASH_KEY?: string
+  // Shared with the Pages proxy so the Worker can trust its forwarded client IP (#307). Optional.
+  PROXY_SECRET?: string
 }
 
 export type Lunch = {

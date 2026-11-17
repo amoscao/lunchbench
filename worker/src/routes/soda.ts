@@ -98,7 +98,7 @@ soda.put('/swipes', async (c) => {
     return c.json({ error: 'Invalid request body', code: 'BAD_REQUEST' }, 400)
   }
 
-  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_swipe', SWIPE_LIMIT.limit, SWIPE_LIMIT.windowSeconds)
+  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw, c.env.PROXY_SECRET), 'soda_swipe', SWIPE_LIMIT.limit, SWIPE_LIMIT.windowSeconds)
   if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many swipes')
 
   const row = await c.env.DB.prepare(
@@ -131,7 +131,7 @@ soda.post('/reports', async (c) => {
     return c.json({ error: 'Invalid barcode', code: 'BAD_REQUEST' }, 400)
   }
 
-  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_report', REPORT_LIMIT.limit, REPORT_LIMIT.windowSeconds)
+  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw, c.env.PROXY_SECRET), 'soda_report', REPORT_LIMIT.limit, REPORT_LIMIT.windowSeconds)
   if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many reports')
 
   const row = await c.env.DB.prepare(
@@ -145,7 +145,7 @@ soda.post('/reports', async (c) => {
   if (!row) return sodaWriteRejected(c, sodaId as number)
 
   if (!barcode) return c.json({ ok: true })
-  const mappedSodaId = await learnBarcode(c.env.DB, getClientIp(c.req.raw), sessionKey, barcode, row.soda_id)
+  const mappedSodaId = await learnBarcode(c.env.DB, getClientIp(c.req.raw, c.env.PROXY_SECRET), sessionKey, barcode, row.soda_id)
   return c.json({ ok: true, barcode_soda_id: mappedSodaId })
 })
 
@@ -205,7 +205,7 @@ soda.post('/unknown-scans', async (c) => {
   const code = normalizeBarcode(body.barcode, format)
   if (!code) return c.json({ error: 'Invalid barcode', code: 'BAD_REQUEST' }, 400)
 
-  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw), 'soda_unknown_scan', UNKNOWN_SCAN_LIMIT.limit, UNKNOWN_SCAN_LIMIT.windowSeconds)
+  const rl = await checkRateLimit(c.env.DB, getClientIp(c.req.raw, c.env.PROXY_SECRET), 'soda_unknown_scan', UNKNOWN_SCAN_LIMIT.limit, UNKNOWN_SCAN_LIMIT.windowSeconds)
   if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many scans')
 
   await c.env.DB.prepare(

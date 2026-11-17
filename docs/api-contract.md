@@ -313,6 +313,15 @@ Every `429 RATE_LIMITED` response (Sodabench writes and `POST /api/admin/verify`
 
 The lunch routes have no rate limits (#264).
 
+### Client IP
+
+Per-IP limits, voter barcode learning and `ip_hash` all use one client IP from `getClientIp` (`worker/src/rate-limit.ts`):
+
+1. `X-Lunchbench-Client-IP`, only when the Worker has `PROXY_SECRET` and the request's `X-Lunchbench-Proxy-Secret` matches it. The Pages `/api` proxy sends both (#307).
+2. Otherwise `CF-Connecting-IP`, then the first `X-Forwarded-For` entry, then `unknown`.
+
+Clients cannot set these headers through the site: the proxy replaces them. Direct callers of the Worker URL without the secret get rule 2. See `PROXY_SECRET` in `docs/13-environment-and-deployment-config.md`.
+
 ---
 
 ## Lunch Object Shape

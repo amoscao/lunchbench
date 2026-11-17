@@ -19,6 +19,19 @@
 - **Add as Worker secret**: `npx wrangler secret put IP_HASH_KEY` (enter value when prompted)
 - **Local**: not needed
 
+## PROXY_SECRET
+- **Purpose**: Optional shared secret between the Pages `/api` proxy and the Worker. With it, the Worker trusts the visitor IP the proxy forwards in `X-Lunchbench-Client-IP`, so per-IP rate limits are per visitor (#307). Missing or mismatched on either side means the Worker falls back to `CF-Connecting-IP` (site-wide limits). Details in `docs/13-environment-and-deployment-config.md`.
+- **Set in both places, same value**: Worker `lunchbench-api` and Pages project `lunchbench`.
+- **Set** (from the repo root, value never printed or written to a file):
+  ```bash
+  PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
+  printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
+  printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
+  unset PROXY_SECRET_VALUE
+  ```
+- **Then redeploy Pages**: a Pages secret applies to new deployments only. Re-run the latest `Deploy to Cloudflare` workflow run (`gh run rerun <run-id>`) or push to `main`.
+- **Local**: not needed. Never put it in a log, a Sentry event, a doc or a PR.
+
 ## CLOUDFLARE_API_TOKEN
 - **Purpose**: Allows CI/CD (GitHub Actions) to deploy the Worker and Pages
 - **Create at**: https://dash.cloudflare.com/profile/api-tokens

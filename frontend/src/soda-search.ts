@@ -19,7 +19,7 @@ const SODAS = ['soda']
  * alternative, so an alias only ever widens a search. Longer keys win. While the last word is
  * still being typed, keys that start with it count too ("cok" -> coke).
  * Extend by adding entries; keys and values use normalized text (see normalizeText).
- * Keys that map to themselves ("root beer", "olipop", "cherry") are kept on purpose: they record
+ * Keys that map to themselves ("root beer", "cherry") are kept on purpose: they record
  * the product owner's alias list, even though plain matching already finds them.
  */
 export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
@@ -47,8 +47,6 @@ export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'great value': WALMART_BRANDS,
   'walmart': WALMART_BRANDS,
   'walmart brand': WALMART_BRANDS,
-  'olipop': ['olipop'],
-  'oli pop': ['olipop'],
   'poppy': ['poppi'],
   'seltzer': SELTZERS,
   'seltzers': SELTZERS,

@@ -139,3 +139,71 @@ describe('order list snapshots', () => {
     expect(body.items.map((item) => [item.slot, item.rank])).toEqual([['top', 1], ['trial', 2]])
   })
 })
+
+describe('swipe feed route', () => {
+  function stat(id: number, overrides: Record<string, unknown> = {}) {
+    return {
+      id, brand: `Brand ${id}`, flavor: 'Plain', type: 'soda', image_key: null,
+      right_swipes: 0, left_swipes: 0, likes: 0, hates: 0, reporters: 0, ...overrides,
+    }
+  }
+
+  function deckEnv(stats: unknown[], swipedIds: number[]): Bindings {
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement
+          },
+          async all() {
+            if (sql.includes('FROM soda_swipes WHERE session_key')) return { results: swipedIds.map((soda_id) => ({ soda_id })) }
+            if (sql.includes('FROM sodas s')) return { results: stats }
+            return { results: [] }
+          },
+          async first() {
+            return null
+          },
+          async run() {
+            return { success: true, meta: { changes: 1 } }
+          },
+        }
+        return statement
+      },
+    } as unknown as D1Database
+    return { DB: db, IMAGES: undefined, VOTE_PASSWORD: '', ADMIN_MANAGER_PASSWORD: '', SENTRY_DSN: '' }
+  }
+
+  async function deckIds(env: Bindings, session: string | null): Promise<number[]> {
+    const headers: Record<string, string> = session ? { 'X-Lunchbench-Session': session } : {}
+    const res = await sodaRouter.request('/deck', { headers }, env)
+    expect(res.status).toBe(200)
+    return ((await res.json()) as { sodas: { id: number }[] }).sodas.map((s) => s.id)
+  }
+
+  test('scores drinks before ordering: a well-liked drink leads most voters\' feeds', async () => {
+    const stats = [
+      stat(1, { likes: 4, reporters: 4 }),
+      ...Array.from({ length: 19 }, (_, i) => stat(i + 2)),
+    ]
+    const env = deckEnv(stats, [])
+    let firstInTop3 = 0
+    const voters = 200
+    for (let i = 0; i < voters; i++) {
+      const session = `550e8400-e29b-41d4-a716-${String(i).padStart(12, '0')}`
+      if ((await deckIds(env, session)).slice(0, 3).includes(1)) firstInTop3 += 1
+    }
+    // Uniform would put it in the top 3 for 15% of voters.
+    expect(firstInTop3 / voters).toBeGreaterThan(0.4)
+  })
+
+  test('leaves out drinks this voter swiped', async () => {
+    const env = deckEnv([stat(1), stat(2), stat(3)], [2])
+    expect((await deckIds(env, SESSION)).sort()).toEqual([1, 3])
+  })
+
+  test('without a session header returns every drink', async () => {
+    const env = deckEnv([stat(1), stat(2), stat(3)], [])
+    expect((await deckIds(env, null)).sort()).toEqual([1, 2, 3])
+  })
+})
+

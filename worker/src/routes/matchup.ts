@@ -31,6 +31,12 @@ type MatchupTokenRow = PresentedPairRow & {
   vegan_only: number
 }
 
+// #249: bound the per-session history read on every GET. Only the most recent rows are kept.
+// Truncation can only shrink the seen set: older pairs become eligible again and "exhausted"
+// needs every pair in the window, so it never fires early. A session that has seen more pairs
+// than the cap just cycles back to its oldest ones.
+export const MATCHUP_HISTORY_LIMIT = 500
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export function parseSessionKey(value: string | null): string | null {
@@ -102,8 +108,10 @@ matchup.get('/', async (c) => {
       ? c.env.DB.prepare(
         `SELECT low_lunch_id, high_lunch_id
          FROM matchup_presentations
-         WHERE session_key = ? AND vegan_only = ?`
-      ).bind(sessionKey, veganFlag).all<PresentedPairRow>()
+         WHERE session_key = ? AND vegan_only = ?
+         ORDER BY presented_at DESC, rowid DESC
+         LIMIT ?`
+      ).bind(sessionKey, veganFlag, MATCHUP_HISTORY_LIMIT).all<PresentedPairRow>()
       : Promise.resolve({ results: [] as PresentedPairRow[] }),
   ])
 

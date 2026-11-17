@@ -28,8 +28,9 @@ const ROWS: LunchRow[] = [
   lunchRow(3, 1),
 ]
 
-function fakeDb(rows: LunchRow[] = ROWS): D1Database {
+function fakeDb(rows: LunchRow[] = ROWS): D1Database & { writeBatches: number } {
   return {
+    writeBatches: 0,
     prepare(sql: string) {
       let bound: unknown[] = []
       const self = {
@@ -62,7 +63,7 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
       }
       return self
     },
-    batch: async (statements: Array<{ sql: string; bound: unknown[] }>) => {
+    async batch(this: { writeBatches: number }, statements: Array<{ sql: string; bound: unknown[] }>) {
       if (statements.every((statement) => statement.sql.includes('SELECT * FROM lunches'))) {
         return statements.map((statement) => {
           const [id] = statement.bound as [number]
@@ -70,9 +71,10 @@ function fakeDb(rows: LunchRow[] = ROWS): D1Database {
           return { results: row ? [row] : [] }
         })
       }
+      this.writeBatches += 1
       return []
     },
-  } as unknown as D1Database
+  } as unknown as D1Database & { writeBatches: number }
 }
 
 function testEnv(rows: LunchRow[] = ROWS, db: D1Database = fakeDb(rows)): Bindings {
@@ -111,6 +113,28 @@ describe('POST /api/vote vegan category enforcement', () => {
   test('rejects vote where right lunch does not exist', async () => {
     const env = testEnv()
     const res = await voteRouter.request('/', voteBody(1, 99), env)
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /api/vote legacy lunches (#286)', () => {
+  const legacy = (id: number, isVegan = 0): LunchRow => ({ ...lunchRow(id, isVegan), is_legacy: 1 })
+
+  test.each([
+    ['left', [legacy(1), lunchRow(2, 0)]],
+    ['right', [lunchRow(1, 0), legacy(2)]],
+    ['both', [legacy(1), legacy(2)]],
+  ] as const)('rejects a vote when the %s lunch is legacy, without writing', async (_side, rows) => {
+    const db = fakeDb([...rows])
+    const res = await voteRouter.request('/', voteBody(1, 2), testEnv([...rows], db))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'Legacy lunches cannot be voted on', code: 'LEGACY_LUNCH' })
+    expect(db.writeBatches).toBe(0)
+  })
+
+  test('a missing lunch is still 404, not 409', async () => {
+    const rows = [legacy(1)]
+    const res = await voteRouter.request('/', voteBody(1, 99), testEnv(rows))
     expect(res.status).toBe(404)
   })
 })

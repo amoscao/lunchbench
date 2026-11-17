@@ -13,6 +13,12 @@
 - **Add as Worker secret**: `npx wrangler secret put PURCHASER_PASSWORD` (enter value when prompted)
 - **Add to `.dev.vars`**: `PURCHASER_PASSWORD=<any local value>` (never commit this file)
 
+## IP_HASH_KEY
+- **Purpose**: Optional HMAC key for the hashed client IP in rate-limit Sentry warnings. Unset means a random key per Worker isolate.
+- **Generate**: `openssl rand -hex 32`
+- **Add as Worker secret**: `npx wrangler secret put IP_HASH_KEY` (enter value when prompted)
+- **Local**: not needed
+
 ## CLOUDFLARE_API_TOKEN
 - **Purpose**: Allows CI/CD (GitHub Actions) to deploy the Worker and Pages
 - **Create at**: https://dash.cloudflare.com/profile/api-tokens

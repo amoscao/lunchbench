@@ -100,6 +100,11 @@ export function isSodaBannedError(e: unknown): boolean {
   return e instanceof ApiError && e.status === 409 && e.code === 'SODA_BANNED'
 }
 
+/** True when the vote named a legacy lunch (#286), e.g. from a matchup served before the lunch went legacy. */
+export function isLegacyLunchError(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 409 && e.code === 'LEGACY_LUNCH'
+}
+
 function resolveImageUrl(imageUrl: string | null): string | null {
   if (!imageUrl) return null
   return new URL(imageUrl, window.location.origin).toString()
@@ -153,8 +158,12 @@ export async function submitVote(
   })
   if (res.status === 429) throw new Error('rate_limited')
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error((err as any).error ?? `Vote failed: ${res.status}`)
+    const err = await res.json().catch(() => ({})) as { error?: unknown; code?: unknown }
+    throw new ApiError(
+      typeof err.error === 'string' ? err.error : `Vote failed: ${res.status}`,
+      res.status,
+      typeof err.code === 'string' ? err.code : undefined
+    )
   }
   const data = await res.json() as {
     vote_id: number

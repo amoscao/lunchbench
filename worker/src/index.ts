@@ -24,6 +24,8 @@ const corsOptions = {
 app.use(sentry(app, (env) => ({
   dsn: env.SENTRY_DSN,
   tracesSampleRate: 0,
+  // Keep client IPs out of events (#262). Rate-limit warnings carry a keyed hash instead.
+  sendDefaultPii: false,
 })))
 app.use('*', securityHeaders)
 app.use('/api/*', restrictBrowserOrigins)

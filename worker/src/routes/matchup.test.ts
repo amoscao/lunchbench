@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { matchupRouter, parseSessionKey } from './matchup'
+import { MATCHUP_HISTORY_LIMIT, matchupRouter, parseSessionKey } from './matchup'
 import type { Bindings, LunchRow } from '../types'
 
 const SESSION = '550e8400-e29b-41d4-a716-446655440000'
@@ -49,12 +49,14 @@ type TokenRow = Presentation & {
 
 function fakeDb(rows: LunchRow[] = ALL_ROWS): D1Database & {
   presentations: Presentation[]
+  presentationQueries: string[]
   sessions: Set<string>
   tokens: Map<string, TokenRow>
 } {
   const rateLimits = new Map<string, { count: number; window_start: string }>()
   const db = {
     presentations: [] as Presentation[],
+    presentationQueries: [] as string[],
     sessions: new Set<string>(),
     tokens: new Map<string, TokenRow>(),
     prepare(sql: string) {
@@ -121,12 +123,13 @@ function fakeDb(rows: LunchRow[] = ALL_ROWS): D1Database & {
           }
           if (sql.includes('FROM votes')) return { results: [] }
           if (sql.includes('FROM matchup_presentations')) {
-            const [sessionKey, veganOnly] = bound as [string, number]
-            return {
-              results: db.presentations.filter((row) =>
-                row.session_key === sessionKey && row.vegan_only === veganOnly
-              ),
-            }
+            db.presentationQueries.push(sql)
+            const [sessionKey, veganOnly, limit] = bound as [string, number, number | undefined]
+            // presentations is in insertion (presented_at) order; the route asks for newest first.
+            const rows = db.presentations
+              .filter((row) => row.session_key === sessionKey && row.vegan_only === veganOnly)
+              .reverse()
+            return { results: sql.includes('LIMIT ?') ? rows.slice(0, limit) : rows }
           }
           return { results: rows }
         },
@@ -136,6 +139,7 @@ function fakeDb(rows: LunchRow[] = ALL_ROWS): D1Database & {
   }
   return db as unknown as D1Database & {
     presentations: Presentation[]
+    presentationQueries: string[]
     sessions: Set<string>
     tokens: Map<string, TokenRow>
   }
@@ -285,5 +289,56 @@ describe('matchup route session tracking', () => {
 
     expect(missing.status).toBe(400)
     expect(unknown.status).toBe(400)
+  })
+})
+
+describe('matchup history cap (#249)', () => {
+  // Every pair of n lunches, oldest presentation first.
+  function presentAllPairs(db: ReturnType<typeof fakeDb>, n: number): void {
+    for (let low = 1; low <= n; low++) {
+      for (let high = low + 1; high <= n; high++) {
+        db.presentations.push({ session_key: SESSION, vegan_only: 0, low_lunch_id: low, high_lunch_id: high })
+      }
+    }
+  }
+
+  function lunches(n: number): LunchRow[] {
+    return Array.from({ length: n }, (_, i) => lunchRow(i + 1, 0))
+  }
+
+  async function getMatchup(db: ReturnType<typeof fakeDb>) {
+    const res = await matchupRouter.request('/', { headers: { 'X-Lunchbench-Session': SESSION } }, env(db))
+    expect(res.status).toBe(200)
+    return await res.json() as { status: string; left?: LunchRow; right?: LunchRow }
+  }
+
+  test('reads only the most recent rows', async () => {
+    const db = fakeDb(lunches(3))
+    await getMatchup(db)
+    expect(MATCHUP_HISTORY_LIMIT).toBe(500)
+    expect(db.presentationQueries).toHaveLength(1)
+    expect(db.presentationQueries[0]).toMatch(/ORDER BY presented_at DESC, rowid DESC\s+LIMIT \?/)
+  })
+
+  test('still reports exhausted when every pair fits in the window', async () => {
+    // 32 lunches = 496 pairs <= 500.
+    const db = fakeDb(lunches(32))
+    presentAllPairs(db, 32)
+    expect(await getMatchup(db)).toEqual({ status: 'exhausted' })
+  })
+
+  test('past the cap, does not report exhausted and serves a pair that fell out of the window', async () => {
+    // 33 lunches = 528 pairs: the 28 oldest fall outside the 500-row window.
+    const db = fakeDb(lunches(33))
+    presentAllPairs(db, 33)
+    const oldest = new Set(db.presentations.slice(0, 528 - MATCHUP_HISTORY_LIMIT)
+      .map((p) => `${p.low_lunch_id}:${p.high_lunch_id}`))
+
+    for (let i = 0; i < 20; i++) {
+      const body = await getMatchup(db)
+      expect(body.status).toBe('ok')
+      const [low, high] = [body.left!.id, body.right!.id].sort((a, b) => a - b)
+      expect(oldest.has(`${low}:${high}`)).toBe(true)
+    }
   })
 })

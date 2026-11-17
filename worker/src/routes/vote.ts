@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { Bindings } from '../types'
 import { conservativeScore, updateRatingPair } from '../elo'
 import type { LunchRow } from '../types'
@@ -16,12 +17,22 @@ type VoteWriteResult =
       rightResult: VoteResultRow
     }
   | { status: 'not_found' }
+  | { status: 'legacy' }
   | { status: 'category_mismatch' }
   | { status: 'conflict' }
 
 type VoteLunchRows = {
   left: LunchRow | null
   right: LunchRow | null
+}
+
+// Legacy lunches (#284) are never served, so a vote on one comes from a stale tab or a direct call (#286).
+function isLegacyPair(left: LunchRow, right: LunchRow): boolean {
+  return left.is_legacy !== 0 || right.is_legacy !== 0
+}
+
+function legacyLunchResponse(c: Context) {
+  return c.json({ error: 'Legacy lunches cannot be voted on', code: 'LEGACY_LUNCH' }, 409)
 }
 
 function uniqueIsoTimestamp(): string {
@@ -63,6 +74,9 @@ export async function recordVoteWithRetry(
 
     if (!leftRow || !rightRow) {
       return { status: 'not_found' }
+    }
+    if (isLegacyPair(leftRow, rightRow)) {
+      return { status: 'legacy' }
     }
     if (leftRow.is_vegan !== rightRow.is_vegan) {
       return { status: 'category_mismatch' }
@@ -110,6 +124,7 @@ export async function recordVoteWithRetry(
             SELECT 1 FROM lunches
             WHERE id = ?
               AND is_vegan = ?
+              AND is_legacy = 0
               AND rating = ?
               AND glicko_rd = ?
               AND glicko_volatility = ?
@@ -119,6 +134,7 @@ export async function recordVoteWithRetry(
             SELECT 1 FROM lunches
             WHERE id = ?
               AND is_vegan = ?
+              AND is_legacy = 0
               AND rating = ?
               AND glicko_rd = ?
               AND glicko_volatility = ?
@@ -244,6 +260,7 @@ vote.post('/', async (c) => {
   if (!initialRows.left || !initialRows.right) {
     return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
   }
+  if (isLegacyPair(initialRows.left, initialRows.right)) return legacyLunchResponse(c)
   if (initialRows.left.is_vegan !== initialRows.right.is_vegan) {
     return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
   }
@@ -260,6 +277,7 @@ vote.post('/', async (c) => {
   if (writeResult.status === 'not_found') {
     return c.json({ error: 'Lunch not found', code: 'NOT_FOUND' }, 404)
   }
+  if (writeResult.status === 'legacy') return legacyLunchResponse(c)
   if (writeResult.status === 'category_mismatch') {
     return c.json({ error: 'Lunches must be from the same category', code: 'BAD_REQUEST' }, 400)
   }

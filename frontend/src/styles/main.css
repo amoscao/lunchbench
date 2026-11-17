@@ -2302,8 +2302,11 @@ body.soda-route { overflow-x: clip; }
   color: var(--warn-text);
 }
 
-/* Only the inner box hides; the role="status" wrapper must stay rendered to be announced. */
+/* Only the inner box hides; the role="status" wrapper must stay rendered to be announced
+   (never display: none or contents). While empty it is a zero-height flex item, so cancel the
+   extra modal gap (14px) it would add. */
 .soda-report-notice:empty { display: none; }
+.soda-report-notice-region:has(> .soda-report-notice:empty) { margin-top: -14px; }
 
 .soda-report-actions {
   display: grid;

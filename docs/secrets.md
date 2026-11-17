@@ -22,14 +22,25 @@
 ## PROXY_SECRET
 - **Purpose**: Optional shared secret between the Pages `/api` proxy and the Worker. With it, the Worker trusts the visitor IP the proxy forwards in `X-Lunchbench-Client-IP`, so per-IP rate limits are per visitor (#307). Missing or mismatched on either side means the Worker falls back to `CF-Connecting-IP` (site-wide limits). Details in `docs/13-environment-and-deployment-config.md`.
 - **Set in both places, same value**: Worker `lunchbench-api` and Pages project `lunchbench`.
-- **Set** (from the repo root, value never printed or written to a file):
+- **Before either block**: repo root, after `pnpm install`, with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` exported. The value is never printed or written to a file (`printf` is a shell builtin, so it is not in `ps` either).
+- **First set**:
   ```bash
   PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
   printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
   printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
   unset PROXY_SECRET_VALUE
   ```
-- **Pages redeploy**: a Pages secret applies to new deployments only. If no Pages deploy is still to come, re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run rerun <run-id>`, within 30 days of that run) or push to `main`. Rotation order and details in `docs/13-environment-and-deployment-config.md`.
+- **Pages redeploy**: a Pages secret applies to new deployments only. If no Pages deploy is still to come, re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run list --workflow=deploy.yml --branch=main --limit 1`, then `gh run rerun <run-id>`, within 30 days of that run) or push to `main`.
+- **Rotate** (keeps the mismatch window short; stay in one shell):
+  ```bash
+  PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
+  printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
+  gh run rerun <run-id>   # latest Deploy to Cloudflare run on main
+  # Wait until that run reaches its "Deploy Frontend to Pages" step, then:
+  printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
+  unset PROXY_SECRET_VALUE
+  ```
+  Until the new Pages deployment is live, the values differ and limits are site-wide (no errors). Details in `docs/13-environment-and-deployment-config.md`.
 - **Local**: not needed. Never put it in a log, a Sentry event, a doc or a PR.
 
 ## CLOUDFLARE_API_TOKEN

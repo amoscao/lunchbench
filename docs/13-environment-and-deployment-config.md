@@ -114,21 +114,13 @@ It must be set in both places, with the same value:
 | Worker `lunchbench-api` | `PROXY_SECRET` | at once (`wrangler secret put` deploys a new version) |
 | Pages project `lunchbench`, production | `PROXY_SECRET` | on the next Pages deployment only |
 
-Missing on either side, or the values differ: the Worker falls back to `CF-Connecting-IP`. Nothing errors and nothing locks out; limits are just site-wide again. So deploy order does not matter.
+Missing on either side, or the values differ: the Worker falls back to `CF-Connecting-IP`. Nothing errors, but limits are site-wide again, as before #307 (one visitor's failed admin logins can lock out everyone). Old code ignores the secret, so deploy order does not matter.
 
-Set both from one generated value. The value is never printed, never stored in a file, and never goes in docs, PRs or logs:
-
-```bash
-# From the repo root, with CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID exported.
-PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
-printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
-printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
-unset PROXY_SECRET_VALUE
-```
+Set and rotate commands are in `docs/secrets.md` under `PROXY_SECRET`. One generated value goes to both places. It is never printed, never stored in a file, and never goes in docs, PRs or logs.
 
 A Pages secret reaches only Pages deployments made after it is set. If the next Pages deploy is still to come (for example, the secret is set before merging the PR that needs it), nothing more is needed. Otherwise redeploy Pages: re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run list --workflow=deploy.yml --branch=main --limit 1`, then `gh run rerun <run-id>`; GitHub allows re-runs for 30 days), or push to `main`.
 
-Rotation: the Worker secret changes at once, the Pages one at the next Pages deploy. While they differ, limits are site-wide (no errors). To keep that window short: set the Pages secret first, start the Pages redeploy, and run the Worker `wrangler secret put` when the run reaches its Pages deploy step. Keep the value in the same shell variable until both are set.
+Rotation: the Worker secret changes at once, the Pages one at the next Pages deploy. While they differ, limits are site-wide. The rotation steps in `docs/secrets.md` set the Pages secret first and the Worker secret only when the redeploy reaches its Pages step, to keep that window short.
 
 Pages preview deployments do not get the secret (`wrangler pages secret put` sets production only), so previews keep site-wide limits.
 

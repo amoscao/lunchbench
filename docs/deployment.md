@@ -92,7 +92,8 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0016_soda_ban_o
 Safe before or after merge, in any order. Until both sides have the same `PROXY_SECRET`, the Worker keeps today's behavior (site-wide limits). Old code ignores the secret.
 
 1. Set `PROXY_SECRET` on the Worker and the Pages project from one generated value. Commands in `docs/secrets.md` under `PROXY_SECRET`.
-2. A Pages secret applies to new deployments only. If step 1 ran before the merge, the merge's deploy picks it up. If it ran after, redeploy Pages: `gh run rerun <run-id>` on the latest `Deploy to Cloudflare` run on `main` (within 30 days of that run), or push to `main`.
+2. A Pages secret applies to new deployments only. If step 1 ran before the merge, the merge's deploy picks it up. If it ran after, redeploy Pages with the "Redeploy Pages" block in `docs/secrets.md`, or push to `main`.
+3. Run the read-only "Check" block in `docs/secrets.md`.
 
 ### Remove OLIPOP (issue #296)
 Run with the owner's go-ahead, from `worker/`, in this order. 0015 only touches data that the current Worker already filters, so it is safe before or after the PR merges.

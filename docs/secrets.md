@@ -20,30 +20,27 @@
 - **Local**: not needed
 
 ## PROXY_SECRET
-- **Purpose**: Optional shared secret between the Pages `/api` proxy and the Worker. With it, the Worker trusts the visitor IP the proxy forwards in `X-Lunchbench-Client-IP`, so per-IP rate limits are per visitor (#307). Missing or mismatched on either side means the Worker falls back to `CF-Connecting-IP` (site-wide limits). Details in `docs/13-environment-and-deployment-config.md`.
+- **Purpose**: Optional shared secret between the Pages `/api` proxy and the Worker. With it, the Worker trusts the visitor IP the proxy forwards in `X-Lunchbench-Client-IP`, so per-IP rate limits are per visitor (#307). Missing or mismatched on either side means the Worker falls back to `CF-Connecting-IP` (site-wide limits, no errors). Details in `docs/13-environment-and-deployment-config.md`.
 - **Set in both places, same value**: Worker `lunchbench-api` and Pages project `lunchbench`.
-- **Before either block**: repo root, after `pnpm install`, with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` exported. The value is never printed or written to a file (`printf` is a shell builtin, so it is not in `ps` either).
-- **First set**:
+- **Before any block**: repo root, after `pnpm install`, with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` exported. Each block pastes as is into bash or zsh.
+- **Set or rotate** (one block; the value is never printed or written to a file, and `printf` is a shell builtin, so it is not in `ps`; the length check stops an empty value from being uploaded):
   ```bash
   PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
-  printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
-  printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
+  [ "${#PROXY_SECRET_VALUE}" -eq 64 ] && printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
+  [ "${#PROXY_SECRET_VALUE}" -eq 64 ] && printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
   unset PROXY_SECRET_VALUE
   ```
-- **Pages redeploy**: a Pages secret applies to new deployments only. If no Pages deploy is still to come, re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run list --workflow=deploy.yml --branch=main --limit 1`, then `gh run rerun <run-id>`, within 30 days of that run) or push to `main`.
-- **Rotate** (keeps the mismatch window short; run both blocks in the same shell). First set the Pages secret and re-run the latest deploy:
+- **Redeploy Pages**: a Pages secret applies to new deployments only. Skip this if a Pages deploy is still to come (for example, the secret was set before merging the PR that needs it). Otherwise re-run the latest deploy (GitHub allows re-runs for 30 days; after that, push to `main`):
   ```bash
-  PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
-  printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
   RUN_ID="$(gh run list --workflow=deploy.yml --branch=main --limit 1 --json databaseId -q '.[0].databaseId')"
   gh run rerun "$RUN_ID"
+  gh run watch "$RUN_ID" --exit-status
   ```
-  Then, once `gh run watch "$RUN_ID"` shows the run on its "Deploy Frontend to Pages" step, set the Worker secret:
+  The Worker secret changes at once. Until the new Pages deployment is live (a few minutes on rotation), the values differ and limits are site-wide. Nothing errors.
+- **Check** (read-only, prints no IPs). After some site traffic, `egress_keys` (Cloudflare egress addresses) should be 0 or near it and `keys` should grow with visitors:
   ```bash
-  printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
-  unset PROXY_SECRET_VALUE
+  (cd worker && npx wrangler d1 execute lunchbench --remote --command "SELECT action, COUNT(*) AS keys, SUM(key LIKE '2a06:98c0:%') AS egress_keys FROM rate_limits WHERE unixepoch(window_start) > unixepoch('now','-1 hour') GROUP BY action")
   ```
-  Until the new Pages deployment is live, the values differ and limits are site-wide (no errors). Details in `docs/13-environment-and-deployment-config.md`.
 - **Local**: not needed. Never put it in a log, a Sentry event, a doc or a PR.
 
 ## CLOUDFLARE_API_TOKEN

@@ -116,11 +116,11 @@ It must be set in both places, with the same value:
 
 Missing on either side, or the values differ: the Worker falls back to `CF-Connecting-IP`. Nothing errors, but limits are site-wide again, as before #307 (one visitor's failed admin logins can lock out everyone). Old code ignores the secret, so deploy order does not matter.
 
-Set and rotate commands are in `docs/secrets.md` under `PROXY_SECRET`. One generated value goes to both places. It is never printed, never stored in a file, and never goes in docs, PRs or logs.
+Set, rotate, redeploy and check commands are in `docs/secrets.md` under `PROXY_SECRET`. One generated value goes to both places. It is never printed, never stored in a file, and never goes in docs, PRs or logs.
 
-A Pages secret reaches only Pages deployments made after it is set. If the next Pages deploy is still to come (for example, the secret is set before merging the PR that needs it), nothing more is needed. Otherwise redeploy Pages: re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run list --workflow=deploy.yml --branch=main --limit 1`, then `gh run rerun <run-id>`; GitHub allows re-runs for 30 days), or push to `main`.
+A Pages secret reaches only Pages deployments made after it is set. If the next Pages deploy is still to come (for example, the secret is set before merging the PR that needs it), nothing more is needed. Otherwise redeploy Pages by re-running the latest `Deploy to Cloudflare` run on `main` (block in `docs/secrets.md`), or push to `main`.
 
-Rotation: the Worker secret changes at once, the Pages one at the next Pages deploy. While they differ, limits are site-wide. The rotation steps in `docs/secrets.md` set the Pages secret first and the Worker secret only when the redeploy reaches its Pages step, to keep that window short.
+Rotation: run the same set block, then redeploy Pages. The Worker secret changes at once, the Pages one at the next Pages deploy. For those few minutes the values differ and limits are site-wide; nothing errors.
 
 Pages preview deployments do not get the secret: `wrangler pages secret put` sets production by default, and previews deliberately stay without it because they share the production Worker and can run unreviewed branch code. Previews keep site-wide limits.
 

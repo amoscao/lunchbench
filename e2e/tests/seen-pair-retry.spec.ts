@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures'
 import { waitForMatchup } from './helpers'
 
 // Fake lunches so the served pairs are fully scripted.
@@ -112,8 +112,6 @@ test.describe('Client-side seen pair retry', () => {
     await expectPair(page, e, f)
     await expect.poll(() => server.acks).toEqual(['cd', 'ef'])
     await expect.poll(() => server.calls()).toBe(5)
-
-    await page.unrouteAll({ behavior: 'ignoreErrors' })
   })
 
   test('retries once and shows the seen pair when the server keeps returning it', async ({ page }) => {
@@ -133,7 +131,5 @@ test.describe('Client-side seen pair retry', () => {
     await page.waitForTimeout(1000)
     expect(server.calls()).toBe(4)
     expect(server.acks).toEqual(['ab-2'])
-
-    await page.unrouteAll({ behavior: 'ignoreErrors' })
   })
 })

@@ -1,4 +1,4 @@
-import type { DrinkStats } from './soda-score'
+import { SODA_BAN_HATES, type DrinkStats } from './soda-score'
 import {
   addDays,
   buildOrderList,
@@ -9,7 +9,28 @@ import {
 } from './soda-order'
 
 /**
- * Per-drink counts for every active drink.
+ * Ids of banned drinks: at least SODA_BAN_HATES distinct voters' latest report is a Hate
+ * (soda_reports keeps one row per voter per drink). Same rule as isBanned() in soda-score.ts.
+ */
+export const BANNED_SODA_IDS_SQL =
+  `SELECT soda_id FROM soda_reports WHERE verdict = 'hate' GROUP BY soda_id HAVING COUNT(*) >= ${SODA_BAN_HATES}`
+
+/** SQL condition for a drink that may be shown: active and not banned. `alias` is the sodas alias. */
+export function shownSodaSql(alias: string): string {
+  return `${alias}.is_active = 1 AND ${alias}.id NOT IN (${BANNED_SODA_IDS_SQL})`
+}
+
+/** True when an active drink is banned (for a clear 409 instead of a 404). */
+export async function isSodaBanned(db: D1Database, sodaId: number): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS hit FROM sodas WHERE id = ? AND is_active = 1 AND id IN (${BANNED_SODA_IDS_SQL})`
+  ).bind(sodaId).first<{ hit: number }>()
+  return row !== null
+}
+
+/**
+ * Per-drink counts for every active drink, banned ones included (scoring needs their evidence for
+ * the brand prior; scoreDrinks and the feed leave them out).
  * Swipes and reports both keep one row per voter per drink (latest wins on write).
  */
 export const DRINK_STATS_SQL = `

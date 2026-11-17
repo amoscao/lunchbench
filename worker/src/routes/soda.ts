@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildFeed, sessionTieKey } from '../soda-deck'
-import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
+import { hasData, isBanned, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
 import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
-import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
+import { imageUrl, isSodaBanned, loadDrinkStats, shownSodaSql, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 import { isBarcodeFormat, normalizeBarcode } from '../barcode'
 
 const soda = new Hono<{ Bindings: Bindings }>()
@@ -36,9 +37,20 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
   return body && typeof body === 'object' ? body as Record<string, unknown> : {}
 }
 
+/**
+ * A swipe or report matched no writable drink. A banned drink (5+ Hate reports) gets 409 SODA_BANNED
+ * so clients can tell it apart from an unknown or inactive one (404).
+ */
+async function sodaWriteRejected(c: Context<{ Bindings: Bindings }>, sodaId: number): Promise<Response> {
+  if (await isSodaBanned(c.env.DB, sodaId)) {
+    return c.json({ error: 'Soda is banned', code: 'SODA_BANNED' }, 409)
+  }
+  return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+}
+
 soda.get('/catalog', async (c) => {
   const result = await c.env.DB.prepare(
-    'SELECT id, brand, flavor, type, image_key FROM sodas WHERE is_active = 1 ORDER BY brand ASC, flavor ASC, id ASC'
+    `SELECT s.id, s.brand, s.flavor, s.type, s.image_key FROM sodas s WHERE ${shownSodaSql('s')} ORDER BY s.brand ASC, s.flavor ASC, s.id ASC`
   ).all<SodaRow>()
   return c.json(
     { sodas: result.results.map(sodaCard) },
@@ -68,7 +80,7 @@ soda.get('/deck', async (c) => {
       if (!randomKeys.has(id)) randomKeys.set(id, Math.random())
       return randomKeys.get(id)!
     }
-  const feed = buildFeed(drinks, swiped, tieKey)
+  const feed = buildFeed(drinks.filter((drink) => !isBanned(drink)), swiped, tieKey)
   return c.json({ sodas: feed.map(sodaCard) }, 200, { 'Cache-Control': 'no-store' })
 })
 
@@ -88,13 +100,13 @@ soda.put('/swipes', async (c) => {
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_swipes (session_key, soda_id, direction, swiped_at)
-     SELECT ?, id, ?, datetime('now') FROM sodas WHERE id = ? AND is_active = 1
+     SELECT ?, s.id, ?, datetime('now') FROM sodas s WHERE s.id = ? AND ${shownSodaSql('s')}
      ON CONFLICT(session_key, soda_id) DO UPDATE SET
        direction = excluded.direction,
        swiped_at = excluded.swiped_at
      RETURNING soda_id`
   ).bind(sessionKey, direction, sodaId).first<{ soda_id: number }>()
-  if (!row) return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+  if (!row) return sodaWriteRejected(c, sodaId as number)
 
   return c.json({ ok: true })
 })
@@ -121,13 +133,13 @@ soda.post('/reports', async (c) => {
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_reports (session_key, soda_id, verdict, reported_at)
-     SELECT ?, id, ?, datetime('now') FROM sodas WHERE id = ? AND is_active = 1
+     SELECT ?, s.id, ?, datetime('now') FROM sodas s WHERE s.id = ? AND ${shownSodaSql('s')}
      ON CONFLICT(session_key, soda_id) DO UPDATE SET
        verdict = excluded.verdict,
        reported_at = excluded.reported_at
      RETURNING soda_id`
   ).bind(sessionKey, verdict, sodaId).first<{ soda_id: number }>()
-  if (!row) return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+  if (!row) return sodaWriteRejected(c, sodaId as number)
 
   if (!barcode) return c.json({ ok: true })
   const mappedSodaId = await learnBarcode(c.env.DB, getClientIp(c.req.raw), sessionKey, barcode, row.soda_id)
@@ -160,7 +172,7 @@ async function learnBarcode(db: D1Database, ip: string, sessionKey: string, code
     }
   }
   const mapping = await db.prepare(
-    'SELECT b.soda_id FROM soda_barcodes b JOIN sodas s ON s.id = b.soda_id WHERE b.code = ? AND s.is_active = 1'
+    `SELECT b.soda_id FROM soda_barcodes b JOIN sodas s ON s.id = b.soda_id WHERE b.code = ? AND ${shownSodaSql('s')}`
   ).bind(code).first<{ soda_id: number }>()
   return mapping?.soda_id ?? null
 }
@@ -170,7 +182,7 @@ soda.get('/barcodes', async (c) => {
   const result = await c.env.DB.prepare(
     `SELECT b.code, b.soda_id FROM soda_barcodes b
      JOIN sodas s ON s.id = b.soda_id
-     WHERE s.is_active = 1
+     WHERE ${shownSodaSql('s')}
      ORDER BY b.code ASC`
   ).all<{ code: string; soda_id: number }>()
   return c.json({ barcodes: result.results }, 200, { 'Cache-Control': 'no-cache' })

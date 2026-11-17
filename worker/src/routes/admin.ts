@@ -9,7 +9,7 @@ import {
   type SessionRole,
 } from '../helpers'
 import { incrementRateLimit, getClientIp, peekRateLimit } from '../rate-limit'
-import { writeWeeklyOrder } from '../soda-data'
+import { BANNED_SODA_IDS_SQL, isSodaBanned, shownSodaSql, writeWeeklyOrder } from '../soda-data'
 import { normalizeBarcode } from '../barcode'
 import { sodaName } from '../soda-score'
 import { groupUnknownScans, type CodeMapping, type UnknownScanRow } from '../soda-unknown-scans'
@@ -227,6 +227,28 @@ admin.get('/soda/unknown-scans', requireAdminSession, async (c) => {
   return c.json({ codes: groups }, 200, { 'Cache-Control': 'no-store' })
 })
 
+// Drinks auto-banned by Hate reports (SODA_BAN_HATES distinct voters). Computed from reports, never stored.
+admin.get('/soda/banned', requireAdminSession, async (c) => {
+  const result = await c.env.DB.prepare(
+    `SELECT s.id, s.brand, s.flavor,
+       SUM(CASE WHEN r.verdict = 'hate' THEN 1 ELSE 0 END) AS hates,
+       SUM(CASE WHEN r.verdict = 'like' THEN 1 ELSE 0 END) AS likes
+     FROM sodas s
+     JOIN soda_reports r ON r.soda_id = s.id
+     WHERE s.is_active = 1 AND s.id IN (${BANNED_SODA_IDS_SQL})
+     GROUP BY s.id
+     ORDER BY hates DESC, s.brand ASC, s.flavor ASC`
+  ).all<{ id: number; brand: string; flavor: string; hates: number; likes: number }>()
+  return c.json({
+    banned: result.results.map((row) => ({
+      id: row.id,
+      name: `${row.brand} ${row.flavor}`,
+      hates: row.hates,
+      likes: row.likes,
+    })),
+  }, 200, { 'Cache-Control': 'no-store' })
+})
+
 // Maps a barcode to a drink (source 'admin', overrides any earlier mapping) and resolves its open scans.
 admin.post('/soda/barcodes', requireAdminSession, async (c) => {
   const body = await c.req.json<{ code?: unknown; soda_id?: unknown }>().catch((): { code?: unknown; soda_id?: unknown } => ({}))
@@ -237,11 +259,16 @@ admin.post('/soda/barcodes', requireAdminSession, async (c) => {
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_barcodes (code, soda_id, source)
-     SELECT ?, id, 'admin' FROM sodas WHERE id = ? AND is_active = 1
+     SELECT ?, s.id, 'admin' FROM sodas s WHERE s.id = ? AND ${shownSodaSql('s')}
      ON CONFLICT(code) DO UPDATE SET soda_id = excluded.soda_id, source = 'admin'
      RETURNING soda_id`
   ).bind(code, body.soda_id).first<{ soda_id: number }>()
-  if (!row) return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+  if (!row) {
+    if (await isSodaBanned(c.env.DB, body.soda_id as number)) {
+      return c.json({ error: 'Soda is banned', code: 'SODA_BANNED' }, 409)
+    }
+    return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+  }
 
   await c.env.DB.prepare(
     `UPDATE soda_unknown_scans SET resolved_soda_id = ?, resolved_by = 'admin'

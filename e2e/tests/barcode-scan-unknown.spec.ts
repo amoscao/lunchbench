@@ -26,24 +26,24 @@ test.describe('Barcode scan mode: unknown code', () => {
     const log = network.requests.find((r) => r.url().endsWith('/api/soda/unknown-scans'))!
     expect(log.postDataJSON()).toEqual({ barcode: UNKNOWN_GTIN, format: 'ean_13' })
 
-    await combobox.fill('olipop vintage')
-    await dialog.locator('.soda-suggest-item', { hasText: 'OLIPOP Vintage Cola' }).click()
+    await combobox.fill('zevia cola')
+    await dialog.locator('.soda-suggest-item', { hasText: 'Zevia Cola' }).click()
     await dialog.getByRole('button', { name: 'Like' }).click()
     await expect(dialog).toBeHidden()
 
     const report = network.requests.find((r) => r.url().endsWith('/api/soda/reports'))!
     expect(report.postDataJSON()).toMatchObject({ verdict: 'like', barcode: UNKNOWN_GTIN })
-    const olipopId = (report.postDataJSON() as { soda_id: number }).soda_id
-    await expect.poll(async () => (await barcodes()).find((row) => row.code === UNKNOWN_GTIN)?.soda_id).toBe(olipopId)
+    const reportedId = (report.postDataJSON() as { soda_id: number }).soda_id
+    await expect.poll(async () => (await barcodes()).find((row) => row.code === UNKNOWN_GTIN)?.soda_id).toBe(reportedId)
 
     // Same page: the learned mapping is remembered locally, so a re-scan matches.
     dialog = await openReport(page)
-    await expect(dialog.locator('.barcode-scan-name')).toHaveText('OLIPOP Vintage Cola')
+    await expect(dialog.locator('.barcode-scan-name')).toHaveText('Zevia Cola')
 
     // After a reload the mapping comes from the server.
     await page.reload()
     dialog = await openReport(page)
-    await expect(dialog.locator('.barcode-scan-name')).toHaveText('OLIPOP Vintage Cola')
+    await expect(dialog.locator('.barcode-scan-name')).toHaveText('Zevia Cola')
     expect(network.requests.filter((r) => r.url().endsWith('/api/soda/unknown-scans'))).toHaveLength(1)
     network.assertNoImageData()
   })

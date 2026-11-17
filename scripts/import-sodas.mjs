@@ -100,6 +100,12 @@ function sqlString(value) {
 }
 
 function writeSql() {
+  // 0012_soda_catalog.sql has shipped (it ran in production). Migrations are append-only, and the source data
+  // has since changed (OLIPOP removed by 0015, issue #296), so regenerating would rewrite history.
+  // Data changes go in a new migration. --force exists only for a deliberate, reviewed rebuild.
+  if (existsSync(MIGRATION_FILE) && !process.argv.includes('--force')) {
+    throw new Error(`${MIGRATION_FILE} already shipped; write a new migration instead (or pass --force deliberately)`)
+  }
   const sodas = readSodas()
   const rows = sodas.map((soda) =>
     `  (${[soda.walmart_item_id, soda.brand, soda.flavor, soda.type, imageKey(soda)].map(sqlString).join(', ')})`

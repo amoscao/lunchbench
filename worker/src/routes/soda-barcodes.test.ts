@@ -14,7 +14,7 @@ const OTHER_GTIN = '0098765432105'
 function setup() {
   const { db, sqlite } = createTestD1()
   const sodaId = (walmartId: string) => Number(sqlite.prepare('SELECT id FROM sodas WHERE walmart_item_id = ?').get(walmartId)!.id)
-  const cola = sodaId('7097351727') // OLIPOP Vintage Cola
+  const cola = sodaId('2444526495') // Zevia Cola
   const coke = sodaId('12166733') // Coca-Cola Original
   const env: Bindings = { DB: db, IMAGES: undefined, VOTE_PASSWORD: '', ADMIN_MANAGER_PASSWORD: '', SENTRY_DSN: '' }
   const expires = new Date(Date.now() + 86_400_000).toISOString()
@@ -152,9 +152,9 @@ describe('admin unknown scans', () => {
       code: UNKNOWN_GTIN,
       scans: 2,
       voters: 2,
-      picks: [{ soda_id: cola, name: 'OLIPOP Vintage Cola', count: 1 }],
+      picks: [{ soda_id: cola, name: 'Zevia Cola', count: 1 }],
       mapped_soda_id: cola,
-      mapped_name: 'OLIPOP Vintage Cola',
+      mapped_name: 'Zevia Cola',
       mapped_source: 'voter',
     })
   })

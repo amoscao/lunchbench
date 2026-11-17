@@ -366,13 +366,107 @@ The loading bar animation is exactly **1.5 s** (`bar-fill 1.5s linear forwards` 
 
 This requires two conditions to be true simultaneously:
 
-1. **Prefetch resolves before the bar fills.** As soon as a matchup renders, `home.ts` fires `nextMatchupPromise = getMatchup(isVeganMode())` in the background. The user has at least their full matchup-viewing time plus up to 1.5 s of vote time for this fetch to complete. `GET /api/matchup` must return in well under 1.5 s.
+1. **Prefetch resolves before the bar fills.** As soon as a matchup renders, `home.ts` fires `nextMatchupPromise = getMatchup(isVeganMode())` in the background. The user has at least their full matchup-viewing time plus up to 1.5 s of vote time for this fetch to complete. `GET /api/matchup` must return in well under 1.5 s. The prefetch also loads and decodes both card images (`preloadMatchupImages`, capped at 3 s), and `renderCard` moves those decoded `<img>` elements into the cards. The decoded images are stored per matchup object, so a re-render (such as a vegan toggle) cannot drop another pair's images. A pair renders with blank images only if the 3 s cap is hit. Initial load waits on the same preload behind the skeleton.
 
 2. **`votePromise` resolves before the bar fills.** `castVote` runs `Promise.all([delay, votePromise])`. `delay` is the 1.5 s timer; `votePromise` is the `POST /api/vote` response. If the POST outlasts the timer, the JS transition is blocked even though the CSS bar is already full. `POST /api/vote` must complete in well under 1.5 s.
 
 After `Promise.all` settles, the code does `next = await (nextMatchupPromise ?? getMatchup(...))`. If `nextMatchupPromise` is already resolved, this `await` returns synchronously and the new matchup appears immediately.
 
 **Implication for backend work:** Any sequential D1 round trips added to `POST /api/vote` or `GET /api/matchup` eat directly into this budget. At ~100–150 ms D1 latency per round trip, the vote POST should target **≤ 6 sequential round trips** to stay comfortably under 1.5 s. `GET /api/matchup` should target **≤ 5 sequential round trips**.
+
+---
+
+## 12a. Sodabench
+
+Mockups live outside the repo; this section is the source of truth.
+
+**Rule: no subtitles or helper text.** Only titles, labels, and controls. No explanatory lines such as "swipe right on sodas you like".
+
+**Nav:** LunchArena (`/`) · SodaArena (`/soda`) · Leaderboard. `/chris` is not in the nav. Internally the feature is still called Sodabench (code, routes, API, tables).
+
+### Swipe deck (`/soda`)
+- Max content width 640px.
+- Header row: page heading "SodaArena" left, primary button "+ Report a soda" right.
+- One continuous feed. There are no decks, no progress counter and no "Start over". It shows the next drink until the voter has swiped every active drink.
+- Card: 380px max, 440px tall (380px under 640px wide), `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px (260px) on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700, two lines max).
+- Card stack (`frontend/src/components/swipe-stack.ts`): the top card plus two real cards underneath, fully rendered. Each card's `<img>` is created and decoded ahead of time, and images for the next four drinks are decoded beyond that. When the top card leaves, the next card is promoted in place (same element, no re-render) and a new card is appended at the bottom.
+- Swipe physics (`frontend/src/utils/swipe-physics.ts`): pointer events, `requestAnimationFrame` and CSS transforms only.
+  - **Drag:** the card follows the pointer 1:1 in x and y. Rotation is 0.07°/px, capped at ±20°, and the sign flips when the card is grabbed in its bottom half.
+  - **Commit:** |dx| > 35% of the card width, or a flick faster than 0.5 px/ms (measured over the last 100 ms) in the same direction.
+  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning for a short hop: it ends one card width from rest (at least 0.4 card widths past where it was released) and fades out over the last 65% of the hop. It does not cross the screen. Duration is distance / speed, clamped to 50-260 ms.
+  - **Snap back:** a damped spring with a slight overshoot.
+  - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
+  - **Stamps:** LIKE (`--accent`, top left) and NOPE (`--hate`, top right) fade in and tilt with |dx|.
+  - **Input:** the flying card ignores input; the promoted card can be dragged at once, so rapid swipes work. Holding an arrow key counts once (auto-repeat is ignored). A lost pointer capture, or a mouse move with no button held, ends the drag with a snap back. Swipe requests are fire-and-forget, retried once, with a "Swipe not saved" alert on a second failure.
+  - **Screen readers:**
+    - each card is named "Brand Flavor";
+    - a visually hidden polite live region announces the new top drink;
+    - the end state is `role="status"`;
+    - when the feed empties, focus moves to its title instead of falling to the page body.
+  - **Touch:** `touch-action: pan-y` keeps vertical page scroll on phones; pointer capture holds the drag.
+  - While on `/soda`, `body` gets `overflow-x: clip` so flung cards never flash a horizontal scrollbar.
+- Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with `--border-accent`, arrow ←, `aria-label="Swipe left"`. Right: `--accent` fill, arrow →, `aria-label="Swipe right"`. Buttons and arrow keys trigger the same fling with a default velocity and a slight upward arc.
+- Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal is open or a text field has focus.
+- End: after the last drink, a card titled "You've rated everything" ("No drinks yet" if the catalog itself is empty). No subtitle. "Report a soda" stays available.
+- `prefers-reduced-motion`: the card fades out in 120 ms. There is no fling, no spring, and no scaling: the cards underneath neither scale with the drag nor animate when promoted.
+
+### Report modal
+- Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).
+- Title "Report a soda" ("Scan the soda barcode" while the camera is scanning), close button (×, 44px).
+- Text field with autocomplete over the full catalog, up to 8 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
+- Search (`frontend/src/soda-search.ts`, local, no request per keystroke):
+  - Normalization ignores case, punctuation, apostrophes, accents and the spaces in brand names: "dr pepper" = "Dr. Pepper", "la croix" = "LaCroix", "a and w" / "aw" = "A&W", "barqs" = "Barq's".
+  - Every typed word must match the brand, flavor or combined name, in any order. Each typed word needs its own catalog word, so "coka cola" cannot match "Zevia Cola" twice.
+  - Words match exactly, by prefix while typing ("str lem"), or inside a longer word for 4+ letters ("berry" finds Raspberry).
+  - The type word ("soda"/"seltzer") also matches, but ranks below brand and flavor matches. The seltzer and soda aliases cover searching by type.
+  - Typos are forgiven per word: 1 edit (Damerau-Levenshtein) for 4-7 letters, 2 for 8+. Only words no catalog word contains get typo matching, so "diet" never drags in "dirty". A typo against the start of a longer word needs 5+ letters and the same first letter, so "mint" does not match "Vintage".
+  - Nicknames live in one exported map, `SODA_ALIASES` ("coke", "dp", "gv", "walmart brand", "sparkling water", "zero", "max", "creme", …). An alias can widen to several brands or flavors and combines with the other words in either order ("diet coke" = "coke diet"). Expansions match exactly or by prefix only. While the last word is still being typed, alias keys that continue it count too, including longer keys ("cok", "doct" → doctor pepper, "fizzy" → fizzy water, "doctor p").
+  - Ranking, in order:
+    1. type-word-only matches last;
+    2. fewer typos;
+    3. smaller total edit distance;
+    4. more words matched as typed;
+    5. better match quality (exact, then prefix, then inside a word);
+    6. the first-listed alias expansion ("gv" lists Great Value before Sam's Choice and bettergoods);
+    7. shorter names, not counting "Original"/"Pure", so a brand query ("coke", "polar") lists the flagship first;
+    8. catalog order.
+  - Only the first 8 words of a query count, which keeps every keystroke instant.
+- Two 52px buttons: **Hate** (solid red `--report-hate`, white text) on the left and **I like** (solid green `--report-like`, white text) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
+- Submitting closes the modal. Nothing else is shown.
+- Scan mode (`frontend/src/components/barcode-scanner.ts`):
+  - Default only on touch-first devices (`(pointer: coarse)`). Desktop opens in manual mode.
+  - Head row: a "Scan barcode" icon button (camera brackets, 44px, `aria-label="Scan barcode"`) left of close. Shown in manual mode when the browser has a camera API and the camera has not failed in this modal.
+  - Scan view: live rear-camera preview (`facingMode: environment`, square 1:1 so a barcode fits held horizontally or vertically, `--radius-md`, black behind), a square scan frame (inset 14%, 3px `--accent` border, the area outside dimmed), and a secondary "Select manually" button (always shown). The view is capped at 45vh so the dialog fits short screens. Both decoders read barcodes in either orientation (ZXing `tryRotate`). "I like" and Hate stay visible and disabled.
+  - Match: the camera stops; the preview is replaced by the drink image (180px, `--product-bg`) and name (`--text-lg`, 700). "I like" and Hate enable. The title returns to "Report a soda". "Select manually" stays.
+  - Unknown code: the code is logged, the camera stops, and the modal switches to manual search with the field focused. A notice above the search (`role="status"`, amber) reads "Barcode not found. Try searching for the drink instead." It clears when scan mode reopens; "Select manually" and a denied camera never show it. The `role="status"` wrapper is always rendered so screen readers announce the text; only the inner box collapses when empty. If the barcode list itself fails to load, the code cannot be looked up and the modal drops to manual search without a notice. The code goes with the manual report so the next scan matches.
+  - Permission denied, no camera, no camera API, or no decoder: straight to manual search. No error screen. The "Scan barcode" button hides.
+  - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors, including while the decoder is still loading. A camera that ends on its own drops to manual search.
+  - Admin "Unknown scans" tab: the Mapped column shows the drink and its source, e.g. "Sprite Original (voter)". Dismiss removes the code's scans and a voter mapping; seed and admin mappings stay. A removed drink is named "<name> (removed)" and a banned one "<name> (banned)". Mapping to a drink that was banned after the tab loaded shows "That drink is banned, so codes cannot be mapped to it. Pick another or unban it first." and reloads the tab.
+  - No helper text: only the preview, the frame and labelled controls.
+
+### Auto-ban (#298)
+- A drink whose latest report from 5 or more distinct voters is Hate disappears on its own, with no admin step: from the swipe feed, report search, the soda leaderboard, the weekly order list and barcode matches. A scanned banned can goes to manual search.
+- The current week's order list on `/chris` loses the drink at once, without a regenerate. The rows below move up one rank; no replacement is added until the next weekly list.
+- A ban does not lift on its own: reports on a banned drink are rejected, so they cannot change. Only an admin unban brings it back.
+- Admin "Banned drinks" tab: a table with Drink, Hates, Likes and an **Unban** button per row (secondary, small), most hated first; "No banned drinks" when empty. Unban shows "Unbanned!" and reloads the list. An unbanned drink is shown again until its Hate count reaches the count at unban + 5 (at least 5 new Hates, more if earlier haters switch to Like), then it is banned again and returns to the list.
+- Pages opened before the ban:
+  - Swiping a card of a drink that was banned since the feed loaded counts as done: no "Swipe not saved" alert.
+  - Reporting it shows "This drink has been removed" in the modal's error slot, clears the pick and drops the drink from that page's search and scan matches.
+
+### Leaderboard tabs
+- Both leaderboards show a tab row above the heading: **Lunch** (`/leaderboard`) and **Soda** (`/leaderboard/soda`). Active tab: `--text-primary` with a 2px `--accent` underline.
+- The lunch page heading and table are unchanged.
+
+### Soda leaderboard (`/leaderboard/soda`)
+- Heading "Soda Leaderboard". Table columns: Rank (gold/silver/bronze badges as lunch), Drink (40px thumbnail + name), Type tag, Swipes.
+- Type tags: Soda (`--bg-hover`), Seltzer (`--tag-seltzer-bg` / `--tag-seltzer-text`).
+- Swipes: → right count in accent, ← left count in `--text-secondary`. A drink with no data shows "New soda to try" or "New seltzer to try" in bold.
+
+### Purchaser page (`/chris`)
+- Logged out: heading "Purchaser Login", password field, "Log in". The token is kept in localStorage (`lb_purchaser_session_token`), separate from the Add Lunch token.
+- Logged in: heading "This Week's Order" with "Week of Mon D" beside it; secondary buttons "Export lunch PDF" and "Log out".
+- One ranked table, read-only, 10 rows: 4 sodas, 4 seltzers, one soda trial, one seltzer trial. Columns #, Drink, Type tag, Swipes. Tags: Soda, Seltzer, Trial (`--accent-subtle`).
+- No quantities, no summary tiles, no substitutions text.
 
 ---
 
@@ -383,6 +477,7 @@ After `Promise.all` settles, the code does `next = await (nextMatchupPromise ?? 
 - All components use CSS custom properties — never hardcode colors
 - No CSS framework (no Tailwind, Bootstrap, etc.) — plain CSS only
 - No external icon libraries — use Unicode symbols or inline SVG only
+- No UI libraries. One exception: the barcode decoder `zxing-wasm` (not a UI library). It is self-hosted (bundled by Vite, never a CDN), pinned to an exact version, and lazy-loaded only when scanning starts on a browser without native `BarcodeDetector`.
 - Font loading: same-origin bundled fonts only. The SPA CSP uses `font-src 'self'`.
 - Theme boot script must be the FIRST script in `<head>`, before any stylesheet
 - Component files export a function that returns an HTMLElement or renders into a container

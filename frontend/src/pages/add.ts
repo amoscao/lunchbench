@@ -1,4 +1,4 @@
-import { ApiError, createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch, verifyAdminToken } from '../api'
+import { ApiError, createLunch, getLunches, getLunchesWithoutImages, uploadImage, type Lunch, verifySessionForRoles } from '../api'
 import { findSimilar, fuzzyFilter } from '../fuzzy'
 import { validateImageFile } from '../upload-validator'
 import { clearStoredSessionToken, getStoredSessionToken, setStoredSessionToken } from '../utils/auth-storage'
@@ -95,7 +95,7 @@ export function renderAdd(container: HTMLElement): void {
     const password = passwordInput?.value.trim() ?? ''
     if (!password) throw new Error('Password is required.')
 
-    const sessionToken = await verifyAdminToken(password)
+    const sessionToken = await verifySessionForRoles(password, ['admin', 'lunch'])
     storedSessionToken = sessionToken
     setStoredSessionToken(sessionToken)
     return sessionToken

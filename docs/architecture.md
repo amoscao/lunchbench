@@ -17,9 +17,59 @@ Lunchbench runs entirely on the Cloudflare free tier. It has four components:
 Browser
   → Cloudflare Pages (static assets + /api/* proxy)
     → Cloudflare Worker (Hono API)
-      → D1 (reads/writes for lunch data, votes, rate limits)
+      → D1 (reads/writes for lunch data, votes, soda swipes/reports, rate limits)
       → R2 (image reads/writes)
+
+Cloudflare cron trigger (Monday 12:00 UTC)
+  → Worker scheduled handler
+    → D1 (writes the weekly soda order snapshot)
 ```
+
+## Sodabench
+
+Sodabench ranks canned sodas and seltzers. It shares the Worker, D1 database, and R2 bucket with the lunch app.
+
+- `/soda`: voters swipe one continuous feed of every drink they have not swiped yet (right = like, left = not a like) and report drinks they had (like or hate).
+- `/leaderboard/soda`: public ranking. `/leaderboard` keeps the lunch ranking; tabs switch between them.
+- `/chris`: purchaser page behind `PURCHASER_PASSWORD`. Shows the lunch PDF export and this week's order list.
+
+Code:
+
+- `worker/src/soda-score.ts`: Beta-posterior scoring with a hierarchical brand prior (pure). See the Scoring section of `docs/api-contract.md`.
+- `worker/src/soda-order.ts`: weekly order list selection, seeded Thompson sampling for trials (pure).
+- `worker/src/soda-deck.ts`: per-voter deck order (pure).
+- `worker/src/soda-data.ts`: D1 aggregation and snapshot writes.
+- `worker/src/routes/soda.ts`: `/api/soda/*` routes.
+- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot and prunes unknown scans older than 180 days.
+- `worker/src/barcode.ts`: UPC/EAN normalization to 13-digit GTINs (pure). `frontend/src/utils/barcode.ts` has the same rules.
+- `worker/src/soda-unknown-scans.ts`: groups the unknown-scan log for the admin view (pure).
+- `frontend/src/components/barcode-scanner.ts`: scan mode of the report modal. Camera preview, decode loop, lookup, unknown-scan logging.
+- `frontend/src/utils/zxing-decoder.ts`: fallback decoder (zxing-wasm), loaded only when scanning starts on a browser without `BarcodeDetector`.
+
+Data:
+
+- D1 tables: `sodas`, `soda_swipes` and `soda_reports` (one row per voter per drink each; a newer swipe or report replaces the older one), `soda_buy_lists` (frozen weekly order snapshots), `soda_barcodes` (code to drink), `soda_unknown_scans` (scans that matched no code) and `soda_ban_overrides` (admin unbans of auto-banned drinks, #298).
+- `scripts/data/sodas.json`: cleaned catalog with Walmart image URLs. Images are not committed. Drinks taken off later (OLIPOP, issue #296) are removed here and deactivated by a migration.
+- `scripts/import-sodas.mjs`: generated `migrations/0012_soda_catalog.sql` (its `sql` command now refuses to overwrite the shipped file; `--force` only for a reviewed rebuild) and uploads images to R2 (`--local` or `--remote`). Image keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, so the migration and the uploads agree.
+- `scripts/import-barcodes.mjs`: one-off import of retail barcodes from Open Food Facts into `scripts/data/soda-barcodes.json`, and generated `migrations/0014_soda_barcodes_seed.sql` (its `sql` command now refuses to overwrite it; `--force` only for a reviewed rebuild). Catalog or barcode changes go in a new migration, like 0015.
+- The SPA Content-Security-Policy blocks hotlinked Walmart images. All drink images go through `GET /api/images/:key`.
+
+### Barcode scanning
+
+- Decoding runs on the device. Camera frames go from the `<video>` to the decoder and nowhere else. The server only receives the decoded digit string, its symbology, the drink id and the verdict.
+- Decoder: native `BarcodeDetector` (formats `upc_a`, `upc_e`, `ean_13`, `ean_8`) when it supports them (Chrome on Android). Otherwise `zxing-wasm` (ZXing C++ as WebAssembly, reader build), bundled by Vite and served from our origin. Its default CDN `locateFile` is overridden. It is a dynamic import, so the ~36 kB JS chunk and the ~947 kB `.wasm` (~410 kB gzip) download only when scanning starts. It runs on the main thread, so frames are downscaled to 960 px on the long side and the slower `tryHarder` pass runs on every other frame only.
+- Camera and decoder start in parallel. The preview shows as soon as the camera opens; a stop while the decoder is still loading still ends every track. A track that ends on its own (device lost) drops the modal to manual search.
+- Lookup is local: `GET /api/soda/barcodes` once per page load.
+
+### SPA Content-Security-Policy
+
+Set by `frontend/functions/_middleware.ts` on HTML responses:
+
+- `script-src 'self' 'wasm-unsafe-eval' https://gc.zgo.at`. `'wasm-unsafe-eval'` lets the barcode decoder compile WebAssembly. It does not allow `eval()` or `new Function()`.
+- No `worker-src`: the decoder runs on the main thread, no workers or `blob:` scripts.
+- `connect-src 'self'` covers the `.wasm` fetch.
+- No `Permissions-Policy` header is set, so camera access is not blocked. If one is added, it must allow `camera=(self)`.
+- `getUserMedia` needs HTTPS. Production is HTTPS; local `localhost` counts as secure.
 
 ## Resource Names
 
@@ -57,6 +107,7 @@ The frontend proxies `/api/*` requests to the worker using a Cloudflare Pages Fu
 | Secret | Where | Purpose |
 |--------|-------|---------|
 | `ADMIN_TOKEN` | Worker secret + `.dev.vars` | Protects lunch creation and image upload routes |
+| `PURCHASER_PASSWORD` | Worker secret + `.dev.vars` | Mints `purchaser` sessions for `/chris` and `GET /api/soda/order/latest` |
 | `CLOUDFLARE_API_TOKEN` | GitHub Actions secret | Allows CI to deploy worker and pages |
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret | Identifies Cloudflare account in CI |
 

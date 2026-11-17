@@ -35,6 +35,19 @@
   --text-lg: 22px;
   --text-xl: 30px;
   --text-logo: 20px;
+  --product-bg: #ffffff;
+  --hate: #1d4ed8;
+  /* Report buttons: solid green "I like", solid red "Hate". White text passes AA on both, in both themes. */
+  --report-like: #15803d;
+  --report-like-hover: #166534;
+  --report-hate: #b91c1c;
+  --report-hate-hover: #991b1b;
+  /* Warning notices (amber). */
+  --warn-bg: #fef3c7;
+  --warn-text: #92400e;
+  --tag-seltzer-bg: #dbeafe;
+  --tag-seltzer-text: #1e3a8a;
+  --modal-scrim: rgba(17, 17, 16, 0.4);
 }
 
 [data-theme="dark"] {
@@ -51,6 +64,12 @@
   --accent-text:  hsl(222, 35%, 6%);
   --accent-subtle: hsl(168, 60%, 12%);
   --accent2:      hsl(282, 82%, 68%);
+  --hate:         #60a5fa;
+  --warn-bg:      hsl(38, 70%, 14%);
+  --warn-text:    #fcd34d;
+  --tag-seltzer-bg: hsl(217, 50%, 18%);
+  --tag-seltzer-text: #bfdbfe;
+  --modal-scrim: rgba(0, 0, 0, 0.6);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.6);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.7);
 }
@@ -1904,3 +1923,620 @@ img {
   gap: 10px;
   justify-content: flex-end;
 }
+
+/* =====================
+   Leaderboard tabs (Lunch / Soda)
+   ===================== */
+.board-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.board-tab {
+  padding: 8px 18px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.board-tab:hover { color: var(--text-primary); }
+
+.board-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* =====================
+   Sodabench: swipe deck
+   ===================== */
+.soda-page {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.soda-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.soda-header .page-heading { margin: 0; }
+
+.soda-report-open { padding: 10px 16px; }
+
+.soda-stage {
+  position: relative;
+  height: var(--soda-stage-height);
+  /* Room for the cards stacked underneath to peek out below the top card. */
+  --soda-card-height: 440px;
+  --soda-stage-height: 470px;
+}
+
+body.soda-route { overflow-x: clip; }
+
+/* Screen-reader-only text (live announcements). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.soda-feed {
+  position: relative;
+  height: 100%;
+  width: 380px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.soda-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--soda-card-height);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.soda-card[data-depth="1"],
+.soda-card[data-depth="2"] {
+  pointer-events: none;
+  cursor: default;
+}
+
+.soda-card.dragging { cursor: grabbing; }
+.soda-card.leaving { pointer-events: none; }
+/* Cards moving up one depth after a swipe (SETTLE_MS in swipe-stack.ts). */
+.soda-card.settling { transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.3, 1); }
+.soda-card.fading { opacity: 0; transition: opacity 0.12s linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  .soda-card.settling { transition: none; }
+}
+
+.soda-stamp {
+  position: absolute;
+  top: 20px;
+  z-index: 1;
+  border: 3px solid currentColor;
+  background: var(--bg-surface);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.soda-stamp-like {
+  left: 18px;
+  color: var(--accent);
+  transform: rotate(-12deg);
+}
+
+.soda-stamp-nope {
+  right: 18px;
+  color: var(--hate);
+  transform: rotate(12deg);
+}
+
+.soda-card-image {
+  flex: 0 0 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--product-bg);
+}
+
+.soda-card-image img {
+  width: 290px;
+  height: 290px;
+  max-width: 90%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.soda-card-initial {
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--border-accent);
+}
+
+.soda-card-info {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.soda-card-brand {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.soda-card-flavor {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.soda-end {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-width: 100%;
+  height: var(--soda-card-height);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  text-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+}
+
+.soda-end-title {
+  outline: none;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.soda-card-skeleton {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-width: 100%;
+  height: var(--soda-card-height);
+  border-radius: var(--radius-lg);
+}
+
+.soda-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.soda-swipe-btn {
+  min-height: 56px;
+  border-radius: 999px;
+  border: 1px solid var(--border-accent);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, transform 0.1s;
+}
+
+.soda-swipe-btn:hover { background: var(--bg-hover); }
+.soda-swipe-btn:active { transform: scale(0.98); }
+
+.soda-swipe-right {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.soda-swipe-right:hover { background: var(--accent-hover); }
+
+.soda-swipe-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* =====================
+   Sodabench: report modal
+   ===================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--modal-scrim);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 120px var(--space-4) var(--space-4);
+}
+
+.soda-report-modal {
+  width: 440px;
+  max-width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.soda-report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.soda-report-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.modal-close:hover { background: var(--bg-hover); }
+
+.soda-report-search { position: relative; }
+
+.soda-report-input { min-height: 48px; font-size: 16px; }
+
+.soda-suggest {
+  list-style: none;
+  margin-top: 6px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.soda-suggest-item {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.soda-suggest-item:hover,
+.soda-suggest-item.selected {
+  background: var(--bg-hover);
+}
+
+.soda-suggest-item img,
+.soda-suggest-noimg {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--product-bg);
+  border-radius: var(--radius-sm);
+}
+
+.soda-report-error { margin: 0; }
+
+/* "Barcode not found" after an unknown scan. Empty (and collapsed) the rest of the time. */
+.soda-report-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+/* Only the inner box hides; the role="status" wrapper must stay rendered to be announced
+   (never display: none or contents). While empty it is a zero-height flex item, so cancel the
+   extra modal gap (14px) it would add. */
+.soda-report-notice:empty { display: none; }
+.soda-report-notice-region:has(> .soda-report-notice:empty) { margin-top: -14px; }
+
+.soda-report-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.soda-report-actions .btn {
+  min-height: 52px;
+  font-size: var(--text-base);
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.soda-report-hate,
+.soda-report-like {
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.soda-report-hate { background: var(--report-hate); }
+.soda-report-like { background: var(--report-like); }
+.soda-report-hate:hover:not(:disabled) { background: var(--report-hate-hover); }
+.soda-report-like:hover:not(:disabled) { background: var(--report-like-hover); }
+
+/* =====================
+   Sodabench: leaderboard and order list
+   ===================== */
+.soda-thumb {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--product-bg);
+  border-radius: var(--radius-sm);
+}
+
+.soda-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.col-type { width: 96px; }
+.col-swipes { width: 150px; text-align: right; white-space: nowrap; }
+.leaderboard-table thead th.col-swipes { text-align: right; }
+
+.soda-tag {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.soda-tag-soda { background: var(--bg-hover); color: var(--text-primary); }
+.soda-tag-seltzer { background: var(--tag-seltzer-bg); color: var(--tag-seltzer-text); }
+.soda-tag-trial { background: var(--accent-subtle); color: var(--accent-hover); }
+
+.swipe-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.swipe-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swipe-count-right { color: var(--accent-hover); font-weight: 700; }
+.swipe-count-left { color: var(--text-secondary); font-weight: 600; }
+
+[data-theme="dark"] .swipe-count-right { color: var(--accent); }
+
+.soda-new {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: normal;
+}
+
+.order-rank {
+  font-size: var(--text-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+
+.chris-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.chris-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.chris-title .page-heading { margin: 0; }
+
+.chris-week {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chris-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.chris-actions .btn { padding: 10px 16px; }
+
+.chris-login { max-width: 400px; }
+
+@media (max-width: 640px) {
+  .soda-stage {
+    --soda-card-height: 380px;
+    --soda-stage-height: 408px;
+  }
+  .soda-card-image { flex-basis: 260px; }
+  .soda-card-image img { width: 230px; height: 230px; }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .soda-report-modal {
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .soda-table td,
+  .soda-table th,
+  .order-table td,
+  .order-table th {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .soda-table .col-name,
+  .order-table .col-name { min-width: 0; }
+  .soda-table .col-rank,
+  .order-table .col-rank { width: 40px; }
+  .col-type,
+  .col-swipes { width: auto; }
+  .swipe-counts { gap: 8px; }
+  .soda-thumb { width: 32px; height: 32px; }
+  .soda-new { font-size: var(--text-xs); }
+}
+
+/* =====================
+   Sodabench: barcode scan mode in the report modal
+   ===================== */
+.soda-report-head .soda-report-title { flex: 1; }
+.soda-report-head .soda-report-scan-open { margin-right: 0; }
+
+.barcode-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.barcode-scan-view {
+  position: relative;
+  /* Square, so a barcode fits held horizontally or vertically. Capped by viewport height so the
+     dialog's buttons stay on screen on short laptops and landscape tablets. */
+  aspect-ratio: 1 / 1;
+  width: min(100%, 45vh);
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #000;
+}
+
+.barcode-scan-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.barcode-scan-frame {
+  position: absolute;
+  inset: 14%;
+  border: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.barcode-scan-match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.barcode-scan-match img,
+.barcode-scan-noimg {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  background: var(--product-bg);
+  border-radius: var(--radius-md);
+}
+
+.barcode-scan-name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.barcode-scan-manual { min-height: 44px; }
+
+/* .modal-close sets display; keep the hidden attribute working on the scan button. */
+.soda-report-head .soda-report-scan-open[hidden] { display: none; }

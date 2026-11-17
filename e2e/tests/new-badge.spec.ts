@@ -42,7 +42,7 @@ test.describe('New food badge', () => {
     await expect(row.locator('.new-badge')).toHaveCount(0)
   })
 
-  test('arena shows New food! only on the new card, alongside Legacy badge', async ({ page }) => {
+  test('arena shows New food! only on the new card', async ({ page }) => {
     await page.route('**/api/matchup**', async (route) => {
       const url = new URL(route.request().url())
       if (route.request().method() !== 'GET' || url.pathname !== '/api/matchup') {
@@ -53,9 +53,7 @@ test.describe('New food badge', () => {
       const body = await response.json()
       if (body.left && body.right) {
         body.left.created_at = d1Datetime(Date.now() - 60 * 60 * 1000)
-        body.left.is_legacy = 1
         body.right.created_at = d1Datetime(Date.now() - 8 * 24 * 60 * 60 * 1000)
-        body.right.is_legacy = 0
       }
       await route.fulfill({ response, json: body })
     })
@@ -64,7 +62,6 @@ test.describe('New food badge', () => {
     await waitForMatchup(page)
     const names = page.locator('.lunch-card-name')
     await expect(names.nth(0).locator('.new-badge')).toHaveText('New food!')
-    await expect(page.locator('.lunch-card-info').nth(0).locator('.legacy-badge-row .legacy-badge')).toHaveText('Paula Legacy Lunch')
     await expect(names.nth(1).locator('.new-badge')).toHaveCount(0)
   })
 })

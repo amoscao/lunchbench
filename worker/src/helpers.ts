@@ -1,6 +1,6 @@
 import type { Lunch, LunchRow } from './types'
 
-type SessionRole = 'admin' | 'lunch'
+export type SessionRole = 'admin' | 'lunch' | 'purchaser'
 
 type AdminSessionRow = {
   token: string
@@ -67,6 +67,7 @@ export async function validateAdminSession(
 
   if (requiredRole === 'admin') return session.role === 'admin'
   if (requiredRole === 'lunch') return session.role === 'admin' || session.role === 'lunch'
+  if (requiredRole === 'purchaser') return session.role === 'admin' || session.role === 'purchaser'
 
   return true
 }

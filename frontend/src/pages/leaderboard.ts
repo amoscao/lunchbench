@@ -2,6 +2,7 @@ import { getLeaderboard, type LeaderboardLunch } from '../api'
 import { isVeganMode } from '../vegan-mode'
 import { animateCountUp } from '../utils/count-up'
 import { isNewLunch } from '../utils/new-lunch'
+import { createLeaderboardTabs } from '../components/leaderboard-tabs'
 
 function rankBadgeClass(rank: number): string {
   if (rank === 1) return 'gold'
@@ -49,6 +50,7 @@ export function renderLeaderboard(container: HTMLElement, navigate: (p: string) 
       </table>
   `
 
+  content.prepend(createLeaderboardTabs('/leaderboard', navigate))
   const tbody = content.querySelector<HTMLElement>('#lb-body')!
 
   getLeaderboard(veganOnly)

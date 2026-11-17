@@ -17,7 +17,8 @@ pnpm install
 
 ```bash
 cp worker/.dev.vars.example worker/.dev.vars
-# Edit worker/.dev.vars and set ADMIN_TOKEN to any random string for local dev
+# Edit worker/.dev.vars and set ADMIN_MANAGER_PASSWORD, VOTE_PASSWORD and PURCHASER_PASSWORD
+# to any local values. Never use production values.
 ```
 
 ## Apply local D1 migrations
@@ -34,7 +35,45 @@ npx wrangler d1 execute lunchbench --local --file=../migrations/0007_session_rol
 npx wrangler d1 execute lunchbench --local --file=../migrations/0008_vegan_leaderboard_index.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0009_matchup_sessions.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/0010_legacy_lunches.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0011_sodabench.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0013_soda_barcodes.sql
 npx wrangler d1 execute lunchbench --local --file=../migrations/seed.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0015_remove_olipop.sql
+npx wrangler d1 execute lunchbench --local --file=../migrations/0016_soda_ban_overrides.sql
+```
+
+`seed.sql` adds 14 sample sodas and seltzers. Their images live in local R2 only after an upload. To load the placeholder images used by E2E:
+
+```bash
+node scripts/import-sodas.mjs upload --local --images-dir scripts/data/seed-images --skip-missing
+```
+
+To load the full catalog (115 active drinks) with real images locally:
+
+```bash
+cd worker
+npx wrangler d1 execute lunchbench --local --file=../migrations/0012_soda_catalog.sql
+# Re-run the barcode seed so the newly loaded drinks get their codes.
+npx wrangler d1 execute lunchbench --local --file=../migrations/0014_soda_barcodes_seed.sql
+# 0012 and 0014 still insert the OLIPOP drinks and barcodes they shipped with. Any re-run of either must be
+# followed by 0015, which deactivates them again (issue #296).
+npx wrangler d1 execute lunchbench --local --file=../migrations/0015_remove_olipop.sql
+cd ..
+# Downloads each image from its Walmart URL, or reads <walmart_item_id>.(jpeg|png) from --images-dir.
+node scripts/import-sodas.mjs upload --local
+```
+
+If your local R2 still holds OLIPOP images from an older upload, delete them with the `--local` form of the commands in `docs/deployment.md` ("Remove OLIPOP").
+
+Barcode scanning needs a secure context for the camera. `http://localhost:5173` counts; a phone on the LAN does not, so test scan mode on a phone through an HTTPS tunnel or a Pages preview.
+
+Fire the weekly soda order cron locally:
+
+```bash
+cd worker
+npx wrangler dev --test-scheduled
+curl "http://localhost:8787/__scheduled?cron=0+12+*+*+1"
 ```
 
 ## Start the Worker dev server

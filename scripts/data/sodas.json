@@ -1,0 +1,922 @@
+[
+  {
+    "walmart_item_id": "16777397",
+    "brand": "7UP",
+    "flavor": "Original",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/7UP-Caffeine-Free-Lemon-Lime-Soda-Pop-12-fl-oz-12-Pack-Cans_2cbd2e02-6206-40dc-a28f-e745921cbfc9.3fae11060c46878cfe9d2ac0f9a1349c.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5045872773",
+    "brand": "7UP",
+    "flavor": "Tropical",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/7UP-Tropical-Caffeine-Free-Lemon-Lime-Mango-Peach-Soda-Pop-12-fl-oz-12-Pack-Cans_f984862f-d03a-4aaa-b0aa-1dc1986323b7.9933f1d70da0c4607d7dec0fac5fd1a2.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16777401",
+    "brand": "A&W",
+    "flavor": "Root Beer",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/A-W-Root-Beer-Soda-Pop-12-fl-oz-12-Pack-Cans_71af0de8-3c1c-4e13-b0f9-dfde3252fc6e.cdae72c7835ba79ce1679fbd76c053cd.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291614",
+    "brand": "Barq's",
+    "flavor": "Root Beer",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Barq-s-Root-Beer-Soda-Pop-12-fl-oz-12-Pack-Cans_2bcfa908-070d-47b6-8398-98d52180b63f.7ea4173c6adc5ead6759370d5cb3eaa5.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291623",
+    "brand": "Barq's",
+    "flavor": "Zero Sugar Root Beer",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Barq-s-Zero-Sugar-Root-Beer-Soda-Pop-12-fl-oz-12-Pack-Cans_8f9ac565-8f74-494c-9344-d40db65964e9.7c3d20c3f7e516d21b5459059dde2b54.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5212491407",
+    "brand": "bettergoods",
+    "flavor": "Lime",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bettergoods-Lime-Flavored-Sparkling-Water-12-fl-oz-8-Cans_a84bdc2f-9bfb-4106-a8a9-4bcb49bcb1c5.249c8022953e2ec614cbde782211f549.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "19701807696",
+    "brand": "Bloom Nutrition",
+    "flavor": "Crisp Apple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Nutrition-Pop-Crisp-Apple-Prebiotic-Soda-12-fl-oz-Can_f9316490-2117-441b-a283-4fdc2a2f45b0.cadbe67c847e778abf7925854a0e536c.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "20566609504",
+    "brand": "Bloom Nutrition",
+    "flavor": "Grape Freeze",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Pop-Grape-Freeze-12oz_a32ff192-e252-4f39-b79b-b23a1e1d0c22.64754909d2775d5e6baf24ff53cecc1d.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "18069966983",
+    "brand": "Bloom Nutrition",
+    "flavor": "Peach Pineapple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Nutrition-Pop-Prebiotic-Soda-Peach-Pineapple-12-fl-oz-Can_0419a38a-21b8-4aa6-a11b-9e8a756c9c63.968be42f8ee6e0c0737cfd6f53fb5d60.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16038152840",
+    "brand": "Bloom Nutrition",
+    "flavor": "Raspberry Lemonade",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Nutrition-Pop-Prebiotic-Soda-Raspberry-Lemonade-12-fl-oz-4-Pack-Cans_27e7e2c0-5a32-466b-a2bc-99149106234e.3f3be1c7faae95ff1dda40354d41a2cd.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "18896918869",
+    "brand": "Bloom Nutrition",
+    "flavor": "Root Beer Float",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Nutrition-Pop-Prebiotic-Soda-Root-Beer-Float-12-fl-oz-4-Pack-Cans_86ab20a4-73ee-4677-b455-1c0e1c5670dc.6675880a66978a7f26dfebcb6b714516.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16024053636",
+    "brand": "Bloom Nutrition",
+    "flavor": "Shirley Temple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Nutrition-Pop-Shirley-Temple-Prebiotic-Soda-12-fl-oz-4-Pack-Cans_6fda1d9d-b27e-4cf5-bb33-e80a4f42c003.cd894df6f84ad71824a9117e8f417ccc.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16033954558",
+    "brand": "Bloom Nutrition",
+    "flavor": "Strawberries & Cream",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Bloom-Nutrition-Pop-Prebiotic-Soda-Strawberries-Cream-12-fl-oz-4-Pack-Cans_4041dc91-f175-42b0-b205-37640483be74.02868ff9136de771d4b97b2b495d02ea.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "977740405",
+    "brand": "bubly",
+    "flavor": "Bellini Bliss",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Bellini-Bliss-Sparkling-Water-12-fl-oz-8-Pack-Cans_0495e0bd-6959-405f-963a-324082675117.c94e7b1a1a9ef639e4cba50c5c82acac.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "948020632",
+    "brand": "bubly",
+    "flavor": "Blackberry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Sparkling-Water-Blackberry-Zero-Sugar-Zero-Calories-12-fl-oz-8-Count_62a3cbf0-05ab-417f-988c-89ce36366506.eb54e352fe924c9e5c3e8edb4a68ca76.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "899967548",
+    "brand": "bubly",
+    "flavor": "Cherry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Sparkling-Water-Zero-Sugar-Zero-Calories-12-fl-oz-8-Count_d133bca4-c692-4d67-aa37-6c05f29ec5f3.639901e80d235664fab49cde5a6d1a5a.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "490194997",
+    "brand": "bubly",
+    "flavor": "Grapefruit",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Sparkling-Water-Grapefruit-Zero-Sugar-Zero-Calories-12-fl-oz-8-Count_0a45ff4e-7a4a-46c1-a96b-2e9fa69b5ce1.8f4607d1224ed9d322e414edca07d4e2.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "220279687",
+    "brand": "bubly",
+    "flavor": "Lime",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Sparkling-Water-Lime-Zero-Sugar-Zero-Calories-Seltzer-Water-12-fl-oz-8-Count_fd8e0175-87c2-4237-b2a3-9f9a4398af35.fa5d9af2a89ace98e25c9e365ab04d8a.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1383743471",
+    "brand": "bubly",
+    "flavor": "Orange Creamsicle",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Orange-Creamsicle-Sparkling-Water-12-fl-oz-8-Pack-Cans_9d548058-fd6c-406a-9d26-4193fdead9e5.56aff866f4bcf539dc475bef089e69ef.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "665764726",
+    "brand": "bubly",
+    "flavor": "Raspberry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Raspberry-Sparkling-Water-12-fl-oz-8-Pack-Cans_17bf4d04-ba91-4e03-8009-672977bf9f8f.c365b205774bdc4c6137487377831e17.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "579022868",
+    "brand": "bubly",
+    "flavor": "Strawberry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Sparkling-Water-Strawberry-Zero-Sugar-Zero-Calories-12-fl-oz-8-Count_bca24022-ba25-47f8-bfa2-4389d09adad8.02a563c81975ad443c70495379d54466.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "807698057",
+    "brand": "bubly",
+    "flavor": "Summer Coconut Pineapple",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/bubly-Summer-Coconut-Pineapple-Sparkling-Water-12-fl-oz-8-Pack-Cans_56c80c42-ae05-4af2-9a26-2b06fb3c1fe5.d3619bf62e7519a4a2a435199bb00e46.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "100175342",
+    "brand": "Canada Dry",
+    "flavor": "Ginger Ale Caffeine-Free",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Canada-Dry-Caffeine-Free-Ginger-Ale-Soda-Pop-7-5-fl-oz-6-Pack-Cans_ea898846-3dce-4677-a1ee-8e067fe2fc86.516a02826864ec61c74af593f2e0e026.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16627508",
+    "brand": "Canada Dry",
+    "flavor": "Ginger Ale Caffeine-Free Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Canada-Dry-Caffeine-Free-Zero-Sugar-Ginger-Ale-Soda-Pop-12-fl-oz-12-Pack-Cans_44b6233b-548a-4a0b-bf0e-ef9959204435.4feb785df4ca77374d58981985307119.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "47197223",
+    "brand": "Clear American",
+    "flavor": "Cherry Limeade",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Clear-American-Cherry-Limeade-Sparkling-Water-12-fl-oz-12-Count_bd4b322a-4e66-4a9b-ac2c-c98bb4948eea.4b514ca9e42261a4212737578d3cc83c.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291620",
+    "brand": "Coca-Cola",
+    "flavor": "Cherry",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Coca-Cola-Cherry-Soda-Pop-12-fl-oz-12-Pack-Cans_1dcd4e19-1da0-425f-9527-0c00a7ed3ffd.3abdc13d75b3ed930311d059715a03bb.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291740",
+    "brand": "Coca-Cola",
+    "flavor": "Cherry Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Coca-Cola-Zero-Sugar-Cherry-Soda-Pop-12-fl-oz-12-Pack-Cans_402b5d07-4c96-4133-b248-4fd80d741c88.bff910df00ebed470a6d07c4c9356320.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291610",
+    "brand": "Coca-Cola",
+    "flavor": "Diet",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Coke-Diet-Soda-Fridge-Pack-12-fl-oz-Cans-12-Pack_871029b7-7817-4fc4-aa30-e855e6826503.238d91a66b1471cf726cfe01f2b23953.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "12166734",
+    "brand": "Coca-Cola",
+    "flavor": "Diet Caffeine-Free",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Coke-Caffeine-Free-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_0354196e-d332-4053-b9bb-28ed405fbbfd.2bda8f9e57d7a6ff27662b4c77c98c3b.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291621",
+    "brand": "Coca-Cola",
+    "flavor": "Diet Cherry",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Coke-Cherry-Diet-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_444e7d44-c0f4-42cd-bf52-62af67d996f4.ea9f3ad60e9b32f7a24afdf6575b5053.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "12166733",
+    "brand": "Coca-Cola",
+    "flavor": "Original",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Coca-Cola-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_a5eb2946-3667-49f9-b6ec-e300dce67f7d.a3f39b6fa99d5716bd3878ec6ba2ceb7.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291651",
+    "brand": "Coca-Cola",
+    "flavor": "Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Coca-Cola-Zero-Sugar-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_9d3c6267-bb4b-47b2-a579-c7511f542dfb.8ce7634e42dfdaefbf7e7ec09148b45b.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "33284106",
+    "brand": "Crush",
+    "flavor": "Orange Caffeine-Free",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Crush-Caffeine-Free-Orange-Soda-Pop-12-fl-oz-24-Pack-Cans_2ead6613-c5fb-435c-924b-751c37820a1a.db99b28e1c28bd73b0882b56d4a48c4b.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "14221910748",
+    "brand": "Dr Pepper",
+    "flavor": "Blackberry",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Dr-Pepper-Blackberry-Soda-Pop-12-fl-oz-12-Pack-Cans_f7e1d8f4-6352-464e-8bf0-5a11b5e88a00.df483344bf15831d1dc2a6f1a7ce998d.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "14196167962",
+    "brand": "Dr Pepper",
+    "flavor": "Blackberry Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Dr-Pepper-Blackberry-Zero-Sugar-Soda-Pop-12-fl-oz-12-Pack-Cans_29f9d805-364f-46af-807c-ac5c9e04995c.986682a0396ad85c713e2533410d3258.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "136000131",
+    "brand": "Dr Pepper",
+    "flavor": "Diet",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Dr-Pepper-Soda-Pop-7-5-fl-oz-10-Pack-Cans_1fd7873a-15e4-41f7-b61d-8d234347ee34.053a36150f998dfa90f5c2ed2e0951df.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10452492",
+    "brand": "Dr Pepper",
+    "flavor": "Original",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Dr-Pepper-Soda-Pop-12-fl-oz-12-Pack-Cans_4e521452-a7ad-4972-b6c6-d862d70c221e.4b7d89d7c78250bc67af123aa991cbed.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291615",
+    "brand": "Fanta",
+    "flavor": "Orange",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Fanta-Orange-Fruit-Soda-Pop-12-fl-oz-12-Pack-Cans_1501789e-4528-4873-b2ad-05405c0e705d.334219bc6f39d9e3202f3bcb5ed4ed70.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10535186",
+    "brand": "Fanta",
+    "flavor": "Orange Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Fanta-Zero-Sugar-Orange-Fruit-Soda-Pop-12-fl-oz-12-Pack-Cans_5737d65f-9492-4512-b091-761d3204b7d6.6895726edc82cfc17f0bbb86f9839441.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291617",
+    "brand": "Fanta",
+    "flavor": "Pineapple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Fanta-Pineapple-Fruit-Soda-Pop-12-fl-oz-12-Pack-Cans_20dcc4ca-a524-4205-9e9b-87dfd9a551e1.607ebfec8bcfa8d76de46e3394ead71e.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291622",
+    "brand": "Fresca",
+    "flavor": "Original Citrus",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Fresca-Citrus-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_f92e3d72-c79e-4dda-92db-e33ea5e98f5f.a8f4b74c4b1ba095814391f155db8d80.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "172833274",
+    "brand": "Goya",
+    "flavor": "Refresco Pineapple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Goya-Refresco-Pineapple-Soda-12-0-FL-OZ_3826f4d2-95d0-4bc1-b3c0-53c674acd878.fe5416cac78d348546502d0c3814798b.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794696",
+    "brand": "Great Value",
+    "flavor": "Dr Thunder",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Great-Value-Dr-Thunder-Soda-Pop-12-fl-oz-12-Pack-Cans_e625a2bf-21a5-42c7-ad90-96893ab71b49.39dc14fb229f5827a651c25550e5d88a.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794697",
+    "brand": "Great Value",
+    "flavor": "Dr Thunder Diet",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Great-Value-Dr-Thunder-Diet-Calorie-Free-Soda-Pop-12-fl-oz-12-Pack-Cans_34959a1b-47af-4ae9-8bba-0aa659fc8481.de22c62e62c885b918b10bc3b24ae620.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794691",
+    "brand": "Great Value",
+    "flavor": "Ginger Ale",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Great-Value-Ginger-Ale-Soda-Pop-12-fl-oz-12-Pack-Cans_55a23cdd-bcee-44e7-b2e2-b5fb5637846a.aaa4bb310ef60bcad1735387bf79bf88.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794698",
+    "brand": "Great Value",
+    "flavor": "Mountain Lightning",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Great-Value-Mountain-Lightning-Citrus-Flavored-Soda-Pop-12-fl-oz-12-Pack-Cans_808fd82c-a252-4c40-a067-c0d54fb2f851.bd02b875b66860cf31492beebf2072ad.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794700",
+    "brand": "Great Value",
+    "flavor": "Root Beer",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Great-Value-Root-Beer-Soda-Pop-12-fl-oz-12-Pack-Cans_3973230b-798f-4c82-bfe8-695abdeae90f.a4ed74b268d6abce280a0b62266daa8e.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16379417998",
+    "brand": "Kuii",
+    "flavor": "Apple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Kuii-Prebiotic-Soda-12-fl-oz-Single-Aluminum-Can-Apple_a9bace59-4c1a-44e2-809a-0d729f7e36ec.ada90489e89075e5a6640deb8c935d23.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16406815678",
+    "brand": "Kuii",
+    "flavor": "Mandarin",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Kuii-Prebiotic-Soda-12-fl-oz-Single-Aluminum-Can-Mandarin_97fcd01c-265f-4510-a870-cf924e70ce2d.f868c99007fb26d811b8d7c8d5e81222.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16405810461",
+    "brand": "Kuii",
+    "flavor": "Mexican Cola",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Kuii-Prebiotic-Soda-12-fl-oz-Single-Aluminum-Can-Mexican-Cola_c3b3ebd2-9bc9-4225-a4bb-e7741f57a710.97ebaffe01c0784c839d6755f5cfd44e.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "14669008302",
+    "brand": "LaCroix",
+    "flavor": "Cherry Lime",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/LaCroix-Cherry-Lime-Sparkling-Water-8-Pack-12-oz-Cans_0a2eb6f0-e151-4722-8dbd-5440b143ca0c.ef4bef5f502fe03e6456d091c4f23d1f.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "36334353",
+    "brand": "LaCroix",
+    "flavor": "Coconut",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/LaCroix-Coconut-Sparkling-Water-12-Fl-Oz-8-Count_7b1c8029-dd53-4dc5-afbe-24714616b441.5bd88b000152fd2777cecdadf27d912a.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "45726041",
+    "brand": "LaCroix",
+    "flavor": "Cran-Raspberry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/La-Croix-Natural-Cran-Raspberry-Flavored-Sparkling-Water-12-fl-oz-8-pack_35140014-b182-4169-a6cc-54bc0f8aa4c0.af8d0fa0f19b677b35ca2c7600d02a4d.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "36333049",
+    "brand": "LaCroix",
+    "flavor": "Lime",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/LaCroix-Lime-Sparkling-Water-8pk-12-fl-oz-Cans-8-Pack-Quantity_b807c0c5-63f0-41c8-b2dc-c39d3a8f2324_1.b01f5319c4b6964c89d53f403ef105a4.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "217072817",
+    "brand": "LaCroix",
+    "flavor": "Limoncello",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/LaCroix-LimonCello-Sparkling-Water-8pk-12-fl-oz-Cans-8-Pack-Quantity_d77030d7-27a8-4e35-bf08-33e16578cf2f.a3895b988ec4626e4eb96148339b1ccb.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "36361306",
+    "brand": "LaCroix",
+    "flavor": "Pamplemousse",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Lacroix-Sparkling-Water-Grapefruit-Pample-Mousse-No-Calories-Artificial-Sweetners-Buy-TWENTFOUR-Cans-Save-Per-Can-Three-s-Can-12-oz-Pack-3_931ca356-a408-4111-b939-54e64d549044_1.d000327738b901ade42b132061f63fa3.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "36325236",
+    "brand": "LaCroix",
+    "flavor": "Pure",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Sprkilng-Water-Can-Pure-8-12-FO_fcc82405-62c7-4d60-8814-6b400fdfb28b.f31f78f0d8a410eed3b7332b83f9f659.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "128979268",
+    "brand": "LaCroix",
+    "flavor": "Tangerine",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/LaCroix-Tangerine-Sparkling-Water-12-Fl-Oz-8-Count_3fe1a6da-d82c-419b-9c43-28a6b9d0f094.66946621515fa0bbf3cc1ca8e1ff4edf.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "3583254482",
+    "brand": "LS Cascada",
+    "flavor": "Kolashanpan",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/LS-Cascada-Kolashanpan-Can-6-12oz_ddcee8e4-6db5-4a25-9db5-569dec71db6b.211b7fd12e91ab469033533ba4d19307.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "913854679",
+    "brand": "Malta India",
+    "flavor": "Malta",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Malta-India-Malt-Beverage-6-Pack-8-fl-oz-Aluminum-Can-Allergens-Not-Contained_05351eee-2b27-467d-9ce5-7c33c6e72eb7.2d355c5b183557912ff0af3cc0b7f180.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "534659909",
+    "brand": "Mountain Dew",
+    "flavor": "Baja Blast",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Mountain-Dew-Baja-Blast-Tropical-Lime-Soda-Pop-12-oz-24-Pack-Cans_df855ccf-5e00-4728-9ec2-94cd4904cc11.a3698b9196e24539edec0ed244c6126d.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16821026",
+    "brand": "Mountain Dew",
+    "flavor": "Diet",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Mountain-Dew-Citrus-Soda-Pop-12-fl-oz-24-Pack-Cans_452f1fae-44be-49b2-9a6b-d58897f1b04f.1d3352b4893a27e91fea0af497765dea.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "19272751123",
+    "brand": "Mountain Dew",
+    "flavor": "Dirty Dew Cream Soda",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Mountain-Dew-Dirty-Dew-Cream-Soda-12-fl-oz-12-Pack-Cans_2f9dff41-c8be-4ff6-85d5-82e4a0e8ab1e.e2c7ae346251d28944a542a20208487d.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "19327505669",
+    "brand": "Mountain Dew",
+    "flavor": "Dirty Dew Cream Soda Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Mountain-Dew-Dirty-Dew-Cream-Soda-Zero-Sugar-12-fl-oz-12-Pack-Cans_92f33b32-03a1-4d97-971a-0394d162b9c1.3a63db192f4e409c475cc3bf6f07f8e6.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16257962941",
+    "brand": "Mountain Dew",
+    "flavor": "Dragon Fruit",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Mountain-Dew-Dragon-Fruit-12-fl-oz-12ct_da340123-0c83-489e-9f00-c8e77a2912cf.7b22fbb31cedf79628958e30cba126f7.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16785029",
+    "brand": "Mountain Dew",
+    "flavor": "Original",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Mountain-Dew-Original-Soda-12-fl-oz-12-Count_94a08299-17d7-4dc1-800e-7c9fd0b245d1.3d02ba398f6e18232d8d9e84517aa847.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1730080968",
+    "brand": "Mug",
+    "flavor": "Root Beer",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Mug-Soda-Root-Beer-Soda-Pop-7-5-fl-oz-10-Pack-Mini-Cans_5c0b0131-e43f-49dd-9e92-772cbffb9969.ebd437300214b44b261e20df6a2f4662.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "849028520",
+    "brand": "Pepsi",
+    "flavor": "Diet",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Pepsi-Cola-Soda-Pop-12-fl-oz-12-Pack-Cans_5a0b4f24-79e3-424f-98f3-8ca4d65b1d56.4402763e868541e2742c915b63e31bb0.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16785027",
+    "brand": "Pepsi",
+    "flavor": "Original",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Cola-Soda-Pop-12-fl-oz-12-pack-Cans_0db0c54c-9439-4d08-9421-1029b6858b72.f640c28e603c41e6774654f8b97b5c15.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "17623162773",
+    "brand": "Pepsi",
+    "flavor": "Prebiotic Cola",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Prebiotic-Cola-Soda-Pop-12-fl-oz-8-pack-cans_96700541-d0af-4bad-8464-35ab2778586a.8ecdab08ac7af9494cafa9cc08cf7f54.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "17601421725",
+    "brand": "Pepsi",
+    "flavor": "Prebiotic Cola Cherry Vanilla",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Prebiotic-Cola-Soda-Pop-Cherry-Vanilla-12-fl-oz-8-pack-cans_1e4fc168-5863-4478-b5a9-4941f68a44ee.6559abca28a043ebbdd717e67c91a093.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1121491633",
+    "brand": "Pepsi",
+    "flavor": "Real Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Cola-Real-Sugar-Soda-Pop-7-5-fl-oz-10-Pack-Mini-Cans_825a2a48-2d38-416f-b0d8-f65a2675a0d8.5b9081c59b550462609bb03bdbc4d08c.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1220446748",
+    "brand": "Pepsi",
+    "flavor": "Wild Cherry",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Soda-Wild-Cherry-7-5-fl-oz-10-Pack-Mini-Cans_1ebd4d93-f9a1-4db2-92af-f717d68fc2f9.3c74a606623705dc52bc6304df936cef.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "13139653378",
+    "brand": "Pepsi",
+    "flavor": "Wild Cherry & Cream",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Soda-Wild-Cherry-And-Cream-12-fl-oz-12-Count-Cans_8f15d431-8df7-4e12-bbe5-6fb2c480f10a.77f241bc8f73f962e14bb8bff00e0a66.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "13148305780",
+    "brand": "Pepsi",
+    "flavor": "Wild Cherry & Cream Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Zero-Sugar-Soda-Wild-Cherry-Cream-12-fl-oz-12-Count-Cans_4c1c87ef-4592-45b2-8761-ea9edbb9f2fe.0cfff74f169f12b70c08a4fbd401a155.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16784993",
+    "brand": "Pepsi",
+    "flavor": "Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Pepsi-Zero-Sugar-Soda-12-Fl-Oz-24-Count_34ef632a-eca7-4cee-81b2-71d8a81610be.20c5c984baa2b4ac64c36cba0bf2534c.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "20915063065",
+    "brand": "Polar",
+    "flavor": "Black Cherry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/3-pack-Polar-Zero-Calorie-Black-Cherry-Sparkling-Seltzer-Water-12-fl-oz-8-Pack-Cans_51a5321d-f38f-403e-b3fa-68c04c3d4500.c9d105aeee97fc8fde0bdcd0e18226d2.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "15375913785",
+    "brand": "Polar",
+    "flavor": "Blackberry Mango",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/6-pack-Polar-Zero-Calorie-Blackberry-Mango-Sparkling-Seltzer-Water-12-fl-oz-8-Pack-Cans_c2301387-e64c-4eb6-af4e-b97cc6fb0b67.e8e9183c38b86797215ae20c65457115.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "505115147",
+    "brand": "Polar",
+    "flavor": "Lime",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Polar-Zero-Calorie-Lime-Sparkling-Seltzer-Water-12-fl-oz-8-Pack-Cans_1d995e66-2083-4589-ba3d-dfffe84ba1dc.c4a144466be8141c5200bebab21fed09.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "2841113791",
+    "brand": "Polar",
+    "flavor": "Orange Vanilla",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Polar-Orange-Vanilla-Sparkling-Seltzer-Water-12-fl-oz-8-pack-cans_69a9bcc2-896c-41b7-98bb-6da83d4398a3.df72f0a52cb79e45bc266308fb7eeaf4.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "342409802",
+    "brand": "Polar",
+    "flavor": "Original",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Polar-Zero-Calorie-Original-Sparkling-Seltzer-Water-12-fl-oz-8-Pack-Cans_c12f0a86-1ac1-4a18-80f9-8b086d1ccc51.2e749f5c3ffe0bc9d5c07225bb45068a.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "692527996",
+    "brand": "Polar",
+    "flavor": "Ruby Red Grapefruit",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Polar-Zero-Calorie-Ruby-Red-Grapefruit-Sparkling-Seltzer-Water-12-fl-oz-8-Pack-Cans_2ae74967-e55d-423d-871b-280dd30865e6.0c37b0fe375eaa4f0bfa82b9b734468a.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "15533350251",
+    "brand": "poppi",
+    "flavor": "Alpine Blast",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/poppi-Alpine-Blast-Prebiotic-Soda-12-oz-Single-Can_dfb57667-143f-4009-a546-9e55af48107f.510133a1c4d00ded9e565f2c82a6f5e2.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "3924012602",
+    "brand": "poppi",
+    "flavor": "Cherry Limeade",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Cherry-Limeade-Prebiotic-Soda-12-oz-4-Pack-Cans_292d92b8-eff0-410e-958c-9f740a6eca18.784e4aa1822912cbf6e4e8cc92b68c57.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5062763667",
+    "brand": "poppi",
+    "flavor": "Cranberry Fizz",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/poppi-Cranberry-Fizz-Prebiotic-Soda-12-fl-oz-1-SIngle-Can_fbd19b9b-5cba-47d3-91be-48e67e9bd0ac.8175f8a3bedfea286833c116ecc5387f.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "15036854734",
+    "brand": "poppi",
+    "flavor": "Cream Soda",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Cream-Soda-Prebiotic-Soda-12-oz-1-Pack-Can_dd72a2b1-5e76-4bab-9ab4-349f3955fc56.7a3797d47d5bd09678aa941c2b1af2bc.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5606042695",
+    "brand": "poppi",
+    "flavor": "Doc Pop",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Doc-Pop-Prebiotic-Soda-12-oz-4-Pack-Cans_4a67166f-efff-4668-9520-902e16db8245.626234501e4f3b68285a5e3add1aba28.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5649666328",
+    "brand": "poppi",
+    "flavor": "Lemon Lime",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Lemon-Lime-Prebiotic-Soda-12-oz-4-Pack-Cans_1faa2d3c-4303-42a5-888e-fc6a5e450191.7597f0c092c7a6ded4221116faaddd1e.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1013225377",
+    "brand": "poppi",
+    "flavor": "Orange",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Orange-Prebiotic-Soda-12-oz-4-Pack-Cans_d25450df-3739-4c15-841b-dc7cd95fa606.81da985b85b50eaf964e0475d7f240e2.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5529047975",
+    "brand": "poppi",
+    "flavor": "Orange Cream",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Orange-Cream-Prebiotic-Soda-12-oz-1-Pack-Can_3a2e9a55-2228-4cba-8ed2-82c0ce2e45e0.5f50c08f000959eaf0508dd50235d5f1.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1921938562",
+    "brand": "poppi",
+    "flavor": "Raspberry Rose",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Raspberry-Rose-Prebiotic-Soda-12-oz-4-Pack-Cans_00a84abd-65ff-4377-923e-0a33aecc15d4.dd65007a4c84494f812e27d4161e1875.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "18009816406",
+    "brand": "poppi",
+    "flavor": "Shirley Temple",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/poppi-Shirley-Temple-Prebiotic-Soda-12-fl-oz-Can-1-Pack-Can_f11b3202-393d-4b09-93ba-c210356d705b.b634c82f0612e0fc799b6be6b45a65ef.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1695005554",
+    "brand": "poppi",
+    "flavor": "Strawberry Lemon",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Strawberry-Lemon-Prebiotic-Soda-12-oz-4-Pack-Cans_ab23fa3c-a25a-4f3e-96a5-70d56e025a6c.bcea0cc4ed5b68a5771c4919bc418269.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5620283968",
+    "brand": "poppi",
+    "flavor": "Wild Berry",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Poppi-Prebiotic-Soda-Wild-Berry-12-fl-oz-Can_5591d518-3f82-45f4-afb7-c3290c575d7b.b16e7b377dd67aec7ba89250b084f138.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794693",
+    "brand": "Sam's Choice",
+    "flavor": "Cola",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sam-s-Cola-Soda-Pop-12-fl-oz-12-Pack-Cans_6b56b2de-3cf5-4d20-a016-ddc868446432.e735254b862bfd558f8ebe67399df711.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10794694",
+    "brand": "Sam's Choice",
+    "flavor": "Diet Cola",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Diet-Sam-s-Cola-Soda-Pop-12-fl-oz-12-Pack-Cans_01c0b7ef-701f-4b16-8515-c7633b66ce24.807e6e13831ac74deffb7bda29a43d04.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "949613072",
+    "brand": "Schweppes",
+    "flavor": "Ginger Ale Caffeine-Free",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Schweppes-Caffeine-Free-Ginger-Ale-Soda-Pop-7-5-fl-oz-10-Pack-Cans_8ec0f7c1-1bf8-4c01-a8b6-fe9d7a7906c5.deb6e04ecbaabe51753802f4a8582d76.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "956786223",
+    "brand": "Sparkling Ice",
+    "flavor": "Blue Raspberry +Caffeine",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Sparkling-Ice-Caffeine-Zero-Sugar-Flavored-Sparkling-Water-Blue-Raspberry-16-Fl-Oz_c263c581-cb93-4767-94cb-a6bdeafb1563.a36fa6724c8395a34ad62884c77aab36.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "263940394",
+    "brand": "Sparkling Ice",
+    "flavor": "Cherry Vanilla +Caffeine",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Sparkling-Ice-Caffeine-Zero-Sugar-Flavored-Sparkling-Water-Cherry-Vanilla-Sparkling-Water-16-Fl-Oz_eaa90993-1f55-41b0-836c-684527548ee3.fe8cf9a96d9a65528b56de9b3d64426c.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "272622986",
+    "brand": "Sparkling Ice",
+    "flavor": "Citrus Twist +Caffeine",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Sparkling-Ice-Caffeine-Naturally-Flavored-Sparkling-Water-Citrus-Twist-16-Fl-Oz_a3274513-e69e-4f3a-99d6-ee248ce5657a.99670518da45216d3d91fb55b086dd6d.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "5281218469",
+    "brand": "Sprite",
+    "flavor": "Chill Cherry-Lime",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sprite-Chill-Cherry-Lime-Caffeine-Free-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_0a6a8377-1194-47a4-83e2-9d2846fb731f.1ce6fbd050aec26ba002761f5990503b.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291611",
+    "brand": "Sprite",
+    "flavor": "Original",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sprite-Lemon-Lime-Caffeine-Free-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_6dcdd2cb-293d-49ba-bacb-546e7d1b70e8.192f59f5e929dcf2f1fe1f3f6d682fa5.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "10291649",
+    "brand": "Sprite",
+    "flavor": "Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sprite-Zero-Sugar-Lemon-Lime-Caffeine-Free-Soda-Pop-Fridge-Pack-Cans-12-fl-oz-12-Pack_7c8efac4-a5b1-43e5-aba4-21e2211b5d48.3b1fbc86273a64645f48aeebc72fb4e5.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1911283602",
+    "brand": "Starry",
+    "flavor": "Lemon Lime",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Starry-Lemon-Lime-Soda-Pop-7-5-fl-oz-10-Pack-Mini-Cans_5ea16ab9-8465-485a-862d-395734a24c0c.ca51ab3354d20c9ff730e22eebbd3fcf.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "55298847",
+    "brand": "Sunchy",
+    "flavor": "Malta",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sunshine-Bottling-Sunchy-Malta-6-ea_26e47b77-86a7-4499-8429-9af4bf2eab85.c6ae63103607af79f0a92034303d0ee4.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "17341398",
+    "brand": "Sunkist",
+    "flavor": "Orange",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sunkist-Orange-Soda-Pop-12-fl-oz-12-Pack-Cans_a5986162-4654-4b1f-b7c4-51568448efeb.3c8b4755019d888aace521829dc05382.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "16777403",
+    "brand": "Sunkist",
+    "flavor": "Orange Zero Sugar",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Sunkist-Zero-Sugar-Orange-Soda-Pop-12-fl-oz-12-Pack-Cans_7df7474d-8e6b-4a9e-84cf-67e255f75575.5d18a8af27813b123e75537daa03e99b.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "1749753386",
+    "brand": "Waterloo",
+    "flavor": "Blackberry Lemonade",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Waterloo-Sparkling-Water-Blackberry-Lemonade-12-fl-oz-8-Pack-Cans_f58fbe44-e19f-4ecf-8bca-13b3b3bd189a.fea98da1fbe66afc88195f95b014125a.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "3091300873",
+    "brand": "Waterloo",
+    "flavor": "Cherry Limeade",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Waterloo-Sparkling-Water-Cherry-Limeade-12-fl-oz-8-Pack-Cans_95f7b1ef-04e2-4566-ad8e-b655669fc601.db1bfae6a2dc75b9dcc9c1eeab87b34d.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "5423357799",
+    "brand": "Waterloo",
+    "flavor": "Raspberry Nectarine",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Waterloo-Sparkling-Water-Raspberry-Nectarine-12-fl-oz-8-Pack-Cans_43cdcde8-d602-43ec-bd6b-9e2db1cadfea.c75b6fa28bab29e1beb645ec11995f39.png",
+    "image_ext": "png"
+  },
+  {
+    "walmart_item_id": "760423502",
+    "brand": "Waterloo",
+    "flavor": "Summer Berry",
+    "type": "seltzer",
+    "image_url": "https://i5.walmartimages.com/seo/Waterloo-Sparkling-Water-Summer-Berry-12-fl-oz-8-Pack-Cans_49e67687-b199-4ab7-97ce-b0159b75e6b6.5009df43229a0328c06c2ea43b51970f.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "2444526495",
+    "brand": "Zevia",
+    "flavor": "Cola",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Zevia-Zero-Sugar-0-Calorie-Cola-Soda-Pop-12-fl-oz-8-Pack-Cans_7ca5a45d-5f93-4489-ae37-483ee3190827.a7db9d8305db4b197bab676891c83841.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "2292221250",
+    "brand": "Zevia",
+    "flavor": "Creamy Root Beer",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Zevia-Zero-Sugar-0-Calorie-Creamy-Root-Beer-Soda-Pop-12-fl-oz-8-Pack_1fe6951e-3dd5-41fb-8a83-5977f001ca54.d2f1613363fb78d69948f47dc1ec69c1.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "2856478483",
+    "brand": "Zevia",
+    "flavor": "Dr. Zevia",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Zevia-Zero-Calorie-No-Sugar-Dr-Zevia-Soda-Pop-12-fl-oz-8-Pack-Cans_04563052-9d11-4b41-8987-471efda0d36d.cdf26911c79241dad16fd67ffe1ecf8f.jpeg",
+    "image_ext": "jpg"
+  },
+  {
+    "walmart_item_id": "2924593553",
+    "brand": "Zevia",
+    "flavor": "Ginger Ale Caffeine-Free",
+    "type": "soda",
+    "image_url": "https://i5.walmartimages.com/seo/Zevia-Zero-Sugar-0-Calorie-Caffeine-Free-Ginger-Ale-Soda-Pop-12-fl-oz-8-Pack-Cans_2e2e191b-6458-4a33-802e-cd802abdf21c.95551233d63e0002619dc1c74b969e2b.jpeg",
+    "image_ext": "jpg"
+  }
+]

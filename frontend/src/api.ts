@@ -82,10 +82,22 @@ export type MatchupResult = Matchup | MatchupExhausted | null
 const BASE = '/api'
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  /** `code` is the API's error code (e.g. 'SODA_BANNED') when the response carried one. */
+  constructor(message: string, readonly status: number, readonly code?: string) {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+/** Reads the `code` field of a JSON error response, if any. */
+async function errorCode(res: Response): Promise<string | undefined> {
+  const body = await res.json().catch(() => null) as { code?: unknown } | null
+  return typeof body?.code === 'string' ? body.code : undefined
+}
+
+/** True when the drink was auto-banned (#298) after this page loaded it. */
+export function isSodaBannedError(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 409 && e.code === 'SODA_BANNED'
 }
 
 function resolveImageUrl(imageUrl: string | null): string | null {
@@ -220,7 +232,23 @@ export async function uploadImage(lunchId: number, file: File, token: string): P
   }
 }
 
-export async function verifyAdminToken(password: string): Promise<string> {
+export type SessionRole = 'admin' | 'lunch' | 'purchaser'
+
+/**
+ * Logs in and returns the token only if the session role is one of `allowed`.
+ * Any other role is revoked at once and reported as an invalid password,
+ * so a purchaser password never works as a lunch login and vice versa.
+ */
+export async function verifySessionForRoles(password: string, allowed: SessionRole[]): Promise<string> {
+  const { token, role } = await verifySession(password)
+  if (!allowed.includes(role)) {
+    await revokeSession(token).catch(() => undefined)
+    throw new Error('Invalid password')
+  }
+  return token
+}
+
+export async function verifySession(password: string): Promise<{ token: string; role: SessionRole }> {
   const res = await fetch(`${BASE}/admin/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -230,6 +258,130 @@ export async function verifyAdminToken(password: string): Promise<string> {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as any).error ?? `Admin verification failed: ${res.status}`)
   }
-  const body = await res.json() as { token: string }
-  return body.token
+  return await res.json() as { token: string; role: SessionRole }
+}
+
+export type SodaType = 'soda' | 'seltzer'
+
+export type Soda = {
+  id: number
+  brand: string
+  flavor: string
+  name: string
+  type: SodaType
+  image_url: string | null
+}
+
+export type SodaLeaderboardRow = Soda & {
+  rank: number
+  right_swipes: number
+  left_swipes: number
+  likes: number
+  hates: number
+  reporters: number
+  score: number
+  has_data: boolean
+}
+
+export type SodaOrderItem = {
+  rank: number
+  slot: 'top' | 'trial'
+  soda_id: number
+  brand: string
+  flavor: string
+  name: string
+  type: SodaType
+  image_url: string | null
+  right_swipes: number
+  left_swipes: number
+  has_data: boolean
+}
+
+export type SodaOrder = {
+  week_start: string
+  generated_at: string
+  items: SodaOrderItem[]
+}
+
+export async function getSodaCatalog(): Promise<Soda[]> {
+  const res = await fetch(`${BASE}/soda/catalog`)
+  if (!res.ok) throw new Error(`Soda catalog fetch failed: ${res.status}`)
+  const data = await res.json() as { sodas: Soda[] }
+  return data.sodas.map(normalizeLunch)
+}
+
+export async function getSodaDeck(): Promise<Soda[]> {
+  const res = await fetch(`${BASE}/soda/deck`, {
+    headers: { 'X-Lunchbench-Session': getSessionId() },
+  })
+  if (!res.ok) throw new Error(`Soda deck fetch failed: ${res.status}`)
+  const data = await res.json() as { sodas: Soda[] }
+  return data.sodas.map(normalizeLunch)
+}
+
+export async function submitSodaSwipe(sodaId: number, direction: 'right' | 'left'): Promise<void> {
+  const res = await fetch(`${BASE}/soda/swipes`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
+    body: JSON.stringify({ soda_id: sodaId, direction }),
+  })
+  if (!res.ok) throw new ApiError(`Swipe failed: ${res.status}`, res.status, await errorCode(res))
+}
+
+/**
+ * `barcode` is the unknown code this voter scanned before picking the drink manually.
+ * The response then says which drink that code maps to now (null when it stays unmapped).
+ */
+export async function submitSodaReport(
+  sodaId: number,
+  verdict: 'like' | 'hate',
+  barcode?: string
+): Promise<{ barcode_soda_id?: number | null }> {
+  const res = await fetch(`${BASE}/soda/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
+    body: JSON.stringify(barcode ? { soda_id: sodaId, verdict, barcode } : { soda_id: sodaId, verdict }),
+  })
+  if (!res.ok) throw new ApiError(`Report failed: ${res.status}`, res.status, await errorCode(res))
+  return await res.json().catch(() => ({})) as { barcode_soda_id?: number | null }
+}
+
+export async function getSodaBarcodes(): Promise<{ code: string; soda_id: number }[]> {
+  const res = await fetch(`${BASE}/soda/barcodes`)
+  if (!res.ok) throw new Error(`Soda barcodes fetch failed: ${res.status}`)
+  const data = await res.json() as { barcodes: { code: string; soda_id: number }[] }
+  return data.barcodes
+}
+
+/** Logs a scanned code that matched no drink. Only the decoded string and its symbology are sent. */
+export async function logUnknownScan(barcode: string, format: string): Promise<void> {
+  const res = await fetch(`${BASE}/soda/unknown-scans`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Lunchbench-Session': getSessionId() },
+    body: JSON.stringify({ barcode, format }),
+  })
+  if (!res.ok) throw new ApiError(`Unknown scan log failed: ${res.status}`, res.status)
+}
+
+export async function getSodaLeaderboard(): Promise<SodaLeaderboardRow[]> {
+  const res = await fetch(`${BASE}/soda/leaderboard`)
+  if (!res.ok) throw new Error(`Soda leaderboard fetch failed: ${res.status}`)
+  const data = await res.json() as { sodas: SodaLeaderboardRow[] }
+  return data.sodas.map(normalizeLunch)
+}
+
+export async function getSodaOrder(token: string): Promise<SodaOrder> {
+  const res = await fetch(`${BASE}/soda/order/latest`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new ApiError(`Order fetch failed: ${res.status}`, res.status)
+  const data = await res.json() as SodaOrder
+  return { ...data, items: data.items.map(normalizeLunch) }
+}
+
+export async function revokeSession(token: string): Promise<void> {
+  await fetch(`${BASE}/admin/session`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
 }

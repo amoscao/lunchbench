@@ -1,5 +1,6 @@
-import { type LeaderboardLunch, type LeaderboardPage, type Lunch } from '../api'
+import { getSodaCatalog, type Lunch, type Soda } from '../api'
 import { escapeHtml } from '../utils/escape-html'
+import { exportLeaderboardPDF } from '../utils/lunch-pdf'
 
 const API_URL = '/api'
 
@@ -118,6 +119,52 @@ async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number;
   return res.json()
 }
 
+type UnknownScanGroup = {
+  code: string
+  formats: string[]
+  scans: number
+  voters: number
+  first_seen: string
+  last_seen: string
+  picks: { soda_id: number; name: string; count: number }[]
+  mapped_soda_id: number | null
+  mapped_name: string | null
+  mapped_source: 'seed' | 'voter' | 'admin' | null
+}
+
+async function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, ...init.headers },
+  })
+  if (res.status === 401) {
+    clearAdminToken()
+    throw new Error('Session expired')
+  }
+  return res
+}
+
+async function fetchUnknownScans(): Promise<UnknownScanGroup[]> {
+  const res = await adminFetch('/admin/soda/unknown-scans')
+  if (!res.ok) throw new Error('Failed to load unknown scans')
+  return (await res.json() as { codes: UnknownScanGroup[] }).codes
+}
+
+type BannedDrink = { id: number; name: string; hates: number; likes: number }
+
+async function fetchBannedDrinks(): Promise<BannedDrink[]> {
+  const res = await adminFetch('/admin/soda/banned')
+  if (!res.ok) throw new Error('Failed to load banned drinks')
+  return (await res.json() as { banned: BannedDrink[] }).banned
+}
+
+/** "2026-11-16 14:03:22" (UTC, from SQLite) -> "Nov 16, 9:03 AM" in the viewer's zone. */
+function formatSeen(value: string): string {
+  const date = new Date(`${value.replace(' ', 'T')}Z`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 async function revokeAdminSession(token: string | null): Promise<void> {
   if (!token) return
   await fetch(`${API_URL}/admin/session`, {
@@ -126,231 +173,8 @@ async function revokeAdminSession(token: string | null): Promise<void> {
   })
 }
 
-async function exportLeaderboardPDF(token: string | null): Promise<void> {
-  void token
-
-  const res = await fetch('/api/lunches/leaderboard')
-  if (!res.ok) throw new Error('Failed to load leaderboard')
-  const { lunches }: LeaderboardPage = await res.json()
-
-  const dateString = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-  const count = lunches.length
-  const tableRows = lunches.map((lunch) => {
-    const rankClass = lunch.rank <= 3 ? ` rank-${lunch.rank}` : ''
-    const veganDot = lunch.is_vegan === 1 ? '<span class="vegan-dot"></span>' : ''
-    const description = lunch.description
-      ? `<div class="dish-desc">${escapeHtml(lunch.description)}</div>`
-      : ''
-    const confidenceClass = lunch.confidence >= 75
-      ? 'conf-high'
-      : lunch.confidence >= 50
-        ? 'conf-mid'
-        : 'conf-low'
-
-    return `
-      <tr>
-        <td class="col-rank"><span class="rank-num${rankClass}">${lunch.rank}</span></td>
-        <td>
-          <div class="dish-name">${escapeHtml(lunch.name)}${veganDot}</div>
-          ${description}
-        </td>
-        <td>
-          <div class="rating-val">${Math.round(lunch.conservative_rating)}</div>
-          <div class="rating-raw">Raw ${Math.round(lunch.rating)}</div>
-        </td>
-        <td class="record">
-          <span class="w">${lunch.wins}W</span>
-          <span class="l">${lunch.losses}L</span>
-          <span class="t">${lunch.ties}T</span>
-        </td>
-        <td>
-          <div class="conf-val ${confidenceClass}">${Math.round(lunch.confidence)}%</div>
-          <div class="conf-rd">RD ${Math.round(lunch.glicko_rd)}</div>
-        </td>
-      </tr>
-    `
-  }).join('')
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>LunchBench Leaderboard</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
-      color: #111;
-      background: #fff;
-      padding: 40px 48px;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 32px;
-      padding-bottom: 20px;
-      border-bottom: 2.5px solid #e5e7eb;
-    }
-    .logo-line {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 30px;
-      font-weight: 800;
-      line-height: 1;
-    }
-    .logo-text {
-      background: linear-gradient(90deg, #10d4a4 0%, #c084fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .subtitle {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 8px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .export-meta {
-      text-align: right;
-      font-size: 12px;
-      color: #9ca3af;
-      line-height: 1.6;
-      padding-top: 6px;
-    }
-    .export-meta strong { color: #6b7280; font-weight: 600; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    thead th {
-      background: #f3f4f6;
-      border-bottom: 2px solid #e5e7eb;
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #6b7280;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    tbody tr:nth-child(even) { background: #f9fafb; }
-    tbody tr { border-bottom: 1px solid #f0f0ee; }
-    tbody td { padding: 10px 14px; vertical-align: middle; }
-    .col-rank { width: 52px; }
-    .rank-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      font-weight: 800;
-      font-size: 13px;
-      background: #f3f4f6;
-      color: #374151;
-    }
-    .rank-1 { background: #fef3c7; color: #92400e; }
-    .rank-2 { background: #f1f5f9; color: #475569; }
-    .rank-3 { background: #fdf4e7; color: #78350f; }
-    .dish-name { font-weight: 700; color: #111827; font-size: 13.5px; }
-    .dish-desc { font-size: 11px; color: #9ca3af; margin-top: 3px; max-width: 260px; }
-    .vegan-dot {
-      display: inline-block;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #16a34a;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-    .rating-val {
-      font-weight: 800;
-      font-size: 15px;
-      color: #0f9e7c;
-    }
-    .rating-raw { font-size: 10.5px; color: #9ca3af; margin-top: 2px; }
-    .record { font-size: 12.5px; }
-    .w { color: #059669; font-weight: 700; }
-    .l { color: #dc2626; font-weight: 700; }
-    .t { color: #6b7280; }
-    .conf-val { font-weight: 700; font-size: 13px; }
-    .conf-high { color: #059669; }
-    .conf-mid  { color: #d97706; }
-    .conf-low  { color: #dc2626; }
-    .conf-rd { font-size: 10.5px; color: #9ca3af; margin-top: 2px; }
-    .footer {
-      margin-top: 28px;
-      padding-top: 14px;
-      border-top: 1px solid #e5e7eb;
-      font-size: 11px;
-      color: #9ca3af;
-      display: flex;
-      justify-content: space-between;
-    }
-    @media print {
-      body { padding: 0; }
-      @page { margin: 0.5in; size: A4 landscape; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="logo-line">
-        <span>🥪</span>
-        <span class="logo-text">LunchBench</span>
-      </div>
-      <div class="subtitle">Hyperfine Lunch Benchmark</div>
-    </div>
-    <div class="export-meta">
-      <strong>Leaderboard Export</strong><br>
-      DATE_STRING<br>
-      COUNT dishes ranked
-    </div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th class="col-rank">#</th>
-        <th>Dish</th>
-        <th>Rating</th>
-        <th>Record</th>
-        <th>Confidence</th>
-      </tr>
-    </thead>
-    <tbody>
-      TABLE_ROWS
-    </tbody>
-  </table>
-  <div class="footer">
-    <span>LunchBench · Hyperfine Lunch Benchmark</span>
-    <span>COUNT lunches · Glicko-2 rating system</span>
-  </div>
-</body>
-</html>`
-    .replace('DATE_STRING', dateString)
-    .replaceAll('COUNT', String(count))
-    .replace('TABLE_ROWS', tableRows)
-
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) throw new Error('Could not open print window')
-
-  printWindow.document.open()
-  printWindow.document.write(html)
-  printWindow.addEventListener('load', () => printWindow.print(), { once: true })
-  printWindow.document.close()
-}
-
 function renderDashboard(container: HTMLElement): void {
-  let activeTab: 'lunches' | 'stats' = 'lunches'
+  let activeTab: 'lunches' | 'stats' | 'scans' | 'banned' = 'lunches'
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
@@ -363,6 +187,8 @@ function renderDashboard(container: HTMLElement): void {
     <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
       <button class="admin-tab admin-tab-active" id="tab-lunches" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px">Lunches</button>
       <button class="admin-tab" id="tab-stats" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Stats</button>
+      <button class="admin-tab" id="tab-scans" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Unknown scans</button>
+      <button class="admin-tab" id="tab-banned" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Banned drinks</button>
     </div>
     <div id="admin-alert" style="display:none" class="alert"></div>
     <div id="admin-tab-content">
@@ -374,17 +200,25 @@ function renderDashboard(container: HTMLElement): void {
 
   const tabLunches = container.querySelector<HTMLButtonElement>('#tab-lunches')!
   const tabStats = container.querySelector<HTMLButtonElement>('#tab-stats')!
+  const tabScans = container.querySelector<HTMLButtonElement>('#tab-scans')!
+  const tabBanned = container.querySelector<HTMLButtonElement>('#tab-banned')!
   const tabContent = container.querySelector<HTMLElement>('#admin-tab-content')!
 
-  function setTab(tab: 'lunches' | 'stats'): void {
+  function setTab(tab: 'lunches' | 'stats' | 'scans' | 'banned'): void {
     activeTab = tab
     const accentStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px`
     const inactiveStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px`
     tabLunches.style.cssText = tab === 'lunches' ? accentStyle : inactiveStyle
     tabStats.style.cssText   = tab === 'stats'   ? accentStyle : inactiveStyle
+    tabScans.style.cssText   = tab === 'scans'   ? accentStyle : inactiveStyle
+    tabBanned.style.cssText  = tab === 'banned'  ? accentStyle : inactiveStyle
     if (tab === 'lunches') {
       tabContent.innerHTML = `<div id="admin-table-wrap"><div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div></div>`
       loadTable()
+    } else if (tab === 'scans') {
+      void loadScans()
+    } else if (tab === 'banned') {
+      void loadBanned()
     } else {
       loadStats()
     }
@@ -392,13 +226,15 @@ function renderDashboard(container: HTMLElement): void {
 
   tabLunches.addEventListener('click', () => setTab('lunches'))
   tabStats.addEventListener('click',   () => setTab('stats'))
+  tabScans.addEventListener('click',   () => setTab('scans'))
+  tabBanned.addEventListener('click',  () => setTab('banned'))
 
   const exportPdfBtn = container.querySelector<HTMLButtonElement>('#export-pdf-btn')!
   exportPdfBtn.addEventListener('click', async () => {
     exportPdfBtn.disabled = true
     exportPdfBtn.textContent = 'Exporting…'
     try {
-      await exportLeaderboardPDF(adminToken)
+      await exportLeaderboardPDF()
     } catch {
       showAlert('Export failed', 'error')
     } finally {
@@ -599,6 +435,168 @@ function renderDashboard(container: HTMLElement): void {
         }
         tabContent.innerHTML = `<div class="alert alert-error">Failed to load stats</div>`
       })
+  }
+
+  function sessionExpired(e: unknown): boolean {
+    if ((e as Error).message !== 'Session expired') return false
+    container.innerHTML = ''
+    renderLogin(container)
+    return true
+  }
+
+  // Drinks hidden by 5+ Hate reports from distinct voters. The ban is computed from reports; Unban
+  // exempts a drink until it gets 5 new Hates (POST /admin/soda/banned/:id/unban).
+  async function loadBanned(): Promise<void> {
+    tabContent.innerHTML = `<div class="skeleton" style="height:120px;border-radius:var(--radius-md)"></div>`
+    let banned: BannedDrink[]
+    try {
+      banned = await fetchBannedDrinks()
+    } catch (e: unknown) {
+      if (sessionExpired(e)) return
+      tabContent.innerHTML = `<div class="alert alert-error">Failed to load banned drinks</div>`
+      return
+    }
+    if (activeTab !== 'banned') return
+    if (banned.length === 0) {
+      tabContent.innerHTML = `<p style="color:var(--text-muted)">No banned drinks</p>`
+      return
+    }
+    tabContent.innerHTML = `
+      <table class="leaderboard-table banned-drinks-table" style="font-size:13px">
+        <thead><tr><th>Drink</th><th>Hates</th><th>Likes</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${banned.map((drink) => `
+            <tr data-soda-id="${drink.id}">
+              <td>${escapeHtml(drink.name)}</td>
+              <td style="font-variant-numeric:tabular-nums">${drink.hates}</td>
+              <td style="font-variant-numeric:tabular-nums">${drink.likes}</td>
+              <td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" data-action="unban" aria-label="Unban ${escapeHtml(drink.name)}">Unban</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="unban"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        btn.disabled = true
+        try {
+          const res = await adminFetch(`/admin/soda/banned/${row.dataset.sodaId}/unban`, { method: 'POST' })
+          // 404: no longer banned (unbanned in another tab, or a Hate changed to Like). The reload shows it.
+          if (!res.ok && res.status !== 404) throw new Error('Unban failed')
+          showAlert(res.ok ? 'Unbanned!' : 'Already not banned', 'success')
+          await loadBanned()
+        } catch (e: unknown) {
+          if (sessionExpired(e)) return
+          btn.disabled = false
+          showAlert('Unban failed', 'error')
+        }
+      })
+    })
+  }
+
+  async function loadScans(): Promise<void> {
+    tabContent.innerHTML = `<div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div>`
+    let groups: UnknownScanGroup[]
+    let catalog: Soda[]
+    try {
+      ;[groups, catalog] = await Promise.all([fetchUnknownScans(), getSodaCatalog()])
+    } catch (e: unknown) {
+      if (sessionExpired(e)) return
+      tabContent.innerHTML = `<div class="alert alert-error">Failed to load unknown scans</div>`
+      return
+    }
+    if (activeTab !== 'scans') return
+    if (groups.length === 0) {
+      tabContent.innerHTML = `<p style="color:var(--text-muted)">No unknown scans</p>`
+      return
+    }
+    // Preselect the current mapping or the most-picked drink, but only one that can still be mapped
+    // to (active). A removed drink is never preselected, so Map is not silently a no-op.
+    const activeIds = new Set(catalog.map((soda) => soda.id))
+    const preselect = (group: UnknownScanGroup): number | null =>
+      [group.mapped_soda_id, ...group.picks.map((pick) => pick.soda_id)]
+        .find((id): id is number => id != null && activeIds.has(id)) ?? null
+    const options = (selected: number | null): string => [
+      `<option value="">Drink…</option>`,
+      ...catalog.map((soda) => `<option value="${soda.id}"${soda.id === selected ? ' selected' : ''}>${escapeHtml(soda.name)}</option>`),
+    ].join('')
+    tabContent.innerHTML = `
+      <table class="leaderboard-table unknown-scans-table" style="font-size:13px">
+        <thead>
+          <tr>
+            <th>Barcode</th>
+            <th>Scans</th>
+            <th>Voters</th>
+            <th>First seen</th>
+            <th>Last seen</th>
+            <th>Picked after</th>
+            <th>Mapped</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${groups.map((group) => `
+            <tr data-code="${escapeHtml(group.code)}">
+              <td style="font-variant-numeric:tabular-nums">${escapeHtml(group.code)}</td>
+              <td>${group.scans}</td>
+              <td>${group.voters}</td>
+              <td style="white-space:nowrap">${escapeHtml(formatSeen(group.first_seen))}</td>
+              <td style="white-space:nowrap">${escapeHtml(formatSeen(group.last_seen))}</td>
+              <td>${group.picks.map((pick) => `${escapeHtml(pick.name)} ×${pick.count}`).join('<br>') || '-'}</td>
+              <td>${group.mapped_name ? `${escapeHtml(group.mapped_name)} (${escapeHtml(group.mapped_source ?? '')})` : '-'}</td>
+              <td style="white-space:nowrap">
+                <select class="form-input" style="width:180px;padding:4px 6px;font-size:12px;display:inline-block" aria-label="Drink for ${escapeHtml(group.code)}">
+                  ${options(preselect(group))}
+                </select>
+                <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;margin-left:4px" data-action="map">Map</button>
+                <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;margin-left:4px" data-action="dismiss">Dismiss</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="map"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        const sodaId = Number(row.querySelector('select')!.value)
+        if (!sodaId) return
+        try {
+          const res = await adminFetch('/admin/soda/barcodes', {
+            method: 'POST',
+            body: JSON.stringify({ code: row.dataset.code, soda_id: sodaId }),
+          })
+          if (res.status === 409) {
+            // The drink was auto-banned (#298) after this tab loaded; the reload drops it from the list.
+            showAlert('That drink is banned, so codes cannot be mapped to it. Pick another or unban it first.', 'error')
+            await loadScans()
+            return
+          }
+          if (!res.ok) throw new Error('Map failed')
+          showAlert('Mapped!', 'success')
+          await loadScans()
+        } catch (e: unknown) {
+          if (!sessionExpired(e)) showAlert('Map failed', 'error')
+        }
+      })
+    })
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="dismiss"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        try {
+          const res = await adminFetch(`/admin/soda/unknown-scans/${encodeURIComponent(row.dataset.code!)}`, { method: 'DELETE' })
+          if (!res.ok) throw new Error('Dismiss failed')
+          showAlert('Dismissed!', 'success')
+          await loadScans()
+        } catch (e: unknown) {
+          if (!sessionExpired(e)) showAlert('Dismiss failed', 'error')
+        }
+      })
+    })
   }
 
   loadTable()

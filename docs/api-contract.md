@@ -18,12 +18,16 @@ Authorization: Bearer <SESSION_TOKEN>
 Create a session with `POST /api/admin/verify`.
 Sessions expire 1 year after issuance.
 
-Two session roles exist:
+Three session roles exist:
 - `admin` — password from `ADMIN_MANAGER_PASSWORD`. Can access every protected route.
 - `lunch` — password from `VOTE_PASSWORD`. Can create lunches and upload lunch images only.
+- `purchaser` — password from `PURCHASER_PASSWORD`. Can read the weekly soda order list (`GET /api/soda/order/latest`) only.
 
 Routes that require `lunch` accept either `admin` or `lunch` sessions.
-Routes that require `admin` reject `lunch` sessions.
+Routes that require `purchaser` accept either `admin` or `purchaser` sessions.
+Routes that require `admin` reject `lunch` and `purchaser` sessions.
+
+`POST /api/admin/verify` checks the admin password first, then the lunch password, then the purchaser password. It returns `{ "token": "<uuid>", "role": "admin" | "lunch" | "purchaser" }`.
 
 Returns `401` if missing or invalid.
 
@@ -118,7 +122,7 @@ Returns two selected lunches for voting.
 - (no param or any other value) — return a non-vegan matchup (`is_vegan = 0`)
 
 Both lunches in the pair always share the same `is_vegan` value.
-A pair never has two legacy lunches (`is_legacy = 1`). Allowed pairs are non-legacy vs non-legacy and non-legacy vs legacy. If only legacy pairs remain, the endpoint returns `{ "status": "exhausted" }`.
+Legacy lunches (`is_legacy = 1`, Paula Legacy Lunch) are never served. Only non-legacy lunches enter the matchup pool. They still appear on the leaderboard and count toward `rank`. The admin PDF export leaves them out and renumbers ranks.
 Selection weights the anchor lunch by `glicko_rd`, excludes session-seen pairs, avoids recent voted pairs when possible, then samples an opponent with a score based on rating proximity, opponent uncertainty, session presentation freshness, and small random jitter. Left/right sides are assigned randomly.
 If the requested group has fewer than 2 lunches, the endpoint returns 204. If the requested session and vegan mode has seen every available pair, the endpoint returns 200 with `{ "status": "exhausted" }`.
 Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.
@@ -378,3 +382,310 @@ Send current session token in `Authorization: Bearer <token>` to revoke it from 
 
 **Errors:**
 - `401 UNAUTHORIZED` — missing or invalid session token
+
+---
+
+## Sodabench
+
+Sodabench ranks the canned sodas and seltzers stocked at Walmart Branford CT #2232.
+Voters swipe drinks and report drinks they had. The purchaser reads a frozen weekly order list.
+
+Voter identity is the browser-local `lb_session_id` UUID sent as `X-Lunchbench-Session`. There is no voter login.
+Writes require a valid session header and return `400 BAD_REQUEST` without one.
+Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour, unknown scans 60 per hour (`429 RATE_LIMITED`). Voter-learned barcode mappings are capped separately at 20 per hour; over that cap the report still counts but the mapping is skipped.
+
+**Accepted risk: ballot stuffing.** Voters have no login. The session UUID is client-generated, so one person can clear localStorage (or script fresh UUIDs) and swipe or report the same drink many times. The per-IP rate limits cap the damage, but a shared office IP means they must stay loose. Lunchbench accepts this for an internal office tool. The order list is advisory and Chris can skip any row.
+Stuffing also reaches the auto-ban (#298): 5 Hate reports from fresh UUIDs ban a drink for everyone, and it drops off Chris's list at once, mid-week included. The mitigation is the admin "Banned drinks" tab: an admin sees every ban with its hate and like counts, and Unban (`POST /api/admin/soda/banned/:id/unban`) brings the drink back. An unbanned drink stays shown until its Hate count reaches the count at unban + 5 (at least 5 more Hates), so the same stuffing has to be repeated in full.
+Writes come only from allowed browser origins (see `docs/13-environment-and-deployment-config.md`).
+
+### Soda Object Shape
+
+```typescript
+type Soda = {
+  id: number
+  brand: string
+  flavor: string
+  name: string               // "<brand> <flavor>"
+  type: "soda" | "seltzer"
+  image_url: string | null   // "/api/images/<image_key>"
+}
+```
+
+### Scoring
+
+Pure functions in `worker/src/soda-score.ts`. Per drink:
+
+- `R` / `L`: voters whose latest swipe is right / left.
+- `likes` / `hates`: voters whose report is like / hate (one report row per voter per drink). `n` = distinct reporters.
+- θ is the chance a drinker is glad the drink was bought. Some brands are just worse, so each drink's prior comes from its brand.
+- Own evidence `(a_i, b_i)`, no prior: each like adds 1 to `a`, each hate adds 1 to `b`. Right swipes: κ = min(3, 0.2·R) · 3/(3+n), add 0.75κ to `a` and 0.25κ to `b`. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
+- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing in scoring or ranking: not the score, not the brand or type means, not the tiebreak. They are shown as a count, and a voter's own left swipe removes that drink from their feed.
+- A hate report is a full negative: it adds 1 to `b`, exactly as a like adds 1 to `a`.
+- Type mean: `m_type = (Σ_type a + c·0.5) / (Σ_type (a+b) + c)`.
+- Brand mean, leaving drink i out so its evidence is not counted twice: `m_B(−i) = (Σ_{j∈B, j≠i} a_j + c·m_type) / (Σ_{j∈B, j≠i} (a_j+b_j) + c)`. A single-drink brand gets exactly `m_type`. Brands are keyed by the catalog `brand` string as-is.
+- Prior `α0 = k·m_B(−i)`, `β0 = k·(1 − m_B(−i))`. Posterior `α = α0 + a_i`, `β = β0 + b_i`. With no data anywhere this is Beta(1, 1).
+- Constants: `c = 4` (`SODA_MEAN_SHRINK`), `k = 2` (`SODA_BRAND_PRIOR_STRENGTH`). Each weekly snapshot records them in `params_json`.
+- The ranking key, the Thompson trial draws and the favorites rule all use this posterior.
+- Inactive drinks (`sodas.is_active = 0`) are excluded everywhere, including the type and brand means.
+- **Auto-ban (#298).** A drink is **banned** when at least `SODA_BAN_HATES = 5` distinct voters' latest report on it is a Hate. Reports from barcode scans and from manual search count alike; likes do not offset hates.
+  - The ban is computed from `soda_reports` on every read; only admin unbans are stored. Once banned, a drink stays banned: its reports can no longer change (`409 SODA_BANNED`), so it comes back only through an admin unban (or a direct data fix).
+  - **Admin unban.** `POST /api/admin/soda/banned/:id/unban` records the drink's current Hate count in `soda_ban_overrides.hates_at_override`. The drink is then banned only at `hates >= SODA_BAN_HATES + hates_at_override`, i.e. after at least 5 new Hates (more if earlier haters switch to Like, since the threshold is fixed at unban time). A second unban moves the override to the new count.
+  - A banned drink disappears everywhere an inactive one does: the swipe feed, catalog and report search, leaderboard, weekly order selection (favorites, trials and the type mean), and `/api/soda/barcodes`. A scanned banned can therefore falls through to manual search and is logged as an unknown scan.
+  - It also leaves the current week's order list at once: `GET /api/soda/order/latest` drops banned and inactive drinks from the stored snapshot when it reads it (see that endpoint). Replacements are not recomputed mid-week.
+  - Its own evidence still counts toward **its brand's prior**, so a bad brand keeps paying for it.
+  - The threshold is recorded in the weekly snapshot's `params_json` as `score.banHates`.
+  - Swipe and report history is kept.
+  - Writes to a banned drink answer `409 SODA_BANNED`. An unknown or inactive drink answers `404 NOT_FOUND`, even when it is also banned.
+- Rank key: posterior mean α/(α+β) desc, then right swipes `R` desc. The public leaderboard breaks remaining ties by name, then id. The weekly order list breaks them with a shuffle seeded by `week_start`, so a fresh catalog (all tied) does not buy alphabetically.
+
+### GET /api/soda/catalog
+Every active, not banned drink, ordered by brand then flavor. Used by the report autocomplete.
+
+**Response 200:**
+```json
+{ "sodas": [ { "id": 1, "brand": "7UP", "flavor": "Original", "name": "7UP Original", "type": "soda", "image_url": "/api/images/images/<uuid>.jpg" } ] }
+```
+
+### GET /api/soda/deck
+The voter's whole swipe feed: every active, not banned drink this voter has not swiped yet. There are no fixed-size decks. The full catalog is about 115 small rows, so the client loads it once.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
+
+Order: a random order weighted toward drinks people like, so voters mostly see promising drinks instead of wading through ones the office dislikes (`worker/src/soda-deck.ts`).
+
+- Weight = brand factor × own factor, capped to `[1/8, 16]` (`deckWeight`).
+- Brand factor: `odds(m_B(−i)) / odds(m_type)`, with `odds(x) = x/(1−x)`, the drink's brand prior mean `m_B(−i)` and its type mean `m_type` from the scoring model below. A drink is compared with its own category, so reports on one brand do not reshuffle every other brand or the other type. An untried flavor of a loved brand comes early; one of a hated brand comes late.
+- Own factor: `((1 + a)/(1 + b))^2` (`DECK_BIAS_POWER = 2`), where `(a, b)` is the drink's own evidence (`ownEvidence`: reports, plus right swipes as weak likes). It is 1 with no evidence, rises with every like or right swipe and falls with every hate. Raw counts are used rather than the posterior, because the posterior pulls toward the right-swipe mean (0.75): in an office that mostly reports likes, right swipes would otherwise lower a drink's feed weight. Left swipes do not count.
+- The caps (`DECK_MIN_WEIGHT`, `DECK_MAX_WEIGHT`) keep the extremes 128x apart, so a hated drink is rare near the top but still turns up early for some voters and can still collect right swipes.
+- With no ratings anywhere, every weight is 1 and the order is a uniform shuffle.
+- Weighted sampling without replacement (Efraimidis–Spirakis): key `u^(1/w)`, sorted largest first, with `u` from `"<session key>:<drink id>"` hashed and passed through a PRNG finalizer.
+- The order is stable across reloads while ratings don't change. The voter's own right swipes and reports count as ratings, so they can shift the rest of their feed a little. Without a session header, the order is random per request. Swiped drinks never come back. Once every drink is swiped, the list is empty.
+
+**Response 200:** `{ "sodas": [Soda] }`
+
+### PUT /api/soda/swipes
+Records the voter's swipe. A later swipe on the same drink replaces the earlier one.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (required)
+
+**Request body:**
+```json
+{ "soda_id": 12, "direction": "right" }
+```
+`direction` is `"right"` (like) or `"left"` (not a like).
+
+**Response 200:** `{ "ok": true }`
+
+**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `409 SODA_BANNED` (the drink is banned), `429 RATE_LIMITED`
+
+### POST /api/soda/reports
+Records that the voter had the drink and liked or hated it. One report per voter per drink: a newer report replaces the older one (latest verdict wins).
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (required)
+
+**Request body:**
+```json
+{ "soda_id": 12, "verdict": "like", "barcode": "0012345678905" }
+```
+`verdict` is `"like"` or `"hate"`.
+`barcode` is optional: the unknown code this voter scanned just before picking the drink manually. It must be a valid UPC/EAN (normalized as in Barcodes below); an invalid one is `400`.
+
+With `barcode`, after the report is saved:
+
+1. The voter's latest unresolved `soda_unknown_scans` row for that code gets `resolved_soda_id` = the reported drink (`resolved_by = 'voter'`).
+2. Only if step 1 found a row, the code is mapped to the drink in `soda_barcodes` with `source = 'voter'`, unless it is already mapped. First mapping wins; an admin can override it. A report cannot map a code its voter never logged as unknown.
+3. One agreeing session is enough. Lunchbench does not wait for 2 sessions to agree: voters are an honest office crowd, most codes would otherwise never get mapped, and a wrong mapping is visible on the admin list and fixable there. The per-IP cap above limits abuse.
+
+**Response 200:** `{ "ok": true }`. With `barcode`: `{ "ok": true, "barcode_soda_id": 12 }`, the drink the code maps to now (`null` if it stays unmapped). The client adds it to its local lookup so a re-scan matches.
+
+**Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND` (unknown or inactive drink), `409 SODA_BANNED` (the drink is banned; the report is rejected, not stored), `429 RATE_LIMITED`
+
+### Barcodes
+
+The report modal can scan a can's barcode (see `docs/design-spec.md`). Decoding runs on the device; no image or frame ever leaves it. The server only receives the decoded digit string.
+
+Every code is stored and compared as a 13-digit GTIN: UPC-E is expanded to UPC-A, then UPC-A and EAN-8 are zero-padded on the left. The GTIN check digit must be valid. A UPC-E from a decoder may arrive short: 6 digits (number system 0 assumed, check digit computed) or 7 digits (six digits + check with number system 0 when that check is valid, else number system + six digits with the check computed). Short forms are only read as UPC-E when `format` is `upc_e`; a computed check digit cannot catch a misread. The same rules live in `worker/src/barcode.ts` and `frontend/src/utils/barcode.ts`.
+
+### GET /api/soda/barcodes
+Every barcode mapped to an active, not banned drink. The client fetches it once per page load and looks scans up locally; there is no request per scan.
+
+**Response 200:** `{ "barcodes": [ { "code": "0049000006346", "soda_id": 12 } ] }` (`Cache-Control: no-cache`)
+
+### POST /api/soda/unknown-scans
+Logs a scanned code that matched no known drink, for the admin "Unknown scans" list.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (required)
+
+**Request body:**
+```json
+{ "barcode": "0012345678905", "format": "ean_13" }
+```
+`format` is the decoder's symbology: `upc_a`, `upc_e`, `ean_13` or `ean_8`. It decides whether a code under 12 digits is UPC-E or EAN-8. The body is the barcode string and format only; there is no field for image data.
+
+**Response 200:** `{ "ok": true, "code": "0012345678905" }` (the normalized code)
+
+**Errors:** `400 BAD_REQUEST` (no session, bad format, not digits, bad length or check digit), `429 RATE_LIMITED`
+
+Rows older than 180 days are deleted by the weekly cron.
+
+### GET /api/soda/leaderboard
+Every active, not banned drink (sodas and seltzers together), ranked in two groups:
+
+1. drinks with their own evidence (`R + n > 0`: a right swipe or a report), in posterior order;
+2. drinks without own evidence (untried, or left swipes only), in posterior order, then name and id.
+
+Left swipes are not evidence, so a left swipe alone does not move a drink into group 1. The brand prior still orders group 2, but an untried flavor of a loved brand never outranks a drink with real evidence. `has_data` (which counts left swipes) only chooses between showing swipe counts and "New soda/seltzer to try". This grouping is a product decision (made by the owner's proxy, open to revisit) and applies to this endpoint only; the weekly order list uses the plain posterior order.
+
+**Response 200:**
+```json
+{
+  "sodas": [
+    {
+      "rank": 1,
+      "id": 12,
+      "brand": "Dr Pepper",
+      "flavor": "Original",
+      "name": "Dr Pepper Original",
+      "type": "soda",
+      "image_url": "/api/images/images/<uuid>.jpg",
+      "right_swipes": 3,
+      "left_swipes": 0,
+      "likes": 1,
+      "hates": 0,
+      "reporters": 1,
+      "score": 0.66,
+      "has_data": true
+    }
+  ]
+}
+```
+`has_data` is false when the drink has no swipes and no reports. The UI then shows "New soda to try" or "New seltzer to try".
+
+### GET /api/soda/order/latest
+**Requires purchaser auth** (`admin` or `purchaser` session).
+
+Returns the latest frozen weekly order list. If no snapshot exists for the current week (fresh deploy, or before Monday's cron), it generates one first with `INSERT OR IGNORE`.
+
+The list has 10 rows, in order:
+1. top 4 sodas (`slot: "top"`);
+2. top 4 seltzers (`slot: "top"`);
+3. one soda trial, then one seltzer trial (`slot: "trial"`).
+
+Each type's trial is picked from that type's drinks that are not already listed, falling through these tiers so the trial changes every week:
+
+1. trial-eligible drinks (fewer than 3 reporters) not trialed in the previous 2 weeks;
+2. any drink not trialed in the previous 2 weeks (the eligible pool is exhausted);
+3. trial-eligible drinks trialed recently;
+4. the best-scored drink left.
+
+Tiers 1-3 are Thompson-sampled with the RNG seeded by `week_start`, so a given week is reproducible. A type never gets two trials; if it has no drink left at all, its trial row is omitted.
+
+The snapshot is frozen, but each read drops items whose drink is now banned or inactive (one status query) and renumbers `rank` 1..n. The other rows keep their places; nothing is recomputed to replace the dropped drink until the next snapshot (Monday cron or `POST /api/admin/soda/regenerate`).
+
+There are no backup rows. Snapshots stored before backups were removed may still contain `slot: "backup"` items. They were the last ranks, so this endpoint drops them on read and ranks stay contiguous. Such a snapshot keeps its old 3 + 3 + 3 shape until the next Monday cron. To switch the current week right away, an admin can call `POST /api/admin/soda/regenerate`.
+
+Favorites fill in tiers, each in rank order:
+
+1. Backed drinks: own evidence (`R + n > 0`), posterior mean at least the type mean `m_type`, and own evidence mean `a/(a+b)` at least `min(m_type, 0.5)`. The own-evidence check stops a strong brand from carrying a drink whose only evidence is a hate into a top slot. It is capped at 0.5 because people tend to report what they liked, which can push `m_type` above 0.75, the own mean of a swipe-only drink.
+2. Every other drink except known-bad ones: untried drinks, and drinks with decent own evidence whose posterior sits below `m_type`.
+3. Known-bad drinks: own evidence mean below `min(m_type, 0.5)`, such as a drink with only hates.
+
+The bar is the type mean, not the drink's own brand prior: a favorite should beat an average soda (or seltzer), and a strong brand should not hold its own good drinks to a higher bar. Exact score ties use the week-seeded shuffle.
+Fewer rows come back when the catalog is too small to fill every slot. `params_json` records the counts (`topPerType: 4`, `trialsPerType: 1`).
+There is no inventory or purchase tracking.
+
+**Response 200:**
+```json
+{
+  "week_start": "2026-11-16",
+  "generated_at": "2026-11-16T12:00:03.120Z",
+  "items": [
+    {
+      "rank": 1,
+      "slot": "top",
+      "soda_id": 12,
+      "brand": "Dr Pepper",
+      "flavor": "Original",
+      "name": "Dr Pepper Original",
+      "type": "soda",
+      "image_key": "images/<uuid>.jpg",
+      "image_url": "/api/images/images/<uuid>.jpg",
+      "right_swipes": 3,
+      "left_swipes": 0,
+      "has_data": true
+    }
+  ]
+}
+```
+`week_start` is the Monday of the week in America/New_York.
+
+**Errors:** `401 UNAUTHORIZED`
+
+### POST /api/admin/soda/regenerate
+**Requires admin auth.** Recomputes the current week's order list and replaces the stored snapshot. Same week and same data give the same list.
+
+**Response 200:** `{ "week_start": "2026-11-16" }`
+
+**Errors:** `401 UNAUTHORIZED`
+
+### GET /api/admin/soda/unknown-scans
+**Requires admin auth.** The unknown-scan log grouped by code. Unmapped codes first, then most recently seen. Never returns session keys, only distinct-voter counts.
+
+**Response 200:**
+```json
+{
+  "codes": [
+    {
+      "code": "0012345678905",
+      "formats": ["ean_13"],
+      "scans": 3,
+      "voters": 2,
+      "first_seen": "2026-11-16 14:03:22",
+      "last_seen": "2026-11-16 15:10:04",
+      "picks": [ { "soda_id": 12, "name": "Zevia Cola", "count": 2 } ],
+      "mapped_soda_id": 12,
+      "mapped_name": "Zevia Cola",
+      "mapped_source": "voter"
+    }
+  ]
+}
+```
+`first_seen` / `last_seen` are SQLite UTC timestamps. `picks` counts scans that voters resolved by reporting a drink manually; admin mappings are not picks. `mapped_source` is `seed`, `voter` or `admin` (null when unmapped). The admin tab shows it next to the drink. A drink that is no longer active (`is_active = 0`) is named with a ` (removed)` suffix in `picks[].name` and `mapped_name`; a banned one gets ` (banned)`. The admin tab never preselects either, because neither is in the catalog it maps to.
+
+**Errors:** `401 UNAUTHORIZED`
+
+### POST /api/admin/soda/barcodes
+**Requires admin auth.** Maps a code to an active, not banned drink with `source = 'admin'`, replacing any earlier mapping, and marks that code's unresolved scans resolved (`resolved_by = 'admin'`).
+
+**Request body:** `{ "code": "012345678905", "soda_id": 12 }` (any valid UPC/EAN; stored normalized)
+
+**Response 200:** `{ "code": "0012345678905", "soda_id": 12 }`
+
+**Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`, `404 NOT_FOUND` (unknown or inactive drink), `409 SODA_BANNED` (banned drink)
+
+### GET /api/admin/soda/banned
+**Requires admin auth.** Active drinks currently auto-banned (see Scoring, "Auto-ban"), most hated first. `hates` and `likes` are all-time counts, including Hates from before an earlier unban.
+
+**Response 200:**
+```json
+{ "banned": [ { "id": 12, "name": "Coca-Cola Original", "hates": 5, "likes": 2 } ] }
+```
+
+**Errors:** `401 UNAUTHORIZED`
+
+### POST /api/admin/soda/banned/:id/unban
+**Requires admin auth.** Lifts a drink's auto-ban. Stores the drink's current Hate count in `soda_ban_overrides` (one row per drink, replaced on a later unban), so the drink is shown again until its Hate count reaches that count + `SODA_BAN_HATES` (5): at least 5 new Hates from distinct voters, more if earlier haters switch to Like.
+
+**Response 200:** `{ "id": 12, "hates_at_override": 5 }`
+
+**Errors:** `400 BAD_REQUEST` (id not a positive integer), `401 UNAUTHORIZED` (no admin session; a purchaser session is not enough), `404 NOT_FOUND` (unknown, inactive or not currently banned)
+
+### DELETE /api/admin/soda/unknown-scans/:code
+**Requires admin auth.** Dismisses a code (for example a non-soda barcode a voter then "reported" as a drink): deletes its rows from the log and its `voter` mapping, if any. The next scan of the code is unknown again, so it is logged again. `seed` and `admin` mappings stay; to change one, map the code to another drink.
+
+**Response 200:** `{ "dismissed": 3, "voter_mapping_removed": true }`
+
+**Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`
+
+### Weekly cron
+`worker/wrangler.toml` triggers the Worker `scheduled` handler at `0 12 * * 1` (Monday 12:00 UTC, 7–8 am Eastern). It writes the week's snapshot to `soda_buy_lists` with `INSERT OR IGNORE`, so a repeat firing keeps the frozen list. It then deletes `soda_unknown_scans` rows older than 180 days.

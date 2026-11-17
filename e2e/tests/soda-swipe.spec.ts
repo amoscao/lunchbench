@@ -177,21 +177,29 @@ test.describe('SodaArena swipe feed', () => {
     await expect(page.locator('.soda-end-title')).toHaveText("You've rated everything")
   })
 
-  test('flung cards fully leave the viewport on both sides, even when rotated', async ({ page }) => {
+  test('flung cards hop about one card width in the swipe direction and fade out', async ({ page }) => {
+    type Exit = { shift: number; width: number; opacity: number }
     await page.addInitScript(() => {
-      const w = window as unknown as { exits: Array<{ left: number; right: number; vw: number }> }
+      const w = window as unknown as { exits: Exit[]; rests: WeakMap<Element, number> }
       w.exits = []
       const remove = Element.prototype.remove
       Element.prototype.remove = function (this: Element) {
         if (this.classList.contains('leaving')) {
-          const r = this.getBoundingClientRect()
-          w.exits.push({ left: r.left, right: r.right, vw: window.innerWidth })
+          const el = this as HTMLElement
+          const r = el.getBoundingClientRect()
+          // The stage centers the card at rest; rotation does not move the box center.
+          const stage = el.parentElement!.getBoundingClientRect()
+          w.exits.push({
+            shift: r.left + r.width / 2 - (stage.left + stage.width / 2),
+            width: el.offsetWidth,
+            opacity: Number(getComputedStyle(el).opacity),
+          })
         }
         return remove.call(this)
       }
     })
     await page.goto('/soda')
-    const exits = () => page.evaluate(() => (window as unknown as { exits: Array<{ left: number; right: number; vw: number }> }).exits)
+    const exits = () => page.evaluate(() => (window as unknown as { exits: Exit[] }).exits)
 
     let id = await topId(page)
     await drag(page, { dx: -250, steps: 12, stepMs: 16, grabAt: 0.3 })
@@ -207,9 +215,14 @@ test.describe('SodaArena swipe feed', () => {
     await expect.poll(async () => (await exits()).length).toBe(3)
 
     const [left, right, button] = await exits()
-    expect(left.right).toBeLessThanOrEqual(0)
-    expect(right.left).toBeGreaterThanOrEqual(right.vw)
-    expect(button.right).toBeLessThanOrEqual(0)
+    for (const exit of [left, right, button]) {
+      expect(exit.opacity).toBe(0)
+      expect(Math.abs(exit.shift)).toBeGreaterThanOrEqual(exit.width * 0.9)
+      expect(Math.abs(exit.shift)).toBeLessThanOrEqual(exit.width * 1.2)
+    }
+    expect(left.shift).toBeLessThan(0)
+    expect(right.shift).toBeGreaterThan(0)
+    expect(button.shift).toBeLessThan(0)
   })
 
   test('holding an arrow key records exactly one swipe', async ({ page }) => {

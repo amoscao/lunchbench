@@ -393,7 +393,7 @@ Mockups live outside the repo; this section is the source of truth.
 - Swipe physics (`frontend/src/utils/swipe-physics.ts`): pointer events, `requestAnimationFrame` and CSS transforms only.
   - **Drag:** the card follows the pointer 1:1 in x and y. Rotation is 0.07°/px, capped at ±20°, and the sign flips when the card is grabbed in its bottom half.
   - **Commit:** |dx| > 35% of the card width, or a flick faster than 0.5 px/ms (measured over the last 100 ms) in the same direction.
-  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning until its rotated box is fully off-screen. Duration is distance / speed, clamped to 100-600 ms. The rest position is taken from the box center, which rotation does not move.
+  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning for a short hop: it ends one card width from rest (at least 0.4 card widths past where it was released) and fades out over the last 65% of the hop. It does not cross the screen. Duration is distance / speed, clamped to 50-260 ms.
   - **Snap back:** a damped spring with a slight overshoot.
   - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
   - **Stamps:** LIKE (`--accent`, top left) and NOPE (`--hate`, top right) fade in and tilt with |dx|.

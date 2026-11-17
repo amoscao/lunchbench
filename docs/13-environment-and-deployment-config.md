@@ -122,7 +122,7 @@ A Pages secret reaches only Pages deployments made after it is set. If the next 
 
 Rotation: the Worker secret changes at once, the Pages one at the next Pages deploy. While they differ, limits are site-wide. The rotation steps in `docs/secrets.md` set the Pages secret first and the Worker secret only when the redeploy reaches its Pages step, to keep that window short.
 
-Pages preview deployments do not get the secret (`wrangler pages secret put` sets production only), so previews keep site-wide limits.
+Pages preview deployments do not get the secret: `wrangler pages secret put` sets production by default, and previews deliberately stay without it because they share the production Worker and can run unreviewed branch code. Previews keep site-wide limits.
 
 Not needed locally. Local dev and E2E have no Pages Function: Vite proxies `/api` straight to `wrangler dev`, and the Worker uses `CF-Connecting-IP` there.
 

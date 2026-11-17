@@ -31,12 +31,15 @@
   unset PROXY_SECRET_VALUE
   ```
 - **Pages redeploy**: a Pages secret applies to new deployments only. If no Pages deploy is still to come, re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run list --workflow=deploy.yml --branch=main --limit 1`, then `gh run rerun <run-id>`, within 30 days of that run) or push to `main`.
-- **Rotate** (keeps the mismatch window short; stay in one shell):
+- **Rotate** (keeps the mismatch window short; run both blocks in the same shell). First set the Pages secret and re-run the latest deploy:
   ```bash
   PROXY_SECRET_VALUE="$(openssl rand -hex 32)"
   printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
-  gh run rerun <run-id>   # latest Deploy to Cloudflare run on main
-  # Wait until that run reaches its "Deploy Frontend to Pages" step, then:
+  RUN_ID="$(gh run list --workflow=deploy.yml --branch=main --limit 1 --json databaseId -q '.[0].databaseId')"
+  gh run rerun "$RUN_ID"
+  ```
+  Then, once `gh run watch "$RUN_ID"` shows the run on its "Deploy Frontend to Pages" step, set the Worker secret:
+  ```bash
   printf '%s' "$PROXY_SECRET_VALUE" | (cd worker && npx wrangler secret put PROXY_SECRET)
   unset PROXY_SECRET_VALUE
   ```

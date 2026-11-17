@@ -16,6 +16,8 @@ export type RateLimitBlocked = {
 export type RateLimitResult = { allowed: true } | RateLimitBlocked
 type RateLimitRow = { count: number; window_start: string }
 
+// Keep every window at most a day: the weekly cron (runWeeklyOrder in index.ts) deletes rows whose
+// window started more than a day ago.
 function getWindowStart(now: Date, windowSeconds: number): string {
   return new Date(
     Math.floor(now.getTime() / (windowSeconds * 1000)) * windowSeconds * 1000

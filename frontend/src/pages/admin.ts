@@ -1,4 +1,4 @@
-import { type Lunch } from '../api'
+import { getSodaCatalog, type Lunch, type Soda } from '../api'
 import { escapeHtml } from '../utils/escape-html'
 import { exportLeaderboardPDF } from '../utils/lunch-pdf'
 
@@ -119,6 +119,44 @@ async function fetchAdminStats(): Promise<{ votes_24h: number; votes_7d: number;
   return res.json()
 }
 
+type UnknownScanGroup = {
+  code: string
+  formats: string[]
+  scans: number
+  voters: number
+  first_seen: string
+  last_seen: string
+  picks: { soda_id: number; name: string; count: number }[]
+  mapped_soda_id: number | null
+  mapped_name: string | null
+  mapped_source: 'seed' | 'voter' | 'admin' | null
+}
+
+async function adminFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, ...init.headers },
+  })
+  if (res.status === 401) {
+    clearAdminToken()
+    throw new Error('Session expired')
+  }
+  return res
+}
+
+async function fetchUnknownScans(): Promise<UnknownScanGroup[]> {
+  const res = await adminFetch('/admin/soda/unknown-scans')
+  if (!res.ok) throw new Error('Failed to load unknown scans')
+  return (await res.json() as { codes: UnknownScanGroup[] }).codes
+}
+
+/** "2026-11-16 14:03:22" (UTC, from SQLite) -> "Nov 16, 9:03 AM" in the viewer's zone. */
+function formatSeen(value: string): string {
+  const date = new Date(`${value.replace(' ', 'T')}Z`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 async function revokeAdminSession(token: string | null): Promise<void> {
   if (!token) return
   await fetch(`${API_URL}/admin/session`, {
@@ -128,7 +166,7 @@ async function revokeAdminSession(token: string | null): Promise<void> {
 }
 
 function renderDashboard(container: HTMLElement): void {
-  let activeTab: 'lunches' | 'stats' = 'lunches'
+  let activeTab: 'lunches' | 'stats' | 'scans' = 'lunches'
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
@@ -141,6 +179,7 @@ function renderDashboard(container: HTMLElement): void {
     <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
       <button class="admin-tab admin-tab-active" id="tab-lunches" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px">Lunches</button>
       <button class="admin-tab" id="tab-stats" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Stats</button>
+      <button class="admin-tab" id="tab-scans" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Unknown scans</button>
     </div>
     <div id="admin-alert" style="display:none" class="alert"></div>
     <div id="admin-tab-content">
@@ -152,17 +191,21 @@ function renderDashboard(container: HTMLElement): void {
 
   const tabLunches = container.querySelector<HTMLButtonElement>('#tab-lunches')!
   const tabStats = container.querySelector<HTMLButtonElement>('#tab-stats')!
+  const tabScans = container.querySelector<HTMLButtonElement>('#tab-scans')!
   const tabContent = container.querySelector<HTMLElement>('#admin-tab-content')!
 
-  function setTab(tab: 'lunches' | 'stats'): void {
+  function setTab(tab: 'lunches' | 'stats' | 'scans'): void {
     activeTab = tab
     const accentStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px`
     const inactiveStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px`
     tabLunches.style.cssText = tab === 'lunches' ? accentStyle : inactiveStyle
     tabStats.style.cssText   = tab === 'stats'   ? accentStyle : inactiveStyle
+    tabScans.style.cssText   = tab === 'scans'   ? accentStyle : inactiveStyle
     if (tab === 'lunches') {
       tabContent.innerHTML = `<div id="admin-table-wrap"><div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div></div>`
       loadTable()
+    } else if (tab === 'scans') {
+      void loadScans()
     } else {
       loadStats()
     }
@@ -170,6 +213,7 @@ function renderDashboard(container: HTMLElement): void {
 
   tabLunches.addEventListener('click', () => setTab('lunches'))
   tabStats.addEventListener('click',   () => setTab('stats'))
+  tabScans.addEventListener('click',   () => setTab('scans'))
 
   const exportPdfBtn = container.querySelector<HTMLButtonElement>('#export-pdf-btn')!
   exportPdfBtn.addEventListener('click', async () => {
@@ -377,6 +421,104 @@ function renderDashboard(container: HTMLElement): void {
         }
         tabContent.innerHTML = `<div class="alert alert-error">Failed to load stats</div>`
       })
+  }
+
+  function sessionExpired(e: unknown): boolean {
+    if ((e as Error).message !== 'Session expired') return false
+    container.innerHTML = ''
+    renderLogin(container)
+    return true
+  }
+
+  async function loadScans(): Promise<void> {
+    tabContent.innerHTML = `<div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div>`
+    let groups: UnknownScanGroup[]
+    let catalog: Soda[]
+    try {
+      ;[groups, catalog] = await Promise.all([fetchUnknownScans(), getSodaCatalog()])
+    } catch (e: unknown) {
+      if (sessionExpired(e)) return
+      tabContent.innerHTML = `<div class="alert alert-error">Failed to load unknown scans</div>`
+      return
+    }
+    if (activeTab !== 'scans') return
+    if (groups.length === 0) {
+      tabContent.innerHTML = `<p style="color:var(--text-muted)">No unknown scans</p>`
+      return
+    }
+    const options = (selected: number | null): string => [
+      `<option value="">Drink…</option>`,
+      ...catalog.map((soda) => `<option value="${soda.id}"${soda.id === selected ? ' selected' : ''}>${escapeHtml(soda.name)}</option>`),
+    ].join('')
+    tabContent.innerHTML = `
+      <table class="leaderboard-table unknown-scans-table" style="font-size:13px">
+        <thead>
+          <tr>
+            <th>Barcode</th>
+            <th>Scans</th>
+            <th>Voters</th>
+            <th>First seen</th>
+            <th>Last seen</th>
+            <th>Picked after</th>
+            <th>Mapped</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${groups.map((group) => `
+            <tr data-code="${escapeHtml(group.code)}">
+              <td style="font-variant-numeric:tabular-nums">${escapeHtml(group.code)}</td>
+              <td>${group.scans}</td>
+              <td>${group.voters}</td>
+              <td style="white-space:nowrap">${escapeHtml(formatSeen(group.first_seen))}</td>
+              <td style="white-space:nowrap">${escapeHtml(formatSeen(group.last_seen))}</td>
+              <td>${group.picks.map((pick) => `${escapeHtml(pick.name)} ×${pick.count}`).join('<br>') || '-'}</td>
+              <td>${group.mapped_name ? `${escapeHtml(group.mapped_name)} (${escapeHtml(group.mapped_source ?? '')})` : '-'}</td>
+              <td style="white-space:nowrap">
+                <select class="form-input" style="width:180px;padding:4px 6px;font-size:12px;display:inline-block" aria-label="Drink for ${escapeHtml(group.code)}">
+                  ${options(group.mapped_soda_id ?? group.picks[0]?.soda_id ?? null)}
+                </select>
+                <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;margin-left:4px" data-action="map">Map</button>
+                <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;margin-left:4px" data-action="dismiss">Dismiss</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="map"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        const sodaId = Number(row.querySelector('select')!.value)
+        if (!sodaId) return
+        try {
+          const res = await adminFetch('/admin/soda/barcodes', {
+            method: 'POST',
+            body: JSON.stringify({ code: row.dataset.code, soda_id: sodaId }),
+          })
+          if (!res.ok) throw new Error('Map failed')
+          showAlert('Mapped!', 'success')
+          await loadScans()
+        } catch (e: unknown) {
+          if (!sessionExpired(e)) showAlert('Map failed', 'error')
+        }
+      })
+    })
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="dismiss"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        try {
+          const res = await adminFetch(`/admin/soda/unknown-scans/${encodeURIComponent(row.dataset.code!)}`, { method: 'DELETE' })
+          if (!res.ok) throw new Error('Dismiss failed')
+          showAlert('Dismissed!', 'success')
+          await loadScans()
+        } catch (e: unknown) {
+          if (!sessionExpired(e)) showAlert('Dismiss failed', 'error')
+        }
+      })
+    })
   }
 
   loadTable()

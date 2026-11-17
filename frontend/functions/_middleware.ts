@@ -1,6 +1,8 @@
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self' https://gc.zgo.at",
+  // 'wasm-unsafe-eval' lets the self-hosted barcode decoder (zxing-wasm) compile WebAssembly.
+  // It does not allow eval() or new Function().
+  "script-src 'self' 'wasm-unsafe-eval' https://gc.zgo.at",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "connect-src 'self' https://lunchbench.goatcounter.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",

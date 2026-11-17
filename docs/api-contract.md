@@ -392,7 +392,7 @@ Voters swipe drinks and report drinks they had. The purchaser reads a frozen wee
 
 Voter identity is the browser-local `lb_session_id` UUID sent as `X-Lunchbench-Session`. There is no voter login.
 Writes require a valid session header and return `400 BAD_REQUEST` without one.
-Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour (`429 RATE_LIMITED`).
+Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour, unknown scans 60 per hour (`429 RATE_LIMITED`). Voter-learned barcode mappings are capped separately at 20 per hour; over that cap the report still counts but the mapping is skipped.
 
 **Accepted risk: ballot stuffing.** Voters have no login. The session UUID is client-generated, so one person can clear localStorage (or script fresh UUIDs) and swipe or report the same drink many times. The per-IP rate limits cap the damage, but a shared office IP means they must stay loose. Lunchbench accepts this for an internal office tool. The order list is advisory and Chris can skip any row.
 Writes come only from allowed browser origins (see `docs/13-environment-and-deployment-config.md`).
@@ -466,13 +466,48 @@ Records that the voter had the drink and liked or hated it. One report per voter
 
 **Request body:**
 ```json
-{ "soda_id": 12, "verdict": "like" }
+{ "soda_id": 12, "verdict": "like", "barcode": "0012345678905" }
 ```
 `verdict` is `"like"` or `"hate"`.
+`barcode` is optional: the unknown code this voter scanned just before picking the drink manually. It must be a valid UPC/EAN (normalized as in Barcodes below); an invalid one is `400`.
 
-**Response 200:** `{ "ok": true }`
+With `barcode`, after the report is saved:
+
+1. The voter's latest unresolved `soda_unknown_scans` row for that code gets `resolved_soda_id` = the reported drink (`resolved_by = 'voter'`).
+2. Only if step 1 found a row, the code is mapped to the drink in `soda_barcodes` with `source = 'voter'`, unless it is already mapped. First mapping wins; an admin can override it. A report cannot map a code its voter never logged as unknown.
+3. One agreeing session is enough. Lunchbench does not wait for 2 sessions to agree: voters are an honest office crowd, most codes would otherwise never get mapped, and a wrong mapping is visible on the admin list and fixable there. The per-IP cap above limits abuse.
+
+**Response 200:** `{ "ok": true }`. With `barcode`: `{ "ok": true, "barcode_soda_id": 12 }`, the drink the code maps to now (`null` if it stays unmapped). The client adds it to its local lookup so a re-scan matches.
 
 **Errors:** `400 BAD_REQUEST`, `404 NOT_FOUND`, `429 RATE_LIMITED`
+
+### Barcodes
+
+The report modal can scan a can's barcode (see `docs/design-spec.md`). Decoding runs on the device; no image or frame ever leaves it. The server only receives the decoded digit string.
+
+Every code is stored and compared as a 13-digit GTIN: UPC-E is expanded to UPC-A, then UPC-A and EAN-8 are zero-padded on the left. The GTIN check digit must be valid. A UPC-E from a decoder may arrive short: 6 digits (number system 0 assumed, check digit computed) or 7 digits (six digits + check with number system 0 when that check is valid, else number system + six digits with the check computed). Short forms are only read as UPC-E when `format` is `upc_e`; a computed check digit cannot catch a misread. The same rules live in `worker/src/barcode.ts` and `frontend/src/utils/barcode.ts`.
+
+### GET /api/soda/barcodes
+Every barcode mapped to an active drink. The client fetches it once per page load and looks scans up locally; there is no request per scan.
+
+**Response 200:** `{ "barcodes": [ { "code": "0049000006346", "soda_id": 12 } ] }` (`Cache-Control: no-cache`)
+
+### POST /api/soda/unknown-scans
+Logs a scanned code that matched no known drink, for the admin "Unknown scans" list.
+
+**Headers:** `X-Lunchbench-Session: <uuid>` (required)
+
+**Request body:**
+```json
+{ "barcode": "0012345678905", "format": "ean_13" }
+```
+`format` is the decoder's symbology: `upc_a`, `upc_e`, `ean_13` or `ean_8`. It decides whether a code under 12 digits is UPC-E or EAN-8. The body is the barcode string and format only; there is no field for image data.
+
+**Response 200:** `{ "ok": true, "code": "0012345678905" }` (the normalized code)
+
+**Errors:** `400 BAD_REQUEST` (no session, bad format, not digits, bad length or check digit), `429 RATE_LIMITED`
+
+Rows older than 180 days are deleted by the weekly cron.
 
 ### GET /api/soda/leaderboard
 Every active drink (sodas and seltzers together), ranked in two groups:
@@ -572,5 +607,47 @@ There is no inventory or purchase tracking.
 
 **Errors:** `401 UNAUTHORIZED`
 
+### GET /api/admin/soda/unknown-scans
+**Requires admin auth.** The unknown-scan log grouped by code. Unmapped codes first, then most recently seen. Never returns session keys, only distinct-voter counts.
+
+**Response 200:**
+```json
+{
+  "codes": [
+    {
+      "code": "0012345678905",
+      "formats": ["ean_13"],
+      "scans": 3,
+      "voters": 2,
+      "first_seen": "2026-11-16 14:03:22",
+      "last_seen": "2026-11-16 15:10:04",
+      "picks": [ { "soda_id": 12, "name": "OLIPOP Vintage Cola", "count": 2 } ],
+      "mapped_soda_id": 12,
+      "mapped_name": "OLIPOP Vintage Cola",
+      "mapped_source": "voter"
+    }
+  ]
+}
+```
+`first_seen` / `last_seen` are SQLite UTC timestamps. `picks` counts scans that voters resolved by reporting a drink manually; admin mappings are not picks. `mapped_source` is `seed`, `voter` or `admin` (null when unmapped). The admin tab shows it next to the drink.
+
+**Errors:** `401 UNAUTHORIZED`
+
+### POST /api/admin/soda/barcodes
+**Requires admin auth.** Maps a code to an active drink with `source = 'admin'`, replacing any earlier mapping, and marks that code's unresolved scans resolved (`resolved_by = 'admin'`).
+
+**Request body:** `{ "code": "012345678905", "soda_id": 12 }` (any valid UPC/EAN; stored normalized)
+
+**Response 200:** `{ "code": "0012345678905", "soda_id": 12 }`
+
+**Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`, `404 NOT_FOUND` (unknown or inactive drink)
+
+### DELETE /api/admin/soda/unknown-scans/:code
+**Requires admin auth.** Dismisses a code (for example a non-soda barcode a voter then "reported" as a drink): deletes its rows from the log and its `voter` mapping, if any. The next scan of the code is unknown again, so it is logged again. `seed` and `admin` mappings stay; to change one, map the code to another drink.
+
+**Response 200:** `{ "dismissed": 3, "voter_mapping_removed": true }`
+
+**Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`
+
 ### Weekly cron
-`worker/wrangler.toml` triggers the Worker `scheduled` handler at `0 12 * * 1` (Monday 12:00 UTC, 7–8 am Eastern). It writes the week's snapshot to `soda_buy_lists` with `INSERT OR IGNORE`, so a repeat firing keeps the frozen list.
+`worker/wrangler.toml` triggers the Worker `scheduled` handler at `0 12 * * 1` (Monday 12:00 UTC, 7–8 am Eastern). It writes the week's snapshot to `soda_buy_lists` with `INSERT OR IGNORE`, so a repeat firing keeps the frozen list. It then deletes `soda_unknown_scans` rows older than 180 days.

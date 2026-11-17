@@ -2442,3 +2442,70 @@ body.soda-route { overflow-x: clip; }
   .soda-thumb { width: 32px; height: 32px; }
   .soda-new { font-size: var(--text-xs); }
 }
+
+/* =====================
+   Sodabench: barcode scan mode in the report modal
+   ===================== */
+.soda-report-head .soda-report-title { flex: 1; }
+.soda-report-head .soda-report-scan-open { margin-right: 0; }
+
+.barcode-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.barcode-scan-view {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #000;
+}
+
+.barcode-scan-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.barcode-scan-frame {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 32%;
+  bottom: 32%;
+  border: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.barcode-scan-match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.barcode-scan-match img,
+.barcode-scan-noimg {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  background: var(--product-bg);
+  border-radius: var(--radius-md);
+}
+
+.barcode-scan-name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.barcode-scan-manual { min-height: 44px; }
+
+/* .modal-close sets display; keep the hidden attribute working on the scan button. */
+.soda-report-head .soda-report-scan-open[hidden] { display: none; }

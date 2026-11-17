@@ -51,8 +51,9 @@ describe('weekly cron', () => {
     }
 
     await runWeeklyOrder(controller, env(db as unknown as D1Database))
-    expect(writes).toHaveLength(1)
+    expect(writes).toHaveLength(2)
     expect(writes[0].sql).toContain('INSERT OR IGNORE INTO soda_buy_lists')
     expect(writes[0].values[0]).toBe('2026-11-16')
+    expect(writes[1].sql).toContain("DELETE FROM soda_unknown_scans WHERE created_at < datetime('now', '-180 days')")
   })
 })

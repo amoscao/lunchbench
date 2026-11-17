@@ -40,7 +40,9 @@ RUN printf '%s\n' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0009_matchup_sessions.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0010_legacy_lunches.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0011_sodabench.sql' \
+  'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0013_soda_barcodes.sql' \
   'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/seed.sql' \
+  'pnpm --dir /app/worker exec wrangler d1 execute lunchbench --local --persist-to /data --file /app/migrations/0014_soda_barcodes_seed.sql' \
   'node /app/scripts/import-sodas.mjs upload --local --persist-to /data --images-dir /app/scripts/data/seed-images --skip-missing' \
   'cd /app/worker' \
   'exec pnpm exec wrangler dev --local --ip 0.0.0.0 --port 8787 --persist-to /data' \

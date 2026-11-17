@@ -28,6 +28,8 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0007_session_ro
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0009_matchup_sessions.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0011_sodabench.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0012_soda_catalog.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0013_soda_barcodes.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0014_soda_barcodes_seed.sql
 ```
 
 ### Sodabench launch steps
@@ -57,6 +59,23 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0012_soda_catal
 5. Merge. The deploy registers the Monday cron from `worker/wrangler.toml`. Until it first fires, `/chris` generates the current week's list on demand.
 
 If the PR merges before step 1, the `/api/soda/*` routes return 500. Before step 3, the deck and soda leaderboard are empty. Before step 4, `/chris` accepts only the admin password.
+
+### Barcode scanning launch steps
+`main` auto-deploys on push. Run these BEFORE merging the barcode scanning PR (#294), in this order:
+
+1. Apply the schema. Additive; the current Worker ignores the new tables.
+   ```bash
+   cd worker
+   npx wrangler d1 execute lunchbench --remote --file=../migrations/0013_soda_barcodes.sql
+   ```
+2. Load the barcode seed. Data only, `INSERT OR IGNORE`, safe to re-run. Needs `0012_soda_catalog.sql` already applied.
+   ```bash
+   cd worker
+   npx wrangler d1 execute lunchbench --remote --file=../migrations/0014_soda_barcodes_seed.sql
+   ```
+3. Merge. The Pages deploy ships the new CSP (`'wasm-unsafe-eval'`) and the bundled decoder in the same release as the scanner.
+
+If the PR merges before step 1, `GET /api/soda/barcodes` and the unknown-scan routes return 500, every scan falls back to manual search, and reports that carry a barcode fail. Before step 2, scans only match codes that voters or admins map.
 
 `seed.sql` is for local dev and E2E only. Do not apply it to production.
 

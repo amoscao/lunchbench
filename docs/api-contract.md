@@ -379,7 +379,7 @@ Returns full stats for one lunch.
 
 Requires admin session token.
 
-Resets all dishes to baseline Glicko-2 values. Keeps name, description, and image unchanged. Deletes all votes.
+Resets all dishes to baseline Glicko-2 values. Keeps name, description, and image unchanged. Deletes all votes. Keeps matchup history (`matchup_sessions`, `matchup_presentations`, `matchup_tokens`).
 
 **Response 200:**
 ```json
@@ -388,6 +388,30 @@ Resets all dishes to baseline Glicko-2 values. Keeps name, description, and imag
 
 **Errors:**
 - `401 UNAUTHORIZED` — missing or expired session token
+
+### DELETE /api/admin/lunches/:id
+
+Requires admin session token.
+
+Deletes the lunch and every row that names it, in one D1 batch (one transaction):
+
+- `matchup_presentations` rows where it is either side (every session, both vegan modes)
+- `matchup_tokens` rows where it is either side, so a token served before the delete gets `400` from `POST /api/matchup/seen`
+- `votes` rows where it is either side
+- the `lunches` row
+
+Other lunches keep their ratings and W/L/T; votes against the deleted lunch are not replayed. `matchup_sessions` rows stay. The R2 image object is not deleted. If any statement fails, nothing is deleted and the response is `500`.
+
+An unknown id still answers `200`.
+
+**Response 200:**
+```json
+{ "deleted": true }
+```
+
+**Errors:**
+- `400 BAD_REQUEST` — invalid id
+- `401 UNAUTHORIZED` — missing or expired admin session token
 
 ### DELETE /api/admin/session
 

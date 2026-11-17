@@ -436,7 +436,7 @@ Every active drink, ordered by brand then flavor. Used by the report autocomplet
 ```
 
 ### GET /api/soda/deck
-The voter's whole swipe feed: every active drink this voter has not swiped yet. There are no fixed-size decks. The full catalog is about 124 small rows, so the client loads it once.
+The voter's whole swipe feed: every active drink this voter has not swiped yet. There are no fixed-size decks. The full catalog is about 115 small rows, so the client loads it once.
 
 **Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
 
@@ -621,9 +621,9 @@ There is no inventory or purchase tracking.
       "voters": 2,
       "first_seen": "2026-11-16 14:03:22",
       "last_seen": "2026-11-16 15:10:04",
-      "picks": [ { "soda_id": 12, "name": "OLIPOP Vintage Cola", "count": 2 } ],
+      "picks": [ { "soda_id": 12, "name": "Zevia Cola", "count": 2 } ],
       "mapped_soda_id": 12,
-      "mapped_name": "OLIPOP Vintage Cola",
+      "mapped_name": "Zevia Cola",
       "mapped_source": "voter"
     }
   ]

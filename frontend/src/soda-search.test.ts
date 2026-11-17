@@ -204,6 +204,7 @@ describe('aliases', () => {
     'orange': (d) => /orange|tangerine|mandarin/i.test(d.flavor),
     'cherry': (d) => /cherry/i.test(d.flavor),
     'creme': (d) => /cream/i.test(d.flavor),
+    'grapefruit': (d) => /grapefruit/i.test(d.flavor),
   }
 
   test('covers every alias key', () => {
@@ -249,6 +250,27 @@ describe('aliases', () => {
 
   test('creme soda finds cream sodas', () => {
     expect(names('creme soda')[0]).toBe('poppi Cream Soda')
+  })
+
+  // Fresca's flagship is grapefruit, listed as "Original Citrus" (#301). The alias adds it to the
+  // grapefruit seltzers, after them, and the type words still split soda from seltzer.
+  test('grapefruit finds the grapefruit seltzers, then Fresca Original Citrus', () => {
+    expect(all('grapefruit')).toEqual(['bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'Fresca Original Citrus'])
+  })
+
+  test.each(['fresca grapefruit', 'grapefruit fresca', 'grapefruit soda', 'grapefruit pop', 'fresca grape', 'fresca'])(
+    '%s finds only Fresca Original Citrus',
+    (query) => {
+      expect(all(query)).toEqual(['Fresca Original Citrus'])
+    }
+  )
+
+  test('grapefruit seltzer leaves Fresca out', () => {
+    expect(all('grapefruit seltzer')).toEqual(['bubly Grapefruit', 'Polar Ruby Red Grapefruit'])
+  })
+
+  test('grapef lists Fresca while typing grapefruit', () => {
+    expect(all('grapef')).toContain('Fresca Original Citrus')
   })
 
   test('diet cherry ranks Coca-Cola Diet Cherry first', () => {

@@ -164,6 +164,9 @@ test.describe('Sodabench report a soda', () => {
     await expect(first).toHaveText('LaCroix Lime')
     await dialog.getByRole('combobox').fill('a and w')
     await expect(first).toHaveText('A&W Root Beer')
+    // The grapefruit alias also adds Fresca Original Citrus (not in the seed), after the literal matches.
+    await dialog.getByRole('combobox').fill('grapefruit')
+    await expect(first).toHaveText('bubly Grapefruit')
   })
 
   test('Hate is on the left and Like on the right, in DOM, visual and tab order', async ({ page }) => {

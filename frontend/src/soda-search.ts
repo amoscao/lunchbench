@@ -61,6 +61,9 @@ export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'sugar free': ZERO_OR_DIET,
   'orange': ['orange', 'tangerine', 'mandarin'],
   'cherry': ['cherry'],
+  // Fresca's flagship is grapefruit, but Walmart and the catalog call it "Original Citrus" (#301).
+  // Not "fresca …": the typed "fresca" already takes the brand word, so "fresca grapefruit" works too.
+  'grapefruit': ['original citrus'],
   'lemon lime': ['lemon lime', 'sprite original', 'sprite zero', '7up original'],
   'creme': ['cream'],
 }

@@ -11,7 +11,7 @@ import { seededRandom } from './soda-order'
 import { scoreDrinks, type DrinkStats, type SodaType } from './soda-score'
 
 function drink(id: number, overrides: Partial<DeckDrink> = {}): DeckDrink {
-  return { id, score: 0.5, type_mean: 0.5, right_swipes: 0, reporters: 0, ...overrides }
+  return { id, prior_mean: 0.5, type_mean: 0.5, right_swipes: 0, likes: 0, hates: 0, reporters: 0, ...overrides }
 }
 
 /** A fixed key strictly inside (0, 1), so tests exercise real sampling rather than the clamp. */
@@ -60,26 +60,55 @@ function shareOfFirst(drinks: DrinkStats[], pick: (d: DrinkStats) => boolean, n 
 }
 
 describe('deckWeight', () => {
-  test('is 1 for a drink at its type mean', () => {
-    expect(deckWeight(drink(1, { score: 0.4, type_mean: 0.4 }))).toBeCloseTo(1)
-    expect(deckWeight(drink(1, { score: 0.7, type_mean: 0.7, reporters: 2 }))).toBeCloseTo(1)
+  test('is 1 for an untried drink of a brand at its type mean', () => {
+    expect(deckWeight(drink(1))).toBeCloseTo(1)
+    expect(deckWeight(drink(1, { prior_mean: 0.8, type_mean: 0.8 }))).toBeCloseTo(1)
   })
 
-  test('drinks with their own evidence use odds ratio squared', () => {
-    // odds 0.75 / odds 0.6 = 3 / 1.5 = 2, squared 4.
-    expect(deckWeight(drink(1, { score: 0.75, type_mean: 0.6, reporters: 1 }))).toBeCloseTo(4)
-    expect(deckWeight(drink(1, { score: 0.6, type_mean: 0.75, right_swipes: 1 }))).toBeCloseTo(1 / 4)
+  test('brand factor: odds of the brand prior over odds of the type mean', () => {
+    // odds 0.75 / odds 0.6 = 3 / 1.5 = 2.
+    expect(deckWeight(drink(1, { prior_mean: 0.75, type_mean: 0.6 }))).toBeCloseTo(2)
+    expect(deckWeight(drink(1, { prior_mean: 0.6, type_mean: 0.75 }))).toBeCloseTo(1 / 2)
   })
 
-  test('untried drinks lean on their brand more softly: odds ratio, not squared', () => {
-    expect(deckWeight(drink(1, { score: 0.75, type_mean: 0.6 }))).toBeCloseTo(2)
-    expect(deckWeight(drink(1, { score: 0.6, type_mean: 0.75 }))).toBeCloseTo(1 / 2)
+  test('own factor: ((1 + a)/(1 + b))^2 from the drink\'s own reports', () => {
+    expect(deckWeight(drink(1, { likes: 1, reporters: 1 }))).toBeCloseTo(4)
+    expect(deckWeight(drink(1, { hates: 1, reporters: 1 }))).toBeCloseTo(1 / 4)
+    expect(deckWeight(drink(1, { likes: 1, hates: 1, reporters: 2 }))).toBeCloseTo(1)
   })
 
   test('is capped to [DECK_MIN_WEIGHT, DECK_MAX_WEIGHT]', () => {
-    expect(deckWeight(drink(1, { score: 0.99, type_mean: 0.5, reporters: 5 }))).toBe(DECK_MAX_WEIGHT)
-    expect(deckWeight(drink(1, { score: 0.01, type_mean: 0.5, reporters: 5 }))).toBe(DECK_MIN_WEIGHT)
-    expect(deckWeight(drink(1, { score: 1, type_mean: 0 }))).toBe(DECK_MAX_WEIGHT)
+    expect(deckWeight(drink(1, { likes: 9, reporters: 9 }))).toBe(DECK_MAX_WEIGHT)
+    expect(deckWeight(drink(1, { hates: 9, reporters: 9 }))).toBe(DECK_MIN_WEIGHT)
+    expect(deckWeight(drink(1, { prior_mean: 1, type_mean: 0 }))).toBe(DECK_MAX_WEIGHT)
+  })
+
+  test.each([
+    ['an office that mostly reports likes (type mean > 0.75)', 'Zevia', (d: DrinkStats[]) => withReports(withReports(d, 'Coca-Cola', 8, 2, 0), 'Great Value', 4, 2, 0)],
+    ['a loved brand', 'poppi', (d: DrinkStats[]) => withReports(d, 'poppi', 4, 2, 0)],
+    ['a hated brand', 'Pepsi', (d: DrinkStats[]) => withReports(d, 'Pepsi', 3, 0, 1)],
+  ])('never falls as right swipes grow, in %s', (_, brand, setup) => {
+    const base = setup(catalog())
+    const target = base.find((d) => d.brand === brand && d.reporters === 0)!
+    let previous = 0
+    for (const right of [0, 1, 2, 5, 10, 15, 30]) {
+      const drinks = base.map((d) => (d.id === target.id ? { ...d, right_swipes: right } : d))
+      const weight = deckWeight(scoreDrinks(drinks).find((d) => d.id === target.id)!)
+      expect(weight, `${right} right swipes`).toBeGreaterThanOrEqual(previous - 1e-12)
+      previous = weight
+    }
+    expect(previous).toBeGreaterThan(deckWeight(scoreDrinks(base).find((d) => d.id === target.id)!))
+  })
+
+  test('a like raises and a hate lowers the weight, wherever the type mean sits', () => {
+    const office = withReports(withReports(catalog(), 'Coca-Cola', 8, 2, 0), 'Great Value', 4, 2, 0)
+    const target = office.find((d) => d.brand === 'Zevia')!
+    const weightWith = (likes: number, hates: number) => {
+      const drinks = office.map((d) => (d.id === target.id ? { ...d, likes, hates, reporters: likes + hates } : d))
+      return deckWeight(scoreDrinks(drinks).find((d) => d.id === target.id)!)
+    }
+    expect(weightWith(1, 0)).toBeGreaterThan(weightWith(0, 0))
+    expect(weightWith(0, 1)).toBeLessThan(weightWith(0, 0))
   })
 })
 
@@ -90,7 +119,7 @@ describe('buildFeed', () => {
   })
 
   test('never includes a drink this voter already swiped', () => {
-    const drinks = Array.from({ length: 30 }, (_, i) => drink(i + 1, { score: (i + 1) / 31, reporters: 1 }))
+    const drinks = Array.from({ length: 30 }, (_, i) => drink(i + 1, { right_swipes: i }))
     const swiped = new Set([1, 2, 3, 10, 20, 30])
     const feed = buildFeed(drinks, swiped, fixedKey)
     expect(feed).toHaveLength(24)

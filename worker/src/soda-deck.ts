@@ -1,17 +1,11 @@
-import { hasOwnEvidence } from './soda-score'
+import { ownEvidence } from './soda-score'
 
 /**
- * How hard the feed leans toward drinks people like, for drinks with their own evidence (a right
- * swipe or a report). Their weight is (odds(θ) / odds(m_type))^2: a liked drink is weighted well
- * above its category, a disliked one well below.
+ * How hard a drink's own evidence moves its feed weight: the own factor is ((1 + a)/(1 + b))^2,
+ * with (a, b) its own like and hate pseudo-counts (reports, plus right swipes as weak likes).
+ * It is 1 with no evidence, rises with every like or right swipe and falls with every hate.
  */
 export const DECK_BIAS_POWER = 2
-/**
- * Untried drinks lean on their brand only (θ is the brand prior), and more softly: power 1. So an
- * untried flavor of a loved brand comes early, but not as early as drinks people actually liked,
- * and an untried flavor of a hated brand comes late without being buried.
- */
-export const DECK_PRIOR_POWER = 1
 /**
  * Weights are capped to this range. The extremes are 128x apart: a hated drink is rare near the
  * top of a feed but still turns up for some voters, so it can still collect right swipes.
@@ -21,11 +15,13 @@ export const DECK_MAX_WEIGHT = 16
 
 export type DeckDrink = {
   id: number
-  /** Posterior mean θ from `scoreDrinks` (brand prior included; left swipes do not count). */
-  score: number
+  /** m_B(−i) from `scoreDrinks`: the drink's brand prior mean, leaving the drink itself out. */
+  prior_mean: number
   /** m_type from `scoreDrinks`: the shrunk mean of every drink of this drink's type. */
   type_mean: number
   right_swipes: number
+  likes: number
+  hates: number
   reporters: number
 }
 
@@ -35,14 +31,21 @@ function odds(p: number): number {
 }
 
 /**
- * Sampling weight: θ's odds relative to its type mean's odds, so a drink is compared with its own
- * category. Reports on one brand move the type mean and that brand together, so they do not
- * reshuffle every other brand of the type. 1 for a drink exactly at its type mean.
+ * Sampling weight = brand factor × own factor, capped to [DECK_MIN_WEIGHT, DECK_MAX_WEIGHT].
+ *
+ * - Brand factor: odds(m_B(−i)) / odds(m_type). A drink is compared with its own category, so
+ *   reports on one brand do not reshuffle every other brand or the other type. 1 for a brand with
+ *   no data. An untried flavor of a loved brand comes early; one of a hated brand comes late.
+ * - Own factor: ((1 + a)/(1 + b))^DECK_BIAS_POWER from the drink's own evidence (`ownEvidence`).
+ *   Raw counts, not the posterior: the posterior pulls toward the swipe mean (0.75), so in an
+ *   office that mostly reports likes, right swipes would lower θ and push a drink later. Raw
+ *   counts make every right swipe and like raise the weight and every hate lower it.
  */
 export function deckWeight(drink: DeckDrink): number {
-  const power = hasOwnEvidence(drink) ? DECK_BIAS_POWER : DECK_PRIOR_POWER
-  const weight = (odds(drink.score) / odds(drink.type_mean)) ** power
-  return Math.min(DECK_MAX_WEIGHT, Math.max(DECK_MIN_WEIGHT, weight))
+  const brand = odds(drink.prior_mean) / odds(drink.type_mean)
+  const { a, b } = ownEvidence(drink)
+  const own = ((1 + a) / (1 + b)) ** DECK_BIAS_POWER
+  return Math.min(DECK_MAX_WEIGHT, Math.max(DECK_MIN_WEIGHT, brand * own))
 }
 
 /**

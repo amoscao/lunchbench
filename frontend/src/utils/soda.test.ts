@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { formatWeekOf, newDrinkText, orderTag, sodaTypeLabel, swipeDirection } from './soda'
+import { formatWeekOf, newDrinkText, orderTag, sodaTypeLabel } from './soda'
 
 describe('soda display helpers', () => {
   test('labels types', () => {
@@ -18,12 +18,5 @@ describe('soda display helpers', () => {
   test('formats the week start without a zone shift', () => {
     // vitest runs with TZ=America/New_York, where a UTC-midnight parse would show Nov 15.
     expect(formatWeekOf('2026-11-16')).toBe('Week of Nov 16')
-  })
-
-  test('maps drag distance to a swipe direction', () => {
-    expect(swipeDirection(120)).toBe('right')
-    expect(swipeDirection(-120)).toBe('left')
-    expect(swipeDirection(40)).toBeNull()
-    expect(swipeDirection(-40)).toBeNull()
   })
 })

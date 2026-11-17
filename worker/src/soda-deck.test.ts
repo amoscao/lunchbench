@@ -1,17 +1,17 @@
 import { describe, expect, test } from 'vitest'
-import { buildDeck, DECK_SIZE, deckEvidence, type DeckDrink } from './soda-deck'
+import { buildFeed, deckEvidence, sessionTieKey, type DeckDrink } from './soda-deck'
+import { seededRandom } from './soda-order'
 
 function drink(id: number, overrides: Partial<DeckDrink> = {}): DeckDrink {
   return { id, right_swipes: 0, left_swipes: 0, reporters: 0, ...overrides }
 }
 
-const rng = () => 0.42
+const byId = (id: number) => id
 
-describe('buildDeck', () => {
-  test('caps the deck at 20 cards', () => {
-    const drinks = Array.from({ length: 50 }, (_, i) => drink(i + 1))
-    expect(DECK_SIZE).toBe(20)
-    expect(buildDeck(drinks, new Map(), DECK_SIZE, rng)).toHaveLength(20)
+describe('buildFeed', () => {
+  test('returns every unswiped drink, with no deck size cap', () => {
+    const drinks = Array.from({ length: 124 }, (_, i) => drink(i + 1))
+    expect(buildFeed(drinks, new Set(), byId)).toHaveLength(124)
   })
 
   test('puts the least-evidence drinks first', () => {
@@ -21,42 +21,61 @@ describe('buildDeck', () => {
       drink(3),
       drink(4, { left_swipes: 2 }),
     ]
-    expect(buildDeck(drinks, new Map(), DECK_SIZE, rng).map((d) => d.id)).toEqual([3, 4, 2, 1])
+    expect(buildFeed(drinks, new Set(), byId).map((d) => d.id)).toEqual([3, 4, 2, 1])
   })
 
   test('counts a report as five swipes of evidence', () => {
     expect(deckEvidence(drink(1, { right_swipes: 2, left_swipes: 1, reporters: 2 }))).toBe(13)
   })
 
-  test('never repeats a swiped drink while unswiped drinks remain', () => {
+  test('never includes a drink this voter already swiped', () => {
     const drinks = Array.from({ length: 30 }, (_, i) => drink(i + 1, { right_swipes: i }))
-    const swiped = new Map(Array.from({ length: 15 }, (_, i) => [i + 1, '2026-11-16 12:00:00'] as [number, string]))
-    const deck = buildDeck(drinks, swiped, DECK_SIZE, rng)
-    expect(deck.slice(0, 15).every((d) => !swiped.has(d.id))).toBe(true)
-    expect(deck.slice(15).every((d) => swiped.has(d.id))).toBe(true)
+    const swiped = new Set([1, 2, 3, 10, 20, 30])
+    const feed = buildFeed(drinks, swiped, byId)
+    expect(feed).toHaveLength(24)
+    expect(feed.some((d) => swiped.has(d.id))).toBe(false)
   })
 
-  test('repeats oldest swipes first once the unswiped pool is exhausted', () => {
-    const drinks = [drink(1), drink(2), drink(3)]
-    const swiped = new Map<number, string>([
-      [1, '2026-11-16 12:00:03'],
-      [2, '2026-11-16 12:00:01'],
-      [3, '2026-11-16 12:00:02'],
-    ])
-    expect(buildDeck(drinks, swiped, DECK_SIZE, rng).map((d) => d.id)).toEqual([2, 3, 1])
+  test('is empty once every drink is swiped (no wraparound)', () => {
+    expect(buildFeed([drink(1), drink(2)], new Set([1, 2]), byId)).toEqual([])
   })
 
-  test('shuffles drinks with equal evidence', () => {
-    const drinks = Array.from({ length: 10 }, (_, i) => drink(i + 1))
-    const orders = new Set<string>()
-    let seed = 1
-    const lcg = () => {
-      seed = (seed * 48271) % 2147483647
-      return seed / 2147483647
+  test('ties follow a per-session key that does not depend on input order', () => {
+    const drinks = Array.from({ length: 12 }, (_, i) => drink(i + 1))
+    const a = buildFeed(drinks, new Set(), sessionTieKey('session-a', seededRandom)).map((d) => d.id)
+    const reversed = buildFeed([...drinks].reverse(), new Set(), sessionTieKey('session-a', seededRandom)).map((d) => d.id)
+    const other = buildFeed(drinks, new Set(), sessionTieKey('session-b', seededRandom)).map((d) => d.id)
+    expect(reversed).toEqual(a)
+    expect(other).not.toEqual(a)
+  })
+
+  test('the remaining drinks keep their relative order after swipes', () => {
+    const drinks = Array.from({ length: 20 }, (_, i) => drink(i + 1))
+    const key = sessionTieKey('session-a', seededRandom)
+    const before = buildFeed(drinks, new Set(), key).map((d) => d.id)
+    const swiped = new Set([before[0], before[3], before[7], before[12]])
+    const after = buildFeed(drinks, swiped, key).map((d) => d.id)
+    expect(after).toEqual(before.filter((id) => !swiped.has(id)))
+  })
+
+  test('tied drinks are spread evenly across voters (no drink is everyone\'s first)', () => {
+    const drinks = Array.from({ length: 124 }, (_, i) => drink(i + 1))
+    const sessions = 5000
+    const rng = seededRandom('uuid-generator')
+    const hex = (n: number) => Array.from({ length: n }, () => Math.floor(rng() * 16).toString(16)).join('')
+    const firstCount = new Map<number, number>()
+    const topFiveCount = new Map<number, number>()
+    for (let i = 0; i < sessions; i++) {
+      const session = `${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}`
+      const feed = buildFeed(drinks, new Set(), sessionTieKey(session, seededRandom))
+      firstCount.set(feed[0].id, (firstCount.get(feed[0].id) ?? 0) + 1)
+      for (const d of feed.slice(0, 5)) topFiveCount.set(d.id, (topFiveCount.get(d.id) ?? 0) + 1)
     }
-    for (let i = 0; i < 5; i++) {
-      orders.add(buildDeck(drinks, new Map(), DECK_SIZE, lcg).map((d) => d.id).join(','))
+    const uniformFirst = sessions / drinks.length
+    const uniformTopFive = (sessions * 5) / drinks.length
+    for (const d of drinks) {
+      expect(firstCount.get(d.id) ?? 0, `first ${d.id}`).toBeLessThanOrEqual(2 * uniformFirst)
+      expect(topFiveCount.get(d.id) ?? 0, `top five ${d.id}`).toBeGreaterThanOrEqual(0.5 * uniformTopFive)
     }
-    expect(orders.size).toBeGreaterThan(1)
   })
 })

@@ -29,7 +29,7 @@ Cloudflare cron trigger (Monday 12:00 UTC)
 
 Sodabench ranks canned sodas and seltzers. It shares the Worker, D1 database, and R2 bucket with the lunch app.
 
-- `/soda`: voters swipe a 20-card deck (right = like, left = not a like) and report drinks they had (like or hate).
+- `/soda`: voters swipe one continuous feed of every drink they have not swiped yet (right = like, left = not a like) and report drinks they had (like or hate).
 - `/leaderboard/soda`: public ranking. `/leaderboard` keeps the lunch ranking; tabs switch between them.
 - `/chris`: purchaser page behind `PURCHASER_PASSWORD`. Shows the lunch PDF export and this week's order list.
 

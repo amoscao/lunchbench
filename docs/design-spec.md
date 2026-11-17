@@ -387,20 +387,51 @@ Mockups live outside the repo; this section is the source of truth.
 ### Swipe deck (`/soda`)
 - Max content width 640px.
 - Header row: page heading "SodaArena" left, primary button "+ Report a soda" right.
-- Progress row: 6px pill track (`--border`) with `--accent` fill, then `n / total` in `--text-sm`, tabular numbers. A session is 20 cards (fewer if the catalog is smaller).
-- Card: 380px max, `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px tall on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700).
-- Two decorative cards sit behind the current card, rotated -3° and 2°.
-- Swipe: pointer drag translates and rotates the card (dx/20 deg). Past 96px on release it flies out; otherwise it snaps back. A "LIKE" stamp fades in while dragging right.
-- Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with `--border-accent`, arrow ←, `aria-label="Swipe left"`. Right: `--accent` fill, arrow →, `aria-label="Swipe right"`.
+- One continuous feed. There are no decks, no progress counter and no "Start over". It shows the next drink until the voter has swiped every active drink.
+- Card: 380px max, 440px tall (380px under 640px wide), `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px (260px) on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700, two lines max).
+- Card stack (`frontend/src/components/swipe-stack.ts`): the top card plus two real cards underneath, fully rendered. Each card's `<img>` is created and decoded ahead of time, and images for the next four drinks are decoded beyond that. When the top card leaves, the next card is promoted in place (same element, no re-render) and a new card is appended at the bottom.
+- Swipe physics (`frontend/src/utils/swipe-physics.ts`): pointer events, `requestAnimationFrame` and CSS transforms only.
+  - **Drag:** the card follows the pointer 1:1 in x and y. Rotation is 0.07°/px, capped at ±20°, and the sign flips when the card is grabbed in its bottom half.
+  - **Commit:** |dx| > 35% of the card width, or a flick faster than 0.5 px/ms (measured over the last 100 ms) in the same direction.
+  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning until its rotated box is fully off-screen. Duration is distance / speed, clamped to 100-600 ms. The rest position is taken from the box center, which rotation does not move.
+  - **Snap back:** a damped spring with a slight overshoot.
+  - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
+  - **Stamps:** LIKE (`--accent`, top left) and NOPE (`--hate`, top right) fade in and tilt with |dx|.
+  - **Input:** the flying card ignores input; the promoted card can be dragged at once, so rapid swipes work. Holding an arrow key counts once (auto-repeat is ignored). A lost pointer capture, or a mouse move with no button held, ends the drag with a snap back. Swipe requests are fire-and-forget, retried once, with a "Swipe not saved" alert on a second failure.
+  - **Screen readers:**
+    - each card is named "Brand Flavor";
+    - a visually hidden polite live region announces the new top drink;
+    - the end state is `role="status"`;
+    - when the feed empties, focus moves to its title instead of falling to the page body.
+  - **Touch:** `touch-action: pan-y` keeps vertical page scroll on phones; pointer capture holds the drag.
+  - While on `/soda`, `body` gets `overflow-x: clip` so flung cards never flash a horizontal scrollbar.
+- Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with `--border-accent`, arrow ←, `aria-label="Swipe left"`. Right: `--accent` fill, arrow →, `aria-label="Swipe right"`. Buttons and arrow keys trigger the same fling with a default velocity and a slight upward arc.
 - Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal is open or a text field has focus.
-- Done: a card with "Deck done" and a secondary "Start over" button, which deals a new deck.
-- `prefers-reduced-motion`: no fly-out or snap animation.
+- End: after the last drink, a card titled "You've rated everything" ("No drinks yet" if the catalog itself is empty). No subtitle. "Report a soda" stays available.
+- `prefers-reduced-motion`: the card fades out in 120 ms. There is no fling, no spring, and no scaling: the cards underneath neither scale with the drag nor animate when promoted.
 
 ### Report modal
 - Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).
 - Title "Report a soda", close button (×, 44px).
-- Text field with autocomplete over the full catalog (`fuzzyFilter`), up to 6 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
-- Two 52px buttons: **Like** (primary) and **Hate** (`--hate` outline). Disabled until a suggestion is picked; editing the text disables them again.
+- Text field with autocomplete over the full catalog, up to 8 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
+- Search (`frontend/src/soda-search.ts`, local, no request per keystroke):
+  - Normalization ignores case, punctuation, apostrophes, accents and the spaces in brand names: "dr pepper" = "Dr. Pepper", "la croix" = "LaCroix", "a and w" / "aw" = "A&W", "barqs" = "Barq's".
+  - Every typed word must match the brand, flavor or combined name, in any order. Each typed word needs its own catalog word, so "coka cola" cannot match "Zevia Cola" twice.
+  - Words match exactly, by prefix while typing ("str lem"), or inside a longer word for 4+ letters ("berry" finds Raspberry).
+  - The type word ("soda"/"seltzer") also matches, but ranks below brand and flavor matches. The seltzer and soda aliases cover searching by type.
+  - Typos are forgiven per word: 1 edit (Damerau-Levenshtein) for 4-7 letters, 2 for 8+. Only words no catalog word contains get typo matching, so "diet" never drags in "dirty". A typo against the start of a longer word needs 5+ letters and the same first letter, so "mint" does not match "Vintage".
+  - Nicknames live in one exported map, `SODA_ALIASES` ("coke", "dp", "gv", "walmart brand", "sparkling water", "zero", "max", "creme", …). An alias can widen to several brands or flavors and combines with the other words in either order ("diet coke" = "coke diet"). Expansions match exactly or by prefix only. While the last word is still being typed, alias keys that continue it count too, including longer keys ("cok", "doct" → doctor pepper, "fizzy" → fizzy water, "doctor p").
+  - Ranking, in order:
+    1. type-word-only matches last;
+    2. fewer typos;
+    3. smaller total edit distance;
+    4. more words matched as typed;
+    5. better match quality (exact, then prefix, then inside a word);
+    6. the first-listed alias expansion ("gv" lists Great Value before Sam's Choice and bettergoods);
+    7. shorter names, not counting "Original"/"Pure", so a brand query ("coke", "polar") lists the flagship first;
+    8. catalog order.
+  - Only the first 8 words of a query count, which keeps every keystroke instant.
+- Two 52px buttons: **Hate** (`--hate` outline) on the left and **Like** (primary) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
 - Submitting closes the modal. Nothing else is shown.
 - Scan mode (`frontend/src/components/barcode-scanner.ts`):
   - Default only on touch-first devices (`(pointer: coarse)`). Desktop opens in manual mode.

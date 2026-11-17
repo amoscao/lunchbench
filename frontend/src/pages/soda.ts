@@ -1,20 +1,38 @@
 import { getSodaCatalog, getSodaDeck, submitSodaSwipe, type Soda } from '../api'
 import { openSodaReportModal, type ReportModal } from '../components/soda-report-modal'
+import { SwipeStack } from '../components/swipe-stack'
 import { escapeHtml } from '../utils/escape-html'
-import { swipeDirection, SWIPE_THRESHOLD_PX } from '../utils/soda'
-
-type Direction = 'right' | 'left'
-
-const FLY_OUT_MS = 220
+import type { Direction } from '../utils/swipe-physics'
 
 const ARROW_LEFT = '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>'
 const ARROW_RIGHT = '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>'
 const PLUS = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'
 
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+/** A card for one drink. The image element arrives preloaded from the stack. */
+function renderSodaCard(soda: Soda, image: HTMLImageElement | null): HTMLElement {
+  const card = document.createElement('article')
+  card.className = 'soda-card'
+  card.dataset.sodaId = String(soda.id)
+  card.setAttribute('aria-label', soda.name)
+  card.innerHTML = `
+    <div class="soda-stamp soda-stamp-like" aria-hidden="true">LIKE</div>
+    <div class="soda-stamp soda-stamp-nope" aria-hidden="true">NOPE</div>
+    <div class="soda-card-image">
+      ${image ? '' : `<span class="soda-card-initial">${escapeHtml(soda.brand.charAt(0))}</span>`}
+    </div>
+    <div class="soda-card-info">
+      <div class="soda-card-brand">${escapeHtml(soda.brand)}</div>
+      <div class="soda-card-flavor">${escapeHtml(soda.flavor)}</div>
+    </div>
+  `
+  if (image) {
+    image.alt = soda.name
+    card.querySelector('.soda-card-image')!.appendChild(image)
+  }
+  return card
 }
 
+/** SodaArena: one continuous swipe feed of every drink this voter has not swiped yet. */
 export function renderSoda(container: HTMLElement): () => void {
   const content = document.createElement('div')
   content.className = 'page-content soda-page'
@@ -23,160 +41,74 @@ export function renderSoda(container: HTMLElement): () => void {
       <h1 class="page-heading">SodaArena</h1>
       <button type="button" class="btn btn-primary soda-report-open">${PLUS}Report a soda</button>
     </div>
-    <div class="soda-progress">
-      <div class="soda-progress-track"><div class="soda-progress-fill"></div></div>
-      <span class="soda-progress-label"></span>
-    </div>
     <div class="alert alert-error soda-alert" role="alert" hidden>Swipe not saved</div>
+    <div class="visually-hidden soda-announce" aria-live="polite" aria-atomic="true"></div>
     <div class="soda-stage">
-      <div class="soda-stage-back soda-stage-back-1" aria-hidden="true"></div>
-      <div class="soda-stage-back soda-stage-back-2" aria-hidden="true"></div>
-      <div class="soda-slot"></div>
+      <div class="soda-feed"></div>
+      <div class="soda-card-skeleton skeleton"></div>
     </div>
     <div class="soda-actions">
-      <button type="button" class="soda-swipe-btn soda-swipe-left" aria-label="Swipe left">${ARROW_LEFT}</button>
-      <button type="button" class="soda-swipe-btn soda-swipe-right" aria-label="Swipe right">${ARROW_RIGHT}</button>
+      <button type="button" class="soda-swipe-btn soda-swipe-left" aria-label="Swipe left" disabled>${ARROW_LEFT}</button>
+      <button type="button" class="soda-swipe-btn soda-swipe-right" aria-label="Swipe right" disabled>${ARROW_RIGHT}</button>
     </div>
   `
   container.appendChild(content)
+  // Flung cards travel past the viewport edge; clip so no horizontal scrollbar flashes.
+  document.body.classList.add('soda-route')
 
-  const slot = content.querySelector<HTMLElement>('.soda-slot')!
-  const progressFill = content.querySelector<HTMLElement>('.soda-progress-fill')!
-  const progressLabel = content.querySelector<HTMLElement>('.soda-progress-label')!
+  const stage = content.querySelector<HTMLElement>('.soda-stage')!
+  const feed = content.querySelector<HTMLElement>('.soda-feed')!
   const leftBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-left')!
   const rightBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-right')!
   const reportBtn = content.querySelector<HTMLButtonElement>('.soda-report-open')!
   const alertEl = content.querySelector<HTMLElement>('.soda-alert')!
+  const announcer = content.querySelector<HTMLElement>('.soda-announce')!
 
-  let deck: Soda[] = []
-  let index = 0
-  let busy = true
   let destroyed = false
   let catalog: Soda[] = []
   let catalogPromise: Promise<Soda[]> | null = null
   let modal: ReportModal | null = null
-  let currentCard: HTMLElement | null = null
 
-  function loadCatalog(): Promise<Soda[]> {
-    catalogPromise ??= getSodaCatalog()
-      .then((sodas) => {
-        catalog = sodas
-        return sodas
-      })
-      .catch((error) => {
-        catalogPromise = null
-        throw error
-      })
-    return catalogPromise
-  }
-
-  function setProgress(): void {
-    const total = deck.length
-    const shown = total === 0 ? 0 : Math.min(index + 1, total)
-    progressLabel.textContent = `${shown} / ${total}`
-    progressFill.style.width = total === 0 ? '0%' : `${Math.round((Math.min(index, total) / total) * 100)}%`
-  }
-
-  function setButtons(): void {
-    const enabled = !busy && index < deck.length
+  function setButtons(enabled: boolean): void {
     leftBtn.disabled = !enabled
     rightBtn.disabled = !enabled
   }
 
-  function preload(soda: Soda | undefined): void {
-    if (!soda?.image_url) return
-    const img = new Image()
-    img.src = soda.image_url
-  }
-
-  function renderCard(soda: Soda): HTMLElement {
-    const card = document.createElement('article')
-    card.className = 'soda-card'
-    card.dataset.sodaId = String(soda.id)
-    card.innerHTML = `
-      <div class="soda-card-stamp" aria-hidden="true">LIKE</div>
-      <div class="soda-card-image">
-        ${soda.image_url
-          ? `<img src="${escapeHtml(soda.image_url)}" alt="${escapeHtml(soda.name)}" draggable="false" />`
-          : `<span class="soda-card-initial">${escapeHtml(soda.brand.charAt(0))}</span>`}
-      </div>
-      <div class="soda-card-info">
-        <div class="soda-card-brand">${escapeHtml(soda.brand)}</div>
-        <div class="soda-card-flavor">${escapeHtml(soda.flavor)}</div>
-      </div>
-    `
-    attachDrag(card)
-    return card
-  }
-
-  function renderDone(): HTMLElement {
-    const done = document.createElement('div')
-    done.className = 'soda-card soda-card-done'
-    done.innerHTML = '<div class="soda-done-title">Deck done</div>'
-    const restart = document.createElement('button')
-    restart.type = 'button'
-    restart.className = 'btn btn-secondary soda-restart'
-    restart.textContent = 'Start over'
-    restart.addEventListener('click', () => void loadDeck())
-    done.appendChild(restart)
-    return done
-  }
-
-  function renderState(icon: string, title: string, retry?: () => void): void {
-    currentCard = null
-    slot.innerHTML = `
-      <div class="soda-card soda-card-done">
-        <div class="state-icon">${icon}</div>
-        <div class="soda-done-title">${escapeHtml(title)}</div>
-      </div>
-    `
+  function showState(title: string, icon?: string, retry?: () => void): HTMLElement {
+    stage.querySelector('.soda-end')?.remove()
+    const state = document.createElement('div')
+    state.className = 'soda-end'
+    state.setAttribute('role', 'status')
+    state.innerHTML = `${icon ? `<div class="state-icon">${icon}</div>` : ''}<div class="soda-end-title" tabindex="-1">${escapeHtml(title)}</div>`
     if (retry) {
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'btn btn-secondary'
       btn.textContent = 'Retry'
       btn.addEventListener('click', retry)
-      slot.firstElementChild?.appendChild(btn)
+      state.appendChild(btn)
     }
+    stage.appendChild(state)
+    return state
   }
 
-  function show(): void {
-    setProgress()
-    slot.innerHTML = ''
-    if (index >= deck.length) {
-      currentCard = null
-      slot.appendChild(renderDone())
-    } else {
-      currentCard = renderCard(deck[index])
-      slot.appendChild(currentCard)
-      preload(deck[index + 1])
-    }
-    setButtons()
-  }
-
-  async function loadDeck(): Promise<void> {
-    busy = true
-    setButtons()
-    slot.innerHTML = '<div class="skeleton soda-card-skeleton"></div>'
+  /** End of the feed. An empty catalog says so instead of claiming everything is rated. */
+  async function showEnd(): Promise<void> {
+    const focusWasHere = content.contains(document.activeElement) || document.activeElement === document.body
+    setButtons(false)
+    let catalogEmpty = false
     try {
-      const next = await getSodaDeck()
-      if (destroyed) return
-      deck = next
-      index = 0
-      busy = false
-      if (deck.length === 0) {
-        setProgress()
-        renderState('🥤', 'No drinks yet')
-        setButtons()
-        return
-      }
-      show()
+      catalogEmpty = (await loadCatalog()).length === 0
     } catch {
-      if (destroyed) return
-      busy = false
-      renderState('⚠', 'Something went wrong', () => void loadDeck())
-      setButtons()
+      // Unknown: assume the voter rated everything.
     }
+    if (destroyed) return
+    const title = catalogEmpty ? 'No drinks yet' : "You've rated everything"
+    // Announced even when focus is elsewhere (the status card is also role="status").
+    announcer.textContent = title
+    const state = showState(title)
+    // The swipe buttons just got disabled; keep focus on the page instead of letting it fall to body.
+    if (focusWasHere) state.querySelector<HTMLElement>('.soda-end-title')?.focus()
   }
 
   // Retries once. A final failure shows the error alert; the next saved swipe clears it.
@@ -193,84 +125,66 @@ export function renderSoda(container: HTMLElement): () => void {
     if (!destroyed) alertEl.hidden = false
   }
 
-  function swipe(direction: Direction): void {
-    const card = currentCard
-    if (busy || !card || index >= deck.length) return
-    busy = true
-    setButtons()
-    void recordSwipe(deck[index].id, direction)
+  const stack = new SwipeStack<Soda>({
+    container: feed,
+    imageUrl: (soda) => soda.image_url,
+    renderCard: renderSodaCard,
+    onSwipe: (soda, direction) => void recordSwipe(soda.id, direction),
+    onEmpty: () => void showEnd(),
+    onTop: (soda) => {
+      announcer.textContent = soda.name
+    },
+  })
 
-    const advance = (): void => {
+  async function loadFeed(): Promise<void> {
+    stage.querySelector('.soda-end')?.remove()
+    try {
+      const sodas = await getSodaDeck()
       if (destroyed) return
-      index += 1
-      busy = false
-      show()
+      stage.querySelector('.soda-card-skeleton')?.remove()
+      setButtons(sodas.length > 0)
+      stack.setItems(sodas)
+    } catch {
+      if (destroyed) return
+      stage.querySelector('.soda-card-skeleton')?.remove()
+      showState('Something went wrong', '⚠', () => void loadFeed())
     }
-    if (prefersReducedMotion()) {
-      advance()
-      return
-    }
-    card.classList.remove('dragging')
-    card.classList.add('flying')
-    const sign = direction === 'right' ? 1 : -1
-    card.style.transform = `translateX(${sign * 140}%) rotate(${sign * 18}deg)`
-    card.style.opacity = '0'
-    window.setTimeout(advance, FLY_OUT_MS)
   }
 
-  function attachDrag(card: HTMLElement): void {
-    const stamp = card.querySelector<HTMLElement>('.soda-card-stamp')!
-    let pointerId: number | null = null
-    let startX = 0
-    let dx = 0
-
-    card.addEventListener('pointerdown', (event) => {
-      if (busy || pointerId !== null || event.button !== 0) return
-      pointerId = event.pointerId
-      startX = event.clientX
-      dx = 0
-      card.setPointerCapture(event.pointerId)
-      card.classList.add('dragging')
-    })
-    card.addEventListener('pointermove', (event) => {
-      if (event.pointerId !== pointerId) return
-      dx = event.clientX - startX
-      card.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`
-      stamp.style.opacity = String(Math.max(0, Math.min(1, dx / SWIPE_THRESHOLD_PX)))
-    })
-    const release = (event: PointerEvent): void => {
-      if (event.pointerId !== pointerId) return
-      pointerId = null
-      if (card.hasPointerCapture(event.pointerId)) card.releasePointerCapture(event.pointerId)
-      const direction = event.type === 'pointerup' ? swipeDirection(dx) : null
-      if (direction) {
-        swipe(direction)
-        return
-      }
-      card.classList.remove('dragging')
-      card.style.transform = ''
-      stamp.style.opacity = ''
-    }
-    card.addEventListener('pointerup', release)
-    card.addEventListener('pointercancel', release)
+  function loadCatalog(): Promise<Soda[]> {
+    catalogPromise ??= getSodaCatalog()
+      .then((sodas) => {
+        catalog = sodas
+        return sodas
+      })
+      .catch((error) => {
+        catalogPromise = null
+        throw error
+      })
+    return catalogPromise
   }
 
   // Scoped to this page: added on render, removed by the router cleanup.
   function onKeydown(event: KeyboardEvent): void {
     if (modal || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+    // Holding an arrow key auto-repeats; one press is one vote.
+    if (event.repeat && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+      event.preventDefault()
+      return
+    }
     const active = document.activeElement
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
     if (event.key === 'ArrowRight') {
       event.preventDefault()
-      swipe('right')
+      stack.swipe('right')
     } else if (event.key === 'ArrowLeft') {
       event.preventDefault()
-      swipe('left')
+      stack.swipe('left')
     }
   }
 
-  leftBtn.addEventListener('click', () => swipe('left'))
-  rightBtn.addEventListener('click', () => swipe('right'))
+  leftBtn.addEventListener('click', () => stack.swipe('left'))
+  rightBtn.addEventListener('click', () => stack.swipe('right'))
   // A flag, not `disabled`: disabling the focused button would drop focus before the modal records its opener.
   let opening = false
   reportBtn.addEventListener('click', async () => {
@@ -290,11 +204,13 @@ export function renderSoda(container: HTMLElement): () => void {
   })
   document.addEventListener('keydown', onKeydown)
 
-  void loadDeck()
+  void loadFeed()
   void loadCatalog().catch(() => undefined)
 
   return () => {
     destroyed = true
+    document.body.classList.remove('soda-route')
+    stack.destroy()
     document.removeEventListener('keydown', onKeydown)
     modal?.close()
   }

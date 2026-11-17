@@ -99,16 +99,22 @@ test.describe('Sodabench report a soda', () => {
     expect(reports).toBe(0)
   })
 
-  test('arrow keys in the report field do not swipe the deck', async ({ page }) => {
+  test('arrow keys in the report field do not swipe the feed', async ({ page }) => {
+    let swipes = 0
+    page.on('request', (request) => {
+      if (request.url().includes('/api/soda/swipes')) swipes += 1
+    })
     await page.goto('/soda')
-    const label = page.locator('.soda-progress-label')
-    await expect(label).toHaveText(/^1 \//)
+    const top = page.locator('.soda-card[data-depth="0"]')
+    await expect(top).toBeVisible()
+    const id = await top.getAttribute('data-soda-id')
     const dialog = await openReport(page)
     await dialog.getByRole('combobox').fill('lime')
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowLeft')
     await page.keyboard.press('Escape')
-    await expect(label).toHaveText(/^1 \//)
+    await expect(top).toHaveAttribute('data-soda-id', id!)
+    expect(swipes).toBe(0)
   })
 
   test('Tab stays inside the dialog and Escape closes it from any control', async ({ page }) => {
@@ -129,5 +135,51 @@ test.describe('Sodabench report a soda', () => {
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
     await expect(page.getByRole('button', { name: 'Report a soda' })).toBeFocused()
+  })
+
+  test('a misspelled search still finds and reports the drink', async ({ page }) => {
+    const id = await sodaIdByName('Sprite Original')
+    const before = await getSodaRow(id)
+
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    await dialog.getByRole('combobox').fill('spirte')
+    const suggestion = dialog.locator('.soda-suggest-item').first()
+    await expect(suggestion).toHaveText('Sprite Original')
+    await suggestion.click()
+    await dialog.getByRole('button', { name: 'Like' }).click()
+
+    await expect(dialog).toBeHidden()
+    await expect.poll(async () => (await getSodaRow(id)).likes).toBe(before.likes + 1)
+  })
+
+  test('nicknames and spacing variants find the drink', async ({ page }) => {
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    const first = dialog.locator('.soda-suggest-item').first()
+
+    await dialog.getByRole('combobox').fill('dp')
+    await expect(first).toHaveText('Dr Pepper Original')
+    await dialog.getByRole('combobox').fill('la croix lime')
+    await expect(first).toHaveText('LaCroix Lime')
+    await dialog.getByRole('combobox').fill('a and w')
+    await expect(first).toHaveText('A&W Root Beer')
+  })
+
+  test('Hate is on the left and Like on the right, in DOM, visual and tab order', async ({ page }) => {
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    await pick(page, 'sprite', 'Sprite Original')
+    const hate = dialog.getByRole('button', { name: 'Hate' })
+    const like = dialog.getByRole('button', { name: 'Like' })
+
+    const hateBox = (await hate.boundingBox())!
+    const likeBox = (await like.boundingBox())!
+    expect(hateBox.x).toBeLessThan(likeBox.x)
+    expect(await dialog.locator('.soda-report-actions button').allTextContents()).toEqual(['Hate', 'Like'])
+
+    await hate.focus()
+    await page.keyboard.press('Tab')
+    await expect(like).toBeFocused()
   })
 })

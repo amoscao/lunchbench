@@ -1,5 +1,4 @@
-export const DECK_SIZE = 20
-/** One report counts as much evidence as this many swipes when ordering the deck. */
+/** One report counts as much evidence as this many swipes when ordering the feed. */
 export const DECK_REPORT_WEIGHT = 5
 
 export type DeckDrink = {
@@ -14,32 +13,29 @@ export function deckEvidence(drink: DeckDrink): number {
   return drink.right_swipes + drink.left_swipes + DECK_REPORT_WEIGHT * drink.reporters
 }
 
-function shuffle<T>(items: T[], rng: () => number): T[] {
-  const out = [...items]
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[out[i], out[j]] = [out[j], out[i]]
-  }
-  return out
+/**
+ * A voter's swipe feed: every drink this voter has not swiped, least evidence first.
+ * Ties are ordered by a per-drink key (`tieKey(id)`), not by shuffling the remaining list, so a
+ * drink's place relative to the others never changes as the voter swipes or reloads.
+ * Swiped drinks never come back. The feed is one continuous list; there are no fixed-size decks.
+ */
+export function buildFeed<T extends DeckDrink>(
+  drinks: T[],
+  swipedIds: ReadonlySet<number>,
+  tieKey: (id: number) => number
+): T[] {
+  return drinks
+    .filter((drink) => !swipedIds.has(drink.id))
+    .map((drink) => ({ drink, evidence: deckEvidence(drink), tie: tieKey(drink.id) }))
+    .sort((a, b) => a.evidence - b.evidence || a.tie - b.tie || a.drink.id - b.drink.id)
+    .map((entry) => entry.drink)
 }
 
 /**
- * Orders a voter's deck.
- * Drinks this voter has not swiped come first, least evidence first; ties are shuffled.
- * Swiped drinks only follow once the unswiped pool is used up, oldest swipe first.
+ * Tie key stable per voter and drink. The seed "<session>:<id>" is hashed and then run through a
+ * PRNG finalizer (`seeded(text)()`), because a raw string hash mixes the trailing id digits poorly
+ * and would start most voters on the same few drinks.
  */
-export function buildDeck<T extends DeckDrink>(
-  drinks: T[],
-  voterSwipedAt: Map<number, string>,
-  size = DECK_SIZE,
-  rng: () => number = Math.random
-): T[] {
-  const unswiped = shuffle(drinks.filter((drink) => !voterSwipedAt.has(drink.id)), rng)
-    .sort((a, b) => deckEvidence(a) - deckEvidence(b))
-  const swiped = drinks
-    .filter((drink) => voterSwipedAt.has(drink.id))
-    .sort((a, b) =>
-      (voterSwipedAt.get(a.id) ?? '').localeCompare(voterSwipedAt.get(b.id) ?? '') || a.id - b.id
-    )
-  return [...unswiped, ...swiped].slice(0, size)
+export function sessionTieKey(sessionKey: string, seeded: (text: string) => () => number): (id: number) => number {
+  return (id) => seeded(`${sessionKey}:${id}`)()
 }

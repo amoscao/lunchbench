@@ -22,12 +22,3 @@ export function formatWeekOf(weekStart: string): string {
   const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
   return `Week of ${label}`
 }
-
-/** Drag distance, in px, past which a released card counts as a swipe. */
-export const SWIPE_THRESHOLD_PX = 96
-
-export function swipeDirection(dx: number, threshold = SWIPE_THRESHOLD_PX): 'right' | 'left' | null {
-  if (dx >= threshold) return 'right'
-  if (dx <= -threshold) return 'left'
-  return null
-}

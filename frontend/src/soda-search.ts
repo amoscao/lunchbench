@@ -12,6 +12,7 @@ const WALMART_BRANDS = ['great value', 'sams choice', 'bettergoods']
 const ZERO_OR_DIET = ['zero', 'diet']
 const SELTZERS = ['seltzer']
 const SODAS = ['soda']
+const GRAPEFRUIT = ['original citrus', 'pamplemousse']
 
 /**
  * Nicknames. Key: a normalized query phrase. Value: alternatives; a drink matches the alias when
@@ -61,6 +62,12 @@ export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'sugar free': ZERO_OR_DIET,
   'orange': ['orange', 'tangerine', 'mandarin'],
   'cherry': ['cherry'],
+  // Grapefruit drinks without "grapefruit" in the name (#301): Fresca's flagship, which Walmart and the
+  // catalog call "Original Citrus", and LaCroix Pamplemousse (French for grapefruit). No "fresca grapefruit"
+  // key is needed: "fresca" matches the brand and "grapefruit" the flavor through this alias.
+  'grapefruit': GRAPEFRUIT,
+  // The plural lists "grapefruit" too, so the Grapefruit drinks match exactly instead of by typo.
+  'grapefruits': ['grapefruit', ...GRAPEFRUIT],
   'lemon lime': ['lemon lime', 'sprite original', 'sprite zero', '7up original'],
   'creme': ['cream'],
 }

@@ -13,18 +13,23 @@ export const SWIPE = {
   flickVelocity: 0.5,
   /** Release velocity is measured over the last this-many ms of moves. */
   velocityWindowMs: 100,
+  /** A flung card ends this many card widths from rest, and at least this far past its release point. */
+  flingTravelWidths: 1,
+  flingMinExtraWidths: 0.4,
+  /** The flung card fades out over the last part of the fling: opacity starts dropping at this share. */
+  flingFadeStart: 0.35,
   /** Fling duration bounds. Inside them the card exits at exactly the release speed. */
-  minFlingMs: 100,
-  maxFlingMs: 600,
+  minFlingMs: 50,
+  maxFlingMs: 260,
   /** Slowest exit speed, px/ms, so a barely-past-threshold release still leaves briskly. */
-  minFlingSpeed: 1.2,
+  minFlingSpeed: 1.5,
   /** Cap on vertical drift during a fling, px. */
-  maxFlingDriftY: 260,
+  maxFlingDriftY: 120,
   /** Extra spin added over a fling, degrees. */
-  flingSpin: 12,
+  flingSpin: 8,
   /** Buttons and arrow keys fling with this velocity, px/ms: sideways with a slight upward arc. */
-  buttonVelocityX: 1.6,
-  buttonVelocityY: -0.35,
+  buttonVelocityX: 2.2,
+  buttonVelocityY: -0.4,
   /** The card under the top one waits at this scale and drop (px). */
   nextScale: 0.95,
   nextDrop: 10,
@@ -92,26 +97,25 @@ export type FlingInput = {
   rotation: number
   vx: number
   vy: number
-  /** Left edge of the card at rest (no translate, no rotation), in viewport px. */
-  cardLeft: number
   cardWidth: number
-  cardHeight: number
-  viewportWidth: number
 }
 
 export type FlingPlan = { toX: number; toY: number; toRotation: number; durationMs: number }
 
 /**
  * Fling target and duration. The card keeps its momentum: it moves at constant velocity, starting
- * at the release speed, until its rotated box is fully off-screen (it is gone before a decelerating
- * tail would show). It keeps its vertical velocity and keeps spinning. Duration = distance / speed,
- * clamped to 100-600 ms, so faster flicks exit sooner and a slow release still leaves briskly.
+ * at the release speed, for a short hop (about one card width from rest) while it fades out
+ * (`flingOpacity`). It does not cross the whole screen. It keeps its vertical velocity and keeps
+ * spinning. Duration = distance / speed, clamped to 50-260 ms, so faster flicks exit sooner and a
+ * slow release still leaves briskly.
  */
 export function planFling(input: FlingInput): FlingPlan {
   const sign = input.direction === 'right' ? 1 : -1
-  const reach = Math.hypot(input.cardWidth, input.cardHeight) / 2
-  const targetCenterX = sign > 0 ? input.viewportWidth + reach : -reach
-  const toX = targetCenterX - (input.cardLeft + input.cardWidth / 2)
+  const end = Math.max(
+    SWIPE.flingTravelWidths * input.cardWidth,
+    Math.abs(input.dx) + SWIPE.flingMinExtraWidths * input.cardWidth
+  )
+  const toX = sign * end
   const distance = Math.abs(toX - input.dx)
   const speed = Math.max(Math.abs(input.vx), SWIPE.minFlingSpeed)
   const durationMs = clamp(distance / speed, SWIPE.minFlingMs, SWIPE.maxFlingMs)
@@ -123,6 +127,12 @@ export function planFling(input: FlingInput): FlingPlan {
     toRotation: input.rotation + spinSign * SWIPE.flingSpin,
     durationMs,
   }
+}
+
+/** Opacity at fling progress t (0..1): solid at first, then a linear fade to 0 at the end. */
+export function flingOpacity(t: number): number {
+  if (t <= SWIPE.flingFadeStart) return 1
+  return clamp(1 - (t - SWIPE.flingFadeStart) / (1 - SWIPE.flingFadeStart), 0, 1)
 }
 
 /** Start x-speed of a planned fling, px/ms (the motion is constant-velocity). */

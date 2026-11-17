@@ -9,7 +9,6 @@ import {
   scoreDrinks,
   SODA_BRAND_PRIOR_STRENGTH,
   SODA_MEAN_SHRINK,
-  sodaAppeal,
   swipeKappa,
   type DrinkStats,
 } from './soda-score'
@@ -143,24 +142,49 @@ describe('hierarchical brand prior', () => {
 })
 
 describe('ranking', () => {
-  test('left swipes lower appeal only', () => {
-    expect(sodaAppeal(drink(1))).toBe(0.5)
-    expect(sodaAppeal(drink(1, { right_swipes: 4, left_swipes: 0 }))).toBeCloseTo(5 / 6)
-    expect(sodaAppeal(drink(1, { right_swipes: 4, left_swipes: 6 }))).toBeCloseTo(5 / 12)
+  test('left swipes are a non-vote: they change neither score nor order', () => {
+    const none = drink(1, { brand: 'X', flavor: 'B' })
+    const manyLeft = drink(2, { brand: 'X', flavor: 'A', left_swipes: 50 })
+    const [a, b] = scoreDrinks([none, manyLeft])
+    expect(b.score).toBe(a.score)
+    expect(b.alpha).toBe(a.alpha)
+    expect(b.beta).toBe(a.beta)
+    // Name order decides ('A' first), so 50 left swipes do not push the drink below one with none.
+    expect(rankDrinks([none, manyLeft]).map((d) => d.id)).toEqual([2, 1])
   })
 
-  test('ranks by posterior mean, then appeal, then name', () => {
+  test('a hate report counts against the drink as much as a like counts for it', () => {
+    const [neutral, liked, hated] = scoreDrinks([
+      drink(1, { brand: 'X' }),
+      drink(2, { brand: 'Y', likes: 1, reporters: 1 }),
+      drink(3, { brand: 'Z', hates: 1, reporters: 1 }),
+    ])
+    expect(hated.score).toBeLessThan(neutral.score)
+    expect(liked.score - neutral.score).toBeCloseTo(neutral.score - hated.score)
+  })
+
+  test('ranks by posterior mean, then right swipes, then name', () => {
     const liked = drink(1, { likes: 2, reporters: 2 })
     const swipedOnly = drink(2, { right_swipes: 10 })
-    const sameScoreMoreLeft = drink(3, { flavor: 'A', left_swipes: 9 })
-    const sameScoreFewerLeft = drink(4, { flavor: 'B', left_swipes: 1 })
+    const sameScoreLeftOnly = drink(3, { flavor: 'A', left_swipes: 9 })
+    const sameScoreLeftOnlyToo = drink(4, { flavor: 'B', left_swipes: 1 })
     const hated = drink(5, { hates: 1, reporters: 1 })
 
-    const ranked = rankDrinks([hated, sameScoreMoreLeft, swipedOnly, sameScoreFewerLeft, liked])
-    expect(ranked.map((d) => d.id)).toEqual([1, 2, 4, 3, 5])
+    const ranked = rankDrinks([hated, sameScoreLeftOnly, swipedOnly, sameScoreLeftOnlyToo, liked])
+    expect(ranked.map((d) => d.id)).toEqual([1, 2, 3, 4, 5])
   })
 
-  test('ties with equal appeal fall back to name, then id', () => {
+  test('equal scores break on right swipes, more first', () => {
+    // Both past the swipe cap (R >= 15), same brand, same reports: identical posteriors.
+    const fewer = drink(1, { brand: 'X', flavor: 'A', right_swipes: 15 })
+    const more = drink(2, { brand: 'X', flavor: 'B', right_swipes: 40 })
+    const [a, b] = scoreDrinks([fewer, more])
+    expect(a.score).toBe(b.score)
+    expect(rankDrinks([fewer, more]).map((d) => d.id)).toEqual([2, 1])
+    expect(rankForLeaderboard([fewer, more]).map((d) => d.id)).toEqual([2, 1])
+  })
+
+  test('ties on score fall back to name, then id', () => {
     const [a, b] = scoreDrinks([drink(2, { flavor: 'Apple', brand: 'X' }), drink(1, { flavor: 'Banana', brand: 'X' })])
     expect(compareDrinks(a, b)).toBeLessThan(0)
     const [c, d] = scoreDrinks([drink(1, { flavor: 'Same', brand: 'X' }), drink(2, { flavor: 'Same', brand: 'X' })])
@@ -211,8 +235,9 @@ describe('public leaderboard order', () => {
     const drinks = [plainLeftOnly, plainUntried, lovedUntried, ...brandMates('Loved', 2, 4, 0)]
 
     const noEvidence = rankForLeaderboard(drinks).filter((d) => !hasOwnEvidence(d)).map((d) => d.id)
-    // Loved brand prior first; then the two Plain drinks tie on score and appeal breaks it.
-    expect(noEvidence).toEqual([1, 3, 2])
+    // Loved brand prior first; then the two Plain drinks tie on score, and left swipes do not
+    // break the tie (they are a non-vote): same name, so id order decides.
+    expect(noEvidence).toEqual([1, 2, 3])
   })
 
   test('the brand prior still orders untried drinks among themselves', () => {

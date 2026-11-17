@@ -36,10 +36,11 @@ test.describe('Barcode scan mode: known code', () => {
     const dialog = await openReport(page)
 
     await expect(dialog.locator('.barcode-scan-name')).toHaveText('Coca-Cola Original')
+    await expect(dialog.getByRole('heading')).toHaveText('Report a soda')
     await expectCameraOff(page)
     await expect(dialog.getByRole('button', { name: 'Select manually' })).toBeVisible()
 
-    await dialog.getByRole('button', { name: 'Like' }).click()
+    await dialog.getByRole('button', { name: 'I like' }).click()
     await expect(dialog).toBeHidden()
     await expect.poll(async () => (await getSodaRow(cokeId)).likes).toBe(before.likes + 1)
 

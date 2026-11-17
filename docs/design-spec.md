@@ -413,8 +413,25 @@ Mockups live outside the repo; this section is the source of truth.
 ### Report modal
 - Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).
 - Title "Report a soda", close button (×, 44px).
-- Text field with autocomplete over the full catalog (`fuzzyFilter`), up to 6 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
-- Two 52px buttons: **Like** (primary) and **Hate** (`--hate` outline). Disabled until a suggestion is picked; editing the text disables them again.
+- Text field with autocomplete over the full catalog, up to 8 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
+- Search (`frontend/src/soda-search.ts`, local, no request per keystroke):
+  - Normalization ignores case, punctuation, apostrophes, accents and the spaces in brand names: "dr pepper" = "Dr. Pepper", "la croix" = "LaCroix", "a and w" / "aw" = "A&W", "barqs" = "Barq's".
+  - Every typed word must match the brand, flavor or combined name, in any order. Each typed word needs its own catalog word, so "coka cola" cannot match "Zevia Cola" twice.
+  - Words match exactly, by prefix while typing ("str lem"), or inside a longer word for 4+ letters ("berry" finds Raspberry).
+  - The type word ("soda"/"seltzer") also matches, but ranks below brand and flavor matches. The seltzer and soda aliases cover searching by type.
+  - Typos are forgiven per word: 1 edit (Damerau-Levenshtein) for 4-7 letters, 2 for 8+. Only words no catalog word contains get typo matching, so "diet" never drags in "dirty". A typo against the start of a longer word needs 5+ letters and the same first letter, so "mint" does not match "Vintage".
+  - Nicknames live in one exported map, `SODA_ALIASES` ("coke", "dp", "gv", "walmart brand", "sparkling water", "zero", "max", "creme", …). An alias can widen to several brands or flavors and combines with the other words in either order ("diet coke" = "coke diet"). Expansions match exactly or by prefix only. While the last word is still being typed, alias keys that continue it count too, including longer keys ("cok", "doct" → doctor pepper, "fizzy" → fizzy water, "doctor p").
+  - Ranking, in order:
+    1. type-word-only matches last;
+    2. fewer typos;
+    3. smaller total edit distance;
+    4. more words matched as typed;
+    5. better match quality (exact, then prefix, then inside a word);
+    6. the first-listed alias expansion ("gv" lists Great Value before Sam's Choice and bettergoods);
+    7. shorter names, not counting "Original"/"Pure", so a brand query ("coke", "polar") lists the flagship first;
+    8. catalog order.
+  - Only the first 8 words of a query count, which keeps every keystroke instant.
+- Two 52px buttons: **Hate** (`--hate` outline) on the left and **Like** (primary) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
 - Submitting closes the modal. Nothing else is shown.
 
 ### Leaderboard tabs

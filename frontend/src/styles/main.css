@@ -2465,8 +2465,11 @@ body.soda-route { overflow-x: clip; }
 
 .barcode-scan-view {
   position: relative;
-  /* Square, so a barcode fits held horizontally or vertically. */
+  /* Square, so a barcode fits held horizontally or vertically. Capped by viewport height so the
+     dialog's buttons stay on screen on short laptops and landscape tablets. */
   aspect-ratio: 1 / 1;
+  width: min(100%, 45vh);
+  margin-inline: auto;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: #000;

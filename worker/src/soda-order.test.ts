@@ -279,6 +279,18 @@ describe('fresh catalog (no data)', () => {
     expect(ranked.map((d) => d.id)).toEqual([3, 2, 1])
   })
 
+  test('rankForWeek breaks equal scores on right swipes before the seeded shuffle', () => {
+    // Past the swipe cap, same brand: equal scores, different R.
+    const drinks = [
+      drink(1, 'soda', { brand: 'X', right_swipes: 15 }),
+      drink(2, 'soda', { brand: 'X', right_swipes: 40 }),
+      drink(3, 'soda', { brand: 'X', right_swipes: 20 }),
+    ]
+    for (const seed of ['2026-11-16', '2026-11-23', '2026-11-30']) {
+      expect(rankForWeek(drinks, seed).map((d) => d.id)).toEqual([2, 3, 1])
+    }
+  })
+
   test('rankForWeek keeps score order above the seeded tiebreak', () => {
     const drinks = [...fresh(), drink(99, 'soda', { likes: 1, reporters: 1 })]
     expect(rankForWeek(drinks, '2026-11-16')[0].id).toBe(99)

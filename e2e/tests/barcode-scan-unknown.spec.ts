@@ -21,6 +21,7 @@ test.describe('Barcode scan mode: unknown code', () => {
     // Unknown: straight to manual search, camera off, code logged.
     const combobox = dialog.getByRole('combobox')
     await expect(combobox).toBeFocused()
+    await expect(dialog.getByRole('heading')).toHaveText('Report a soda')
     await expectCameraOff(page)
     await expect.poll(() => network.requests.filter((r) => r.url().endsWith('/api/soda/unknown-scans')).length).toBe(1)
     const log = network.requests.find((r) => r.url().endsWith('/api/soda/unknown-scans'))!

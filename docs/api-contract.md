@@ -418,7 +418,7 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 - `likes` / `hates`: voters whose report is like / hate (one report row per voter per drink). `n` = distinct reporters.
 - θ is the chance a drinker is glad the drink was bought. Some brands are just worse, so each drink's prior comes from its brand.
 - Own evidence `(a_i, b_i)`, no prior: each like adds 1 to `a`, each hate adds 1 to `b`. Right swipes: κ = min(3, 0.2·R) · 3/(3+n), add 0.75κ to `a` and 0.25κ to `b`. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
-- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing: not the score, not the brand or type means, not the tiebreak. They are only shown as a count.
+- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing in scoring or ranking: not the score, not the brand or type means, not the tiebreak. They still count as "seen" for the swipe feed order and are shown as a count.
 - A hate report is a full negative: it adds 1 to `b`, exactly as a like adds 1 to `a`.
 - Type mean: `m_type = (Σ_type a + c·0.5) / (Σ_type (a+b) + c)`.
 - Brand mean, leaving drink i out so its evidence is not counted twice: `m_B(−i) = (Σ_{j∈B, j≠i} a_j + c·m_type) / (Σ_{j∈B, j≠i} (a_j+b_j) + c)`. A single-drink brand gets exactly `m_type`. Brands are keyed by the catalog `brand` string as-is.
@@ -514,7 +514,7 @@ Rows older than 180 days are deleted by the weekly cron.
 Every active drink (sodas and seltzers together), ranked in two groups:
 
 1. drinks with their own evidence (`R + n > 0`: a right swipe or a report), in posterior order;
-2. drinks without own evidence (untried, or left swipes only), in posterior order, then right swipes.
+2. drinks without own evidence (untried, or left swipes only), in posterior order, then name and id.
 
 Left swipes are not evidence, so a left swipe alone does not move a drink into group 1. The brand prior still orders group 2, but an untried flavor of a loved brand never outranks a drink with real evidence. `has_data` (which counts left swipes) only chooses between showing swipe counts and "New soda/seltzer to try". This grouping is a product decision (made by the owner's proxy, open to revisit) and applies to this endpoint only; the weekly order list uses the plain posterior order.
 

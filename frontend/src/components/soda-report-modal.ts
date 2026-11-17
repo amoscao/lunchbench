@@ -14,7 +14,7 @@ const REPORT_TITLE = 'Report a soda'
 
 /**
  * Report a soda: type-ahead over the catalog, then "I like" or Hate.
- * Like and Hate stay disabled until a drink is picked. A successful submit closes the modal.
+ * "I like" and Hate stay disabled until a drink is picked. A successful submit closes the modal.
  * On touch devices it opens in scan mode (barcode-scanner.ts); "Select manually" switches to the search.
  */
 export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null, onClose: () => void): ReportModal {

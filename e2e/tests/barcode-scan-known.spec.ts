@@ -36,6 +36,7 @@ test.describe('Barcode scan mode: known code', () => {
     const dialog = await openReport(page)
 
     await expect(dialog.locator('.barcode-scan-name')).toHaveText('Coca-Cola Original')
+    await expect(dialog.getByRole('heading')).toHaveText('Report a soda')
     await expectCameraOff(page)
     await expect(dialog.getByRole('button', { name: 'Select manually' })).toBeVisible()
 

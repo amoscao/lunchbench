@@ -143,14 +143,14 @@ describe('hierarchical brand prior', () => {
 
 describe('ranking', () => {
   test('left swipes are a non-vote: they change neither score nor order', () => {
-    const none = drink(1, { flavor: 'A' })
-    const manyLeft = drink(2, { flavor: 'B', left_swipes: 50 })
+    const none = drink(1, { brand: 'X', flavor: 'B' })
+    const manyLeft = drink(2, { brand: 'X', flavor: 'A', left_swipes: 50 })
     const [a, b] = scoreDrinks([none, manyLeft])
     expect(b.score).toBe(a.score)
     expect(b.alpha).toBe(a.alpha)
     expect(b.beta).toBe(a.beta)
-    // Name order decides, exactly as with no swipes at all.
-    expect(rankDrinks([manyLeft, none]).map((d) => d.id)).toEqual([1, 2])
+    // Name order decides ('A' first), so 50 left swipes do not push the drink below one with none.
+    expect(rankDrinks([none, manyLeft]).map((d) => d.id)).toEqual([2, 1])
   })
 
   test('a hate report counts against the drink as much as a like counts for it', () => {
@@ -172,6 +172,16 @@ describe('ranking', () => {
 
     const ranked = rankDrinks([hated, sameScoreLeftOnly, swipedOnly, sameScoreLeftOnlyToo, liked])
     expect(ranked.map((d) => d.id)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  test('equal scores break on right swipes, more first', () => {
+    // Both past the swipe cap (R >= 15), same brand, same reports: identical posteriors.
+    const fewer = drink(1, { brand: 'X', flavor: 'A', right_swipes: 15 })
+    const more = drink(2, { brand: 'X', flavor: 'B', right_swipes: 40 })
+    const [a, b] = scoreDrinks([fewer, more])
+    expect(a.score).toBe(b.score)
+    expect(rankDrinks([fewer, more]).map((d) => d.id)).toEqual([2, 1])
+    expect(rankForLeaderboard([fewer, more]).map((d) => d.id)).toEqual([2, 1])
   })
 
   test('ties on score fall back to name, then id', () => {

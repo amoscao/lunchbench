@@ -13,6 +13,7 @@ test.describe('Barcode scan mode: camera lifecycle', () => {
     const dialog = await openReport(page)
 
     await expect(dialog.getByRole('heading')).toHaveText('Scan the soda barcode')
+    await expect(dialog).toHaveAccessibleName('Scan the soda barcode')
     await expect(dialog.getByLabel('Camera')).toBeVisible()
     // Square scan area, so a barcode fits held either way.
     const view = await dialog.locator('.barcode-scan-view').boundingBox()

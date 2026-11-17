@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { Hono } from 'hono'
 import { captureMessage } from '@sentry/cloudflare'
@@ -124,5 +127,15 @@ describe('rateLimitedResponse', () => {
     } finally {
       error.mockRestore()
     }
+  })
+})
+
+describe('every 429 goes through rateLimitedResponse', () => {
+  test('no other worker source builds a 429 or a RATE_LIMITED body', () => {
+    const src = fileURLToPath(new URL('.', import.meta.url))
+    const offenders = readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'rate-limit.ts')
+      .filter((file) => /,\s*429\s*\)|['"]RATE_LIMITED['"]/.test(readFileSync(join(src, file), 'utf8')))
+    expect(offenders).toEqual([])
   })
 })

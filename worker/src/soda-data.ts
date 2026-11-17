@@ -1,4 +1,4 @@
-import type { DrinkStats } from './soda-score'
+import { SODA_BAN_HATES, type DrinkStats } from './soda-score'
 import {
   addDays,
   buildOrderList,
@@ -8,8 +8,42 @@ import {
   type OrderItem,
 } from './soda-order'
 
+/** SQL: Hate count of drink `alias`.id. Correlated, so a single-drink check seeks idx_soda_reports_soda. */
+function hateCountSql(alias: string): string {
+  return `(SELECT COUNT(*) FROM soda_reports r WHERE r.soda_id = ${alias}.id AND r.verdict = 'hate')`
+}
+
+/** SQL: the Hate count that bans drink `alias`.id: SODA_BAN_HATES, plus the count at an admin unban. */
+function banThresholdSql(alias: string): string {
+  return `(${SODA_BAN_HATES} + COALESCE((SELECT o.hates_at_override FROM soda_ban_overrides o WHERE o.soda_id = ${alias}.id), 0))`
+}
+
 /**
- * Per-drink counts for every active drink.
+ * SQL condition: drink `alias` is banned. Same rule as isBanned() in soda-score.ts: at least
+ * SODA_BAN_HATES distinct voters' latest report is a Hate (soda_reports keeps one row per voter per
+ * drink), counted from the Hate count at the last admin unban, if any.
+ */
+export function bannedSodaSql(alias: string): string {
+  return `${hateCountSql(alias)} >= ${banThresholdSql(alias)}`
+}
+
+/** SQL condition for a drink that may be shown: active and not banned. `alias` is the sodas alias. */
+export function shownSodaSql(alias: string): string {
+  return `${alias}.is_active = 1 AND NOT (${bannedSodaSql(alias)})`
+}
+
+/** True when an active drink is banned (for a clear 409 instead of a 404). */
+export async function isSodaBanned(db: D1Database, sodaId: number): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS hit FROM sodas s WHERE s.id = ? AND s.is_active = 1 AND ${bannedSodaSql('s')}`
+  ).bind(sodaId).first<{ hit: number }>()
+  return row !== null
+}
+
+/**
+ * Per-drink counts for every active drink, BANNED ONES INCLUDED, plus each drink's unban offset.
+ * Always pass these to scoreDrinks (feed, leaderboard, weekly order): it leaves banned drinks out of
+ * its output and the type mean, and keeps their evidence in their brand's prior.
  * Swipes and reports both keep one row per voter per drink (latest wins on write).
  */
 export const DRINK_STATS_SQL = `
@@ -19,7 +53,8 @@ export const DRINK_STATS_SQL = `
     COALESCE(sw.left_swipes, 0) AS left_swipes,
     COALESCE(rp.likes, 0) AS likes,
     COALESCE(rp.hates, 0) AS hates,
-    COALESCE(rp.reporters, 0) AS reporters
+    COALESCE(rp.reporters, 0) AS reporters,
+    COALESCE(o.hates_at_override, 0) AS ban_offset
   FROM sodas s
   LEFT JOIN (
     SELECT soda_id,
@@ -36,10 +71,15 @@ export const DRINK_STATS_SQL = `
     FROM soda_reports
     GROUP BY soda_id
   ) rp ON rp.soda_id = s.id
+  LEFT JOIN soda_ban_overrides o ON o.soda_id = s.id
   WHERE s.is_active = 1
 `
 
-export async function loadDrinkStats(db: D1Database): Promise<DrinkStats[]> {
+/**
+ * Every active drink with counts, banned ones included (see DRINK_STATS_SQL). Not a list of drinks
+ * to show: scoreDrinks decides that.
+ */
+export async function loadScoringStats(db: D1Database): Promise<DrinkStats[]> {
   const result = await db.prepare(DRINK_STATS_SQL).all<DrinkStats>()
   return result.results
 }
@@ -81,7 +121,7 @@ export async function writeWeeklyOrder(
 ): Promise<string> {
   const weekStart = weekStartFor(now)
   const [drinks, recentTrialIds] = await Promise.all([
-    loadDrinkStats(db),
+    loadScoringStats(db),
     loadRecentTrialIds(db, weekStart),
   ])
   const items = buildOrderList(drinks, { seed: weekStart, recentTrialIds })

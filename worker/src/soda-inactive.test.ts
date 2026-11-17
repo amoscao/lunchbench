@@ -105,16 +105,18 @@ describe('inactive drinks are excluded everywhere', () => {
     expect(noOlipop(order.items)).toEqual([])
   })
 
-  test('regenerating replaces a stored snapshot that still lists OLIPOP', async () => {
+  test('a stored snapshot that still lists OLIPOP drops it at read time, without a regenerate', async () => {
     const { env, sqlite, olipop } = setup()
-    const stale = [{ rank: 1, slot: 'top', soda_id: olipop[0], brand: 'OLIPOP', flavor: 'Vintage Cola', type: 'soda', image_key: null, right_swipes: 20, left_swipes: 0, has_data: true }]
+    const coke = Number(sqlite.prepare("SELECT id FROM sodas WHERE walmart_item_id = '12166733'").get()!.id)
+    const item = (rank: number, sodaId: number, brand: string) =>
+      ({ rank, slot: 'top', soda_id: sodaId, brand, flavor: 'X', type: 'soda', image_key: null, right_swipes: 1, left_swipes: 0, has_data: true })
+    const stale = [item(1, olipop[0], 'OLIPOP'), item(2, coke, 'Coca-Cola')]
     sqlite.prepare('INSERT INTO soda_buy_lists (week_start, generated_at, items_json, params_json) VALUES (?, ?, ?, ?)')
       .run(weekStartFor(new Date()), new Date().toISOString(), JSON.stringify(stale), '{}')
-    const read = async () => (await (await sodaRouter.request('/order/latest', { headers: { Authorization: 'Bearer purchaser-token' } }, env)).json() as { items: Named[] }).items
-    // The frozen snapshot is served as stored until an admin regenerates it.
-    expect(noOlipop(await read())).toHaveLength(1)
-    await adminRouter.request('/soda/regenerate', { method: 'POST', headers: { Authorization: 'Bearer admin-token' } }, env)
-    expect(noOlipop(await read())).toEqual([])
+    const res = await sodaRouter.request('/order/latest', { headers: { Authorization: 'Bearer purchaser-token' } }, env)
+    const items = (await res.json() as { items: Array<Named & { rank: number }> }).items
+    expect(noOlipop(items)).toEqual([])
+    expect(items.map((i) => [i.soda_id, i.rank])).toEqual([[coke, 1]])
   })
 
   test('barcode map', async () => {

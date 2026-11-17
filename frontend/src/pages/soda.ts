@@ -1,4 +1,4 @@
-import { getSodaCatalog, getSodaDeck, submitSodaSwipe, type Soda } from '../api'
+import { getSodaCatalog, getSodaDeck, isSodaBannedError, submitSodaSwipe, type Soda } from '../api'
 import { openSodaReportModal, type ReportModal } from '../components/soda-report-modal'
 import { SwipeStack } from '../components/swipe-stack'
 import { escapeHtml } from '../utils/escape-html'
@@ -118,8 +118,10 @@ export function renderSoda(container: HTMLElement): () => void {
         await submitSodaSwipe(sodaId, direction)
         if (!destroyed) alertEl.hidden = true
         return
-      } catch {
-        // Retry once below.
+      } catch (e: unknown) {
+        // The drink was banned after the feed loaded: there is nothing to save, so the card is done.
+        if (isSodaBannedError(e)) return
+        // Otherwise retry once below.
       }
     }
     if (!destroyed) alertEl.hidden = false

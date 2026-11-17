@@ -31,6 +31,7 @@ npx wrangler d1 execute lunchbench --remote --file=../migrations/0012_soda_catal
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0013_soda_barcodes.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0014_soda_barcodes_seed.sql
 npx wrangler d1 execute lunchbench --remote --file=../migrations/0015_remove_olipop.sql
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0016_soda_ban_overrides.sql
 ```
 
 ### Sodabench launch steps
@@ -79,6 +80,13 @@ If the PR merges before step 1, the `/api/soda/*` routes return 500. Before step
 If the PR merges before step 1, `GET /api/soda/barcodes` and the unknown-scan routes return 500, every scan falls back to manual search, and reports that carry a barcode fail. Before step 2, scans only match codes that voters or admins map.
 
 `seed.sql` is for local dev and E2E only. Do not apply it to production.
+
+### Auto-ban unban table (issue #298)
+Run BEFORE merging the auto-ban PR, from `worker/`. Schema only and additive: it creates one empty table that the current Worker ignores. Every soda read path of the new Worker joins it, so if the PR merges first the soda endpoints return 500 until it runs.
+
+```bash
+npx wrangler d1 execute lunchbench --remote --file=../migrations/0016_soda_ban_overrides.sql
+```
 
 ### Remove OLIPOP (issue #296)
 Run with the owner's go-ahead, from `worker/`, in this order. 0015 only touches data that the current Worker already filters, so it is safe before or after the PR merges.

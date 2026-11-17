@@ -117,6 +117,8 @@ describe('order list snapshots', () => {
             if (sql.includes('FROM admin_sessions')) {
               return { results: [{ token: 'purchaser-token', role: 'purchaser', expires_at: '2999-01-01T00:00:00Z' }] }
             }
+            // Read-time status check: every drink in the snapshot is still shown.
+            if (sql.includes('FROM sodas s WHERE s.id IN')) return { results: [{ id: 1 }, { id: 2 }, { id: 3 }] }
             return { results: [] }
           },
           async first() {

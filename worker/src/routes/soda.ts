@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { Bindings } from '../types'
 import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
@@ -6,7 +7,7 @@ import { parseSessionKey } from './matchup'
 import { buildFeed, sessionTieKey } from '../soda-deck'
 import { hasData, rankForLeaderboard, scoreDrinks, sodaName, type DrinkStats } from '../soda-score'
 import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
-import { imageUrl, loadDrinkStats, writeWeeklyOrder, type BuyListRow } from '../soda-data'
+import { imageUrl, isSodaBanned, loadScoringStats, shownSodaSql, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 import { isBarcodeFormat, normalizeBarcode } from '../barcode'
 
 const soda = new Hono<{ Bindings: Bindings }>()
@@ -36,9 +37,21 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
   return body && typeof body === 'object' ? body as Record<string, unknown> : {}
 }
 
+/**
+ * A swipe or report matched no writable drink. A banned drink (5+ Hate reports) gets 409 SODA_BANNED
+ * so clients can tell it apart from an unknown or inactive one (404).
+ */
+async function sodaWriteRejected(c: Context<{ Bindings: Bindings }>, sodaId: number): Promise<Response> {
+  if (await isSodaBanned(c.env.DB, sodaId)) {
+    return c.json({ error: 'Soda is banned', code: 'SODA_BANNED' }, 409)
+  }
+  return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+}
+
+// Every active, not banned drink. Report search filters this list on the client.
 soda.get('/catalog', async (c) => {
   const result = await c.env.DB.prepare(
-    'SELECT id, brand, flavor, type, image_key FROM sodas WHERE is_active = 1 ORDER BY brand ASC, flavor ASC, id ASC'
+    `SELECT s.id, s.brand, s.flavor, s.type, s.image_key FROM sodas s WHERE ${shownSodaSql('s')} ORDER BY s.brand ASC, s.flavor ASC, s.id ASC`
   ).all<SodaRow>()
   return c.json(
     { sodas: result.results.map(sodaCard) },
@@ -47,12 +60,13 @@ soda.get('/catalog', async (c) => {
   )
 })
 
-// The voter's whole feed: every active drink they have not swiped, in a random order weighted
-// toward drinks people like (see buildFeed).
+// The voter's whole feed: every active, not banned drink they have not swiped, in a random order
+// weighted toward drinks people like (see buildFeed). Scoring stats include banned drinks so their
+// evidence weighs on their brand; scoreDrinks leaves the banned drinks themselves out.
 soda.get('/deck', async (c) => {
   const sessionKey = parseSessionKey(c.req.header('X-Lunchbench-Session') ?? null)
   const [drinks, swipes] = await Promise.all([
-    loadDrinkStats(c.env.DB),
+    loadScoringStats(c.env.DB),
     sessionKey
       ? c.env.DB.prepare('SELECT soda_id FROM soda_swipes WHERE session_key = ?')
         .bind(sessionKey)
@@ -89,13 +103,13 @@ soda.put('/swipes', async (c) => {
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_swipes (session_key, soda_id, direction, swiped_at)
-     SELECT ?, id, ?, datetime('now') FROM sodas WHERE id = ? AND is_active = 1
+     SELECT ?, s.id, ?, datetime('now') FROM sodas s WHERE s.id = ? AND ${shownSodaSql('s')}
      ON CONFLICT(session_key, soda_id) DO UPDATE SET
        direction = excluded.direction,
        swiped_at = excluded.swiped_at
      RETURNING soda_id`
   ).bind(sessionKey, direction, sodaId).first<{ soda_id: number }>()
-  if (!row) return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+  if (!row) return sodaWriteRejected(c, sodaId as number)
 
   return c.json({ ok: true })
 })
@@ -122,13 +136,13 @@ soda.post('/reports', async (c) => {
 
   const row = await c.env.DB.prepare(
     `INSERT INTO soda_reports (session_key, soda_id, verdict, reported_at)
-     SELECT ?, id, ?, datetime('now') FROM sodas WHERE id = ? AND is_active = 1
+     SELECT ?, s.id, ?, datetime('now') FROM sodas s WHERE s.id = ? AND ${shownSodaSql('s')}
      ON CONFLICT(session_key, soda_id) DO UPDATE SET
        verdict = excluded.verdict,
        reported_at = excluded.reported_at
      RETURNING soda_id`
   ).bind(sessionKey, verdict, sodaId).first<{ soda_id: number }>()
-  if (!row) return c.json({ error: 'Soda not found', code: 'NOT_FOUND' }, 404)
+  if (!row) return sodaWriteRejected(c, sodaId as number)
 
   if (!barcode) return c.json({ ok: true })
   const mappedSodaId = await learnBarcode(c.env.DB, getClientIp(c.req.raw), sessionKey, barcode, row.soda_id)
@@ -161,17 +175,17 @@ async function learnBarcode(db: D1Database, ip: string, sessionKey: string, code
     }
   }
   const mapping = await db.prepare(
-    'SELECT b.soda_id FROM soda_barcodes b JOIN sodas s ON s.id = b.soda_id WHERE b.code = ? AND s.is_active = 1'
+    `SELECT b.soda_id FROM soda_barcodes b JOIN sodas s ON s.id = b.soda_id WHERE b.code = ? AND ${shownSodaSql('s')}`
   ).bind(code).first<{ soda_id: number }>()
   return mapping?.soda_id ?? null
 }
 
-// Every barcode mapped to an active drink. The client fetches this once and looks scans up locally.
+// Every barcode mapped to an active, not banned drink. The client fetches this once and looks scans up locally.
 soda.get('/barcodes', async (c) => {
   const result = await c.env.DB.prepare(
     `SELECT b.code, b.soda_id FROM soda_barcodes b
      JOIN sodas s ON s.id = b.soda_id
-     WHERE s.is_active = 1
+     WHERE ${shownSodaSql('s')}
      ORDER BY b.code ASC`
   ).all<{ code: string; soda_id: number }>()
   return c.json({ barcodes: result.results }, 200, { 'Cache-Control': 'no-cache' })
@@ -201,7 +215,8 @@ soda.post('/unknown-scans', async (c) => {
 })
 
 soda.get('/leaderboard', async (c) => {
-  const ranked = rankForLeaderboard(await loadDrinkStats(c.env.DB))
+  // Scoring stats include banned drinks for their brand evidence; rankForLeaderboard leaves them out.
+  const ranked = rankForLeaderboard(await loadScoringStats(c.env.DB))
   return c.json(
     {
       sodas: ranked.map((drink, index) => ({
@@ -240,10 +255,21 @@ soda.get('/order/latest', async (c) => {
 
   // Snapshots written before backups were removed may still hold "backup" rows. They were the last
   // ranks, so dropping them on read keeps ranks 1..n contiguous.
-  const items = (JSON.parse(row.items_json) as Array<Omit<OrderItem, 'slot'> & { slot: string }>)
+  const stored = (JSON.parse(row.items_json) as Array<Omit<OrderItem, 'slot'> & { slot: string }>)
     .filter((item) => item.slot !== 'backup')
-    .map((item) => ({
+  // A drink banned (or deactivated) after the snapshot was written leaves Chris's list at once. The
+  // rest keep their order and are renumbered; nothing is recomputed to replace it.
+  const ids = [...new Set(stored.map((item) => item.soda_id))]
+  const shown = ids.length === 0
+    ? new Set<number>()
+    : new Set((await c.env.DB.prepare(
+      `SELECT s.id FROM sodas s WHERE s.id IN (${ids.map(() => '?').join(', ')}) AND ${shownSodaSql('s')}`
+    ).bind(...ids).all<{ id: number }>()).results.map((r) => r.id))
+  const items = stored
+    .filter((item) => shown.has(item.soda_id))
+    .map((item, index) => ({
       ...item,
+      rank: index + 1,
       name: sodaName(item),
       image_url: imageUrl(item.image_key),
     }))

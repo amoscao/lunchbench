@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
+  isBanned,
+  SODA_BAN_HATES,
+  SODA_SCORE_PARAMS,
   compareDrinks,
   hasData,
   hasOwnEvidence,
@@ -123,8 +126,8 @@ describe('hierarchical brand prior', () => {
   test('lots of own evidence barely moves when brand-mates are bad', () => {
     // Same bad drinks in both worlds, so the type mean is identical; only brand membership changes.
     const star = { brand: 'Star', likes: 10, reporters: 10 }
-    const solo = scoreOf([drink(1, star), ...brandMates('Elsewhere', 4, 0, 5)], 1)
-    const withBadMates = scoreOf([drink(1, star), ...brandMates('Star', 4, 0, 5)], 1)
+    const solo = scoreOf([drink(1, star), ...brandMates('Elsewhere', 4, 0, 4)], 1)
+    const withBadMates = scoreOf([drink(1, star), ...brandMates('Star', 4, 0, 4)], 1)
 
     const priorShift = solo.prior_mean - withBadMates.prior_mean
     const scoreShift = solo.score - withBadMates.score
@@ -250,5 +253,49 @@ describe('public leaderboard order', () => {
     ]
     const untried = rankForLeaderboard(drinks).filter((d) => !hasData(d)).map((d) => d.id)
     expect(untried).toEqual([2, 3, 1])
+  })
+})
+
+describe('auto-ban after 5 Hate reports (#298)', () => {
+  const ids = (drinks: DrinkStats[]) => scoreDrinks(drinks).map((d) => d.id)
+
+  test('4 distinct Hate reports keep a drink shown, 5 ban it', () => {
+    expect(SODA_BAN_HATES).toBe(5)
+    expect(SODA_SCORE_PARAMS.banHates).toBe(5)
+    const four = drink(1, { hates: 4, reporters: 4 })
+    const five = drink(2, { hates: 5, reporters: 5 })
+    expect(isBanned(four)).toBe(false)
+    expect(isBanned(five)).toBe(true)
+    expect(ids([four, five, drink(3)])).toEqual([1, 3])
+  })
+
+  test('likes do not offset hates: 5 hates and 20 likes is still banned', () => {
+    expect(ids([drink(1, { hates: 5, likes: 20, reporters: 25 })])).toEqual([])
+  })
+
+  test('a voter changing Hate to Like unbans the drink', () => {
+    const banned = drink(1, { hates: 5, likes: 0, reporters: 5 })
+    const changed = drink(1, { hates: 4, likes: 1, reporters: 5 })
+    expect(ids([banned])).toEqual([])
+    expect(ids([changed])).toEqual([1])
+  })
+
+  test('an admin unban (ban_offset) exempts the drink until SODA_BAN_HATES more hates arrive', () => {
+    // Unbanned at 5 hates: ban_offset = 5, so the threshold becomes 10.
+    expect(isBanned(drink(1, { hates: 5, ban_offset: 5 }))).toBe(false)
+    expect(isBanned(drink(1, { hates: 9, ban_offset: 5 }))).toBe(false)
+    expect(isBanned(drink(1, { hates: 10, ban_offset: 5 }))).toBe(true)
+    expect(ids([drink(1, { hates: 9, reporters: 9, ban_offset: 5 }), drink(2, { hates: 10, reporters: 10, ban_offset: 5 })])).toEqual([1])
+  })
+
+  test('a banned drink still counts toward its brand prior, but not the type mean', () => {
+    const mate = drink(1, { brand: 'Bad', right_swipes: 2 })
+    const other = drink(2, { brand: 'Other', likes: 2, reporters: 2 })
+    const banned = drink(3, { brand: 'Bad', hates: 6, reporters: 6 })
+    const withBan = scoreDrinks([mate, other, banned]).find((d) => d.id === 1)!
+    const withoutBan = scoreDrinks([mate, other]).find((d) => d.id === 1)!
+    expect(withBan.type_mean).toBeCloseTo(withoutBan.type_mean)
+    expect(withBan.prior_mean).toBeLessThan(withoutBan.prior_mean)
+    expect(withBan.score).toBeLessThan(withoutBan.score)
   })
 })

@@ -150,6 +150,14 @@ async function fetchUnknownScans(): Promise<UnknownScanGroup[]> {
   return (await res.json() as { codes: UnknownScanGroup[] }).codes
 }
 
+type BannedDrink = { id: number; name: string; hates: number; likes: number }
+
+async function fetchBannedDrinks(): Promise<BannedDrink[]> {
+  const res = await adminFetch('/admin/soda/banned')
+  if (!res.ok) throw new Error('Failed to load banned drinks')
+  return (await res.json() as { banned: BannedDrink[] }).banned
+}
+
 /** "2026-11-16 14:03:22" (UTC, from SQLite) -> "Nov 16, 9:03 AM" in the viewer's zone. */
 function formatSeen(value: string): string {
   const date = new Date(`${value.replace(' ', 'T')}Z`)
@@ -166,7 +174,7 @@ async function revokeAdminSession(token: string | null): Promise<void> {
 }
 
 function renderDashboard(container: HTMLElement): void {
-  let activeTab: 'lunches' | 'stats' | 'scans' = 'lunches'
+  let activeTab: 'lunches' | 'stats' | 'scans' | 'banned' = 'lunches'
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
@@ -180,6 +188,7 @@ function renderDashboard(container: HTMLElement): void {
       <button class="admin-tab admin-tab-active" id="tab-lunches" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px">Lunches</button>
       <button class="admin-tab" id="tab-stats" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Stats</button>
       <button class="admin-tab" id="tab-scans" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Unknown scans</button>
+      <button class="admin-tab" id="tab-banned" style="padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px">Banned drinks</button>
     </div>
     <div id="admin-alert" style="display:none" class="alert"></div>
     <div id="admin-tab-content">
@@ -192,20 +201,24 @@ function renderDashboard(container: HTMLElement): void {
   const tabLunches = container.querySelector<HTMLButtonElement>('#tab-lunches')!
   const tabStats = container.querySelector<HTMLButtonElement>('#tab-stats')!
   const tabScans = container.querySelector<HTMLButtonElement>('#tab-scans')!
+  const tabBanned = container.querySelector<HTMLButtonElement>('#tab-banned')!
   const tabContent = container.querySelector<HTMLElement>('#admin-tab-content')!
 
-  function setTab(tab: 'lunches' | 'stats' | 'scans'): void {
+  function setTab(tab: 'lunches' | 'stats' | 'scans' | 'banned'): void {
     activeTab = tab
     const accentStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;margin-bottom:-1px`
     const inactiveStyle = `padding:8px 18px;font-size:13px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;margin-bottom:-1px`
     tabLunches.style.cssText = tab === 'lunches' ? accentStyle : inactiveStyle
     tabStats.style.cssText   = tab === 'stats'   ? accentStyle : inactiveStyle
     tabScans.style.cssText   = tab === 'scans'   ? accentStyle : inactiveStyle
+    tabBanned.style.cssText  = tab === 'banned'  ? accentStyle : inactiveStyle
     if (tab === 'lunches') {
       tabContent.innerHTML = `<div id="admin-table-wrap"><div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div></div>`
       loadTable()
     } else if (tab === 'scans') {
       void loadScans()
+    } else if (tab === 'banned') {
+      void loadBanned()
     } else {
       loadStats()
     }
@@ -214,6 +227,7 @@ function renderDashboard(container: HTMLElement): void {
   tabLunches.addEventListener('click', () => setTab('lunches'))
   tabStats.addEventListener('click',   () => setTab('stats'))
   tabScans.addEventListener('click',   () => setTab('scans'))
+  tabBanned.addEventListener('click',  () => setTab('banned'))
 
   const exportPdfBtn = container.querySelector<HTMLButtonElement>('#export-pdf-btn')!
   exportPdfBtn.addEventListener('click', async () => {
@@ -430,6 +444,58 @@ function renderDashboard(container: HTMLElement): void {
     return true
   }
 
+  // Drinks hidden by 5+ Hate reports from distinct voters. The ban is computed from reports; Unban
+  // exempts a drink until it gets 5 new Hates (POST /admin/soda/banned/:id/unban).
+  async function loadBanned(): Promise<void> {
+    tabContent.innerHTML = `<div class="skeleton" style="height:120px;border-radius:var(--radius-md)"></div>`
+    let banned: BannedDrink[]
+    try {
+      banned = await fetchBannedDrinks()
+    } catch (e: unknown) {
+      if (sessionExpired(e)) return
+      tabContent.innerHTML = `<div class="alert alert-error">Failed to load banned drinks</div>`
+      return
+    }
+    if (activeTab !== 'banned') return
+    if (banned.length === 0) {
+      tabContent.innerHTML = `<p style="color:var(--text-muted)">No banned drinks</p>`
+      return
+    }
+    tabContent.innerHTML = `
+      <table class="leaderboard-table banned-drinks-table" style="font-size:13px">
+        <thead><tr><th>Drink</th><th>Hates</th><th>Likes</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${banned.map((drink) => `
+            <tr data-soda-id="${drink.id}">
+              <td>${escapeHtml(drink.name)}</td>
+              <td style="font-variant-numeric:tabular-nums">${drink.hates}</td>
+              <td style="font-variant-numeric:tabular-nums">${drink.likes}</td>
+              <td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" data-action="unban" aria-label="Unban ${escapeHtml(drink.name)}">Unban</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `
+
+    tabContent.querySelectorAll<HTMLButtonElement>('[data-action="unban"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')!
+        btn.disabled = true
+        try {
+          const res = await adminFetch(`/admin/soda/banned/${row.dataset.sodaId}/unban`, { method: 'POST' })
+          // 404: no longer banned (unbanned in another tab, or a Hate changed to Like). The reload shows it.
+          if (!res.ok && res.status !== 404) throw new Error('Unban failed')
+          showAlert(res.ok ? 'Unbanned!' : 'Already not banned', 'success')
+          await loadBanned()
+        } catch (e: unknown) {
+          if (sessionExpired(e)) return
+          btn.disabled = false
+          showAlert('Unban failed', 'error')
+        }
+      })
+    })
+  }
+
   async function loadScans(): Promise<void> {
     tabContent.innerHTML = `<div class="skeleton" style="height:200px;border-radius:var(--radius-md)"></div>`
     let groups: UnknownScanGroup[]
@@ -503,6 +569,12 @@ function renderDashboard(container: HTMLElement): void {
             method: 'POST',
             body: JSON.stringify({ code: row.dataset.code, soda_id: sodaId }),
           })
+          if (res.status === 409) {
+            // The drink was auto-banned (#298) after this tab loaded; the reload drops it from the list.
+            showAlert('That drink is banned, so codes cannot be mapped to it. Pick another or unban it first.', 'error')
+            await loadScans()
+            return
+          }
           if (!res.ok) throw new Error('Map failed')
           showAlert('Mapped!', 'success')
           await loadScans()

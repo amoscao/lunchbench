@@ -1,4 +1,4 @@
-import { submitSodaReport, type Soda } from '../api'
+import { isSodaBannedError, submitSodaReport, type Soda } from '../api'
 import { MAX_RESULTS, searchSodas } from '../soda-search'
 import { escapeHtml } from '../utils/escape-html'
 import { rememberBarcode } from '../utils/barcode'
@@ -167,6 +167,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
 
   async function submit(verdict: 'like' | 'hate'): Promise<void> {
     if (!picked || submitting) return
+    const soda = picked
     submitting = true
     error.hidden = true
     setButtons()
@@ -174,14 +175,32 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
       const barcode = unknownScan?.code
       // The server only learns the code if its unknown-scan row exists, so let that request land first.
       if (unknownScan) await unknownScan.logged
-      const result = await submitSodaReport(picked.id, verdict, barcode)
+      const result = await submitSodaReport(soda.id, verdict, barcode)
       if (barcode && typeof result.barcode_soda_id === 'number') rememberBarcode(barcode, result.barcode_soda_id)
       close()
-    } catch {
+    } catch (e: unknown) {
       submitting = false
+      if (isSodaBannedError(e)) {
+        // Auto-banned (#298) since this page loaded the catalog: drop it from the shared catalog so
+        // neither search nor scan offers it again.
+        removeFromCatalog(soda.id)
+        if (scanPanel) enterManualMode(null)
+        picked = null
+        input.value = ''
+        error.textContent = 'This drink has been removed'
+      } else {
+        error.textContent = 'Report failed'
+      }
       error.hidden = false
       setButtons()
     }
+  }
+
+  /** `catalog` is the page's array, so the removal also holds for later opens of this modal. */
+  function removeFromCatalog(sodaId: number): void {
+    const index = catalog.findIndex((soda) => soda.id === sodaId)
+    if (index >= 0) catalog.splice(index, 1)
+    byId.delete(sodaId)
   }
 
   function focusable(): HTMLElement[] {

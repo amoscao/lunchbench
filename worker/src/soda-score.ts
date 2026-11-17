@@ -16,6 +16,8 @@ export type DrinkStats = {
   hates: number
   /** n: distinct reporters (likes + hates). */
   reporters: number
+  /** Hate count when an admin last unbanned the drink (soda_ban_overrides); 0 or absent if never. */
+  ban_offset?: number
 }
 
 /** Pseudo-counts from a drink's own swipes and reports. No prior. */
@@ -40,6 +42,16 @@ export const SODA_MEAN_SHRINK = 4
 export const SODA_BRAND_PRIOR_STRENGTH = 2
 /** Neutral mean the type mean shrinks toward. */
 export const SODA_NEUTRAL_MEAN = 0.5
+/** A drink with this many distinct voters reporting Hate is banned everywhere (computed, never stored). */
+export const SODA_BAN_HATES = 5
+
+/**
+ * Banned: at least SODA_BAN_HATES voters' latest report on the drink is a Hate. After an admin unban,
+ * `ban_offset` is the Hate count at that moment, so SODA_BAN_HATES new Hates are needed to ban again.
+ */
+export function isBanned(drink: Pick<DrinkStats, 'hates' | 'ban_offset'>): boolean {
+  return drink.hates >= SODA_BAN_HATES + (drink.ban_offset ?? 0)
+}
 
 export const SODA_SCORE_PARAMS = {
   /** Right swipes per report-equivalent: 0.2 pseudo-counts each, so 5 swipes = 1 report. */
@@ -55,6 +67,7 @@ export const SODA_SCORE_PARAMS = {
   /** k in α0 = k·m_B(−i), β0 = k·(1 − m_B(−i)). */
   brandPriorStrength: SODA_BRAND_PRIOR_STRENGTH,
   neutralMean: SODA_NEUTRAL_MEAN,
+  banHates: SODA_BAN_HATES,
 } as const
 
 /** κ = min(3, 0.2·R) · 3/(3+n). Right-swipe pseudo-count weight. */
@@ -95,8 +108,8 @@ function addTo(map: Map<string, Sums>, key: string, evidence: Evidence): void {
 }
 
 /**
- * Scores every drink with a hierarchical brand prior. Brands differ in quality, so a drink
- * borrows strength from its brand-mates:
+ * Scores every drink that is not banned, with a hierarchical brand prior. Brands differ in quality,
+ * so a drink borrows strength from its brand-mates (banned ones included):
  *
  * - m_type = (Σ_type a + c·0.5) / (Σ_type (a+b) + c)
  * - m_B(−i) = (Σ_{j∈B, j≠i} a_j + c·m_type) / (Σ_{j∈B, j≠i} (a_j+b_j) + c). Leaving drink i out avoids
@@ -111,25 +124,28 @@ export function scoreDrinks<T extends DrinkStats>(drinks: T[]): Array<ScoredDrin
   const byType = new Map<string, Sums>()
   const byBrand = new Map<string, Sums>()
   drinks.forEach((drink, i) => {
-    addTo(byType, drink.type, evidence[i])
+    // Banned drinks are never shown and stay out of the type mean, but their evidence still
+    // counts toward their brand's prior: a bad brand keeps paying for them.
+    if (!isBanned(drink)) addTo(byType, drink.type, evidence[i])
     addTo(byBrand, drink.brand, evidence[i])
   })
 
-  return drinks.map((drink, i) => {
+  return drinks.flatMap((drink, i) => {
+    if (isBanned(drink)) return []
     const own = evidence[i]
     const type = byType.get(drink.type)!
     const typeMean = (type.a + c * SODA_NEUTRAL_MEAN) / (type.n + c)
     const brand = byBrand.get(drink.brand)!
     const priorMean = (brand.a - own.a + c * typeMean) / (brand.n - (own.a + own.b) + c)
     const { alpha, beta } = posteriorFrom(own, priorMean)
-    return {
+    return [{
       ...drink,
       alpha,
       beta,
       score: alpha / (alpha + beta),
       prior_mean: priorMean,
       type_mean: typeMean,
-    }
+    }]
   })
 }
 

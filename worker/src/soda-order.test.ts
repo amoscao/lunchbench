@@ -534,3 +534,21 @@ describe('trial rotation across weeks', () => {
     expect(runWeeks(drinks, 4)).toEqual(runWeeks([...drinks].reverse(), 4))
   })
 })
+
+describe('banned drinks in the order list (#298)', () => {
+  test('a banned drink is never a favorite or a trial, and the params record the threshold', () => {
+    const drinks = [
+      drink(1, 'soda', { right_swipes: 15, hates: 5, reporters: 5 }),
+      drink(2, 'soda', { hates: 5, reporters: 5 }),
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 3, 'soda', { likes: 2, reporters: 2 })),
+      ...Array.from({ length: 5 }, (_, i) => drink(i + 11, 'seltzer', { likes: 2, reporters: 2 })),
+    ]
+    for (let week = 0; week < 6; week++) {
+      const items = buildOrderList(drinks, { seed: addDays('2026-11-16', week * 7) })
+      expect(items.map((item) => item.soda_id)).not.toContain(1)
+      expect(items.map((item) => item.soda_id)).not.toContain(2)
+    }
+    const params = orderParams('2026-11-16', []) as { score: { banHates: number } }
+    expect(params.score.banHates).toBe(5)
+  })
+})

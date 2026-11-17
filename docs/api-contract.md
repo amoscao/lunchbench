@@ -418,7 +418,7 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 - `likes` / `hates`: voters whose report is like / hate (one report row per voter per drink). `n` = distinct reporters.
 - θ is the chance a drinker is glad the drink was bought. Some brands are just worse, so each drink's prior comes from its brand.
 - Own evidence `(a_i, b_i)`, no prior: each like adds 1 to `a`, each hate adds 1 to `b`. Right swipes: κ = min(3, 0.2·R) · 3/(3+n), add 0.75κ to `a` and 0.25κ to `b`. Five right swipes weigh one report; the cap is 3 pseudo-counts and fades as reports arrive.
-- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing in scoring or ranking: not the score, not the brand or type means, not the tiebreak. They still count as "seen" for the swipe feed order and are shown as a count.
+- Left swipes are a non-vote ("not a like" includes "haven't had it"). They change nothing in scoring or ranking: not the score, not the brand or type means, not the tiebreak. They are shown as a count, and a voter's own left swipe removes that drink from their feed.
 - A hate report is a full negative: it adds 1 to `b`, exactly as a like adds 1 to `a`.
 - Type mean: `m_type = (Σ_type a + c·0.5) / (Σ_type (a+b) + c)`.
 - Brand mean, leaving drink i out so its evidence is not counted twice: `m_B(−i) = (Σ_{j∈B, j≠i} a_j + c·m_type) / (Σ_{j∈B, j≠i} (a_j+b_j) + c)`. A single-drink brand gets exactly `m_type`. Brands are keyed by the catalog `brand` string as-is.
@@ -441,7 +441,11 @@ The voter's whole swipe feed: every active drink this voter has not swiped yet. 
 
 **Headers:** `X-Lunchbench-Session: <uuid>` (optional; without it no drink counts as swiped).
 
-Order: least evidence first (`R + L + 5·n`). Ties are broken by a per-drink key: `"<session key>:<drink id>"` is hashed and passed through a PRNG finalizer, so tied drinks spread evenly across voters. Each drink therefore keeps its place relative to the others, as long as evidence doesn't change, across swipes and reloads. Without a session header, ties are random. Swiped drinks never come back. Once every drink is swiped, the list is empty.
+Order: a random order weighted toward drinks people like, so voters mostly see promising drinks instead of wading through ones the office dislikes (`worker/src/soda-deck.ts`).
+
+- Each drink's weight is `w = (θ/(1−θ))^2` (`DECK_BIAS_POWER = 2`), where θ is its posterior mean from the scoring model below (brand prior included, left swipes not counted), clamped to 0.02–0.98. A drink scored 0.8 is weighted 16x an unrated drink (0.5); one scored 0.3 is weighted about 0.18x. With no ratings anywhere, every weight is 1 and the order is a uniform shuffle.
+- Weighted sampling without replacement (Efraimidis–Spirakis): key `u^(1/w)`, sorted largest first, with `u` from `"<session key>:<drink id>"` hashed and passed through a PRNG finalizer. Every drink keeps a nonzero chance at every position.
+- Each drink keeps its place relative to the others across swipes and reloads, as long as scores don't change. Without a session header, the order is random per request. Swiped drinks never come back. Once every drink is swiped, the list is empty.
 
 **Response 200:** `{ "sodas": [Soda] }`
 

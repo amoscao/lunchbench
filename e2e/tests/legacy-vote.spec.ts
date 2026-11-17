@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { API_URL, waitForMatchup } from './helpers'
 
 // #286: votes naming a legacy lunch (Paula Legacy Lunch) are rejected with 409 LEGACY_LUNCH.

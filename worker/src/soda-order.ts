@@ -153,7 +153,7 @@ function seededShuffle<T>(items: T[], rng: () => number): T[] {
 }
 
 /**
- * Ranks by score and appeal. Exact ties are broken by a week-seeded shuffle, not by name,
+ * Ranks by score, then right swipes. Exact ties are broken by a week-seeded shuffle, not by name,
  * so a fresh catalog (everything tied at the prior) does not always buy the same alphabetical drinks.
  */
 export function rankForWeek(drinks: DrinkStats[], seed: string): ScoredDrink[] {

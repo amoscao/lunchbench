@@ -492,6 +492,12 @@ function renderDashboard(container: HTMLElement): void {
       tabContent.innerHTML = `<p style="color:var(--text-muted)">No unknown scans</p>`
       return
     }
+    // Preselect the current mapping or the most-picked drink, but only one that can still be mapped
+    // to (active). A removed drink is never preselected, so Map is not silently a no-op.
+    const activeIds = new Set(catalog.map((soda) => soda.id))
+    const preselect = (group: UnknownScanGroup): number | null =>
+      [group.mapped_soda_id, ...group.picks.map((pick) => pick.soda_id)]
+        .find((id): id is number => id != null && activeIds.has(id)) ?? null
     const options = (selected: number | null): string => [
       `<option value="">Drink…</option>`,
       ...catalog.map((soda) => `<option value="${soda.id}"${soda.id === selected ? ' selected' : ''}>${escapeHtml(soda.name)}</option>`),
@@ -522,7 +528,7 @@ function renderDashboard(container: HTMLElement): void {
               <td>${group.mapped_name ? `${escapeHtml(group.mapped_name)} (${escapeHtml(group.mapped_source ?? '')})` : '-'}</td>
               <td style="white-space:nowrap">
                 <select class="form-input" style="width:180px;padding:4px 6px;font-size:12px;display:inline-block" aria-label="Drink for ${escapeHtml(group.code)}">
-                  ${options(group.mapped_soda_id ?? group.picks[0]?.soda_id ?? null)}
+                  ${options(preselect(group))}
                 </select>
                 <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;margin-left:4px" data-action="map">Map</button>
                 <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;margin-left:4px" data-action="dismiss">Dismiss</button>

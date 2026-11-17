@@ -4,8 +4,10 @@
 //   node scripts/import-sodas.mjs build-data <catalog.json> <walmart-items.jsonl>...
 //     Rebuild scripts/data/sodas.json from a Walmart scrape. Skips excluded entries and variety packs.
 //
-//   node scripts/import-sodas.mjs sql
-//     Write migrations/0012_soda_catalog.sql from scripts/data/sodas.json.
+//   node scripts/import-sodas.mjs sql [--force]
+//     Write migrations/0012_soda_catalog.sql from scripts/data/sodas.json. 0012 has shipped and the JSON
+//     has changed since (OLIPOP removed, #296), so this refuses to overwrite it unless --force is given for
+//     a deliberate, reviewed rebuild. Catalog changes go in a new migration.
 //
 //   node scripts/import-sodas.mjs upload --local|--remote [--images-dir DIR] [--skip-missing] [--persist-to DIR]
 //     Put each soda image into the lunchbench-images R2 bucket under its deterministic key.

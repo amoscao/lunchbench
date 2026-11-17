@@ -28,8 +28,6 @@ export type ScoredDrink<T extends DrinkStats = DrinkStats> = T & {
   beta: number
   /** Posterior mean of θ. The primary ranking key. */
   score: number
-  /** (R+1)/(R+L+2). Tiebreak only. */
-  appeal: number
   /** m_B(−i): the brand prior mean for this drink, leaving the drink itself out. */
   prior_mean: number
   /** m_type: the shrunk mean of every drink of this type. */
@@ -76,7 +74,7 @@ export function swipeKappa(rightSwipes: number, reporters: number): number {
 /**
  * A drink's own evidence. Each like adds 1 to a, each hate adds 1 to b.
  * Right swipes add κ·0.75 to a and κ·0.25 to b.
- * Left swipes add nothing: "not a like" includes "haven't had it".
+ * Left swipes add nothing: a left swipe is a non-vote ("not a like" includes "haven't had it").
  */
 export function ownEvidence(drink: Pick<DrinkStats, 'right_swipes' | 'likes' | 'hates' | 'reporters'>): Evidence {
   const kappa = swipeKappa(drink.right_swipes, drink.reporters)
@@ -93,11 +91,6 @@ export function posteriorFrom(evidence: Evidence, priorMean: number): Posterior 
     alpha: k * priorMean + evidence.a,
     beta: k * (1 - priorMean) + evidence.b,
   }
-}
-
-/** appeal = (R+1)/(R+L+2). Tiebreak only; the one place left swipes count. */
-export function sodaAppeal(drink: Pick<DrinkStats, 'right_swipes' | 'left_swipes'>): number {
-  return (drink.right_swipes + 1) / (drink.right_swipes + drink.left_swipes + 2)
 }
 
 type Sums = { a: number; n: number }
@@ -145,7 +138,6 @@ export function scoreDrinks<T extends DrinkStats>(drinks: T[]): Array<ScoredDrin
       alpha,
       beta,
       score: alpha / (alpha + beta),
-      appeal: sodaAppeal(drink),
       prior_mean: priorMean,
       type_mean: typeMean,
     }]
@@ -169,19 +161,22 @@ export function sodaName(drink: Pick<DrinkStats, 'brand' | 'flavor'>): string {
   return `${drink.brand} ${drink.flavor}`
 }
 
-/** Score desc, then appeal desc. 0 when both tie; callers pick the final tiebreak. */
+/**
+ * Score desc, then right swipes desc. Left swipes count for nothing, not even here: a left swipe is
+ * a non-vote. 0 when both tie; callers pick the final tiebreak.
+ */
 export function compareByScore(a: ScoredDrink, b: ScoredDrink): number {
-  return (b.score - a.score) || (b.appeal - a.appeal)
+  return (b.score - a.score) || (b.right_swipes - a.right_swipes)
 }
 
-/** Public leaderboard order: score, appeal, then name and id for a stable result. */
+/** Public leaderboard order: score, right swipes, then name and id for a stable result. */
 export function compareDrinks(a: ScoredDrink, b: ScoredDrink): number {
   return compareByScore(a, b)
     || sodaName(a).localeCompare(sodaName(b))
     || a.id - b.id
 }
 
-/** Scores and sorts by posterior only (score, appeal, name, id). */
+/** Scores and sorts by posterior only (score, right swipes, name, id). */
 export function rankDrinks<T extends DrinkStats>(drinks: T[]): Array<ScoredDrink<T>> {
   return scoreDrinks(drinks).sort(compareDrinks)
 }

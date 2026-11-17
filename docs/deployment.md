@@ -69,7 +69,7 @@ If the PR merges before step 1, the `/api/soda/*` routes return 500. Before step
    cd worker
    npx wrangler d1 execute lunchbench --remote --file=../migrations/0013_soda_barcodes.sql
    ```
-2. Load the barcode seed. Data only, `INSERT OR IGNORE`, safe to re-run. Needs `0012_soda_catalog.sql` already applied.
+2. Load the barcode seed. Data only, `INSERT OR IGNORE`. Needs `0012_soda_catalog.sql` already applied. Any re-run of 0012 or 0014 must be followed by 0015. Otherwise the 9 OLIPOP drinks or their 19 seed barcode mappings come back, and those mappings block voter learning for the codes (`ON CONFLICT DO NOTHING`).
    ```bash
    cd worker
    npx wrangler d1 execute lunchbench --remote --file=../migrations/0014_soda_barcodes_seed.sql
@@ -83,16 +83,26 @@ If the PR merges before step 1, `GET /api/soda/barcodes` and the unknown-scan ro
 ### Remove OLIPOP (issue #296)
 Run with the owner's go-ahead, from `worker/`, in this order. 0015 only touches data that the current Worker already filters, so it is safe before or after the PR merges.
 
-1. Deactivate the drinks and drop their barcodes:
+1. Note a restore point first. 0015 is destructive for barcodes: it deletes every `soda_barcodes` row of the 9 drinks, including voter- and admin-learned mappings, not just the seed ones.
+   ```bash
+   npx wrangler d1 time-travel info lunchbench
+   ```
+   Keep the bookmark it prints. `wrangler d1 time-travel restore lunchbench --bookmark=<bookmark>` undoes the step if needed.
+2. Deactivate the drinks and drop their barcodes:
    ```bash
    npx wrangler d1 execute lunchbench --remote --file=../migrations/0015_remove_olipop.sql
    ```
-2. Check whether this week's frozen order list still names OLIPOP:
+3. Clear this week's frozen order list if it still names OLIPOP. Snapshots store their own `image_key`, so a stale OLIPOP row would keep showing on `/chris`, with a broken image once step 4 runs. Check:
    ```bash
    npx wrangler d1 execute lunchbench --remote --command "SELECT week_start FROM soda_buy_lists WHERE items_json LIKE '%\"brand\":\"OLIPOP\"%' ORDER BY week_start DESC"
    ```
-   If the current week (the latest `week_start`) is listed, regenerate it with an admin session: `POST /api/admin/soda/regenerate`. Snapshots store their own `image_key`, so a stale OLIPOP row would also point at a deleted image. Older weeks need nothing.
-3. Delete the 9 images. The keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, the same ones 0012 stored in `sodas.image_key` (`node scripts/import-sodas.mjs keys` derived them before OLIPOP left `sodas.json`).
+   If the current week (the latest `week_start`) is listed, delete that snapshot and let it rebuild:
+   ```bash
+   npx wrangler d1 execute lunchbench --remote --command "DELETE FROM soda_buy_lists WHERE week_start = '<week>'"
+   ```
+   Then load `/chris` once. `GET /api/soda/order/latest` rebuilds a missing current week (`writeWeeklyOrder(..., 'keep')`) from the active drinks only. Older weeks need nothing.
+   **Do not run step 4 until `/chris` shows no OLIPOP.**
+4. Delete the 9 images. The keys are `images/<uuidv5 of the Walmart item URL>.<ext>`, the same ones 0012 stored in `sodas.image_key` (`node scripts/import-sodas.mjs keys` derived them before OLIPOP left `sodas.json`).
    ```bash
    npx wrangler r2 object delete lunchbench-images/images/73016f37-2dc2-59cb-a628-9d8193690278.jpg   # OLIPOP Cherry Cola
    npx wrangler r2 object delete lunchbench-images/images/deaf3232-53ec-5206-80fb-5838ded36d0e.jpg   # OLIPOP Classic Grape

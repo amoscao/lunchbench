@@ -217,12 +217,15 @@ admin.get('/soda/unknown-scans', requireAdminSession, async (c) => {
     c.env.DB.prepare(
       'SELECT code, soda_id, source FROM soda_barcodes WHERE code IN (SELECT code FROM soda_unknown_scans)'
     ),
-    c.env.DB.prepare('SELECT id, brand, flavor FROM sodas'),
+    c.env.DB.prepare('SELECT id, brand, flavor, is_active FROM sodas'),
   ])
   const groups = groupUnknownScans(
     scans.results as UnknownScanRow[],
     new Map((mapped.results as (CodeMapping & { code: string })[]).map((row) => [row.code, { soda_id: row.soda_id, source: row.source }])),
-    new Map((sodas.results as { id: number; brand: string; flavor: string }[]).map((row) => [row.id, sodaName(row)]))
+    // Inactive drinks (e.g. OLIPOP, #296) stay nameable in old picks but are marked, so an admin sees why
+    // they cannot be mapped to.
+    new Map((sodas.results as { id: number; brand: string; flavor: string; is_active: number }[])
+      .map((row) => [row.id, row.is_active ? sodaName(row) : `${sodaName(row)} (removed)`]))
   )
   return c.json({ codes: groups }, 200, { 'Cache-Control': 'no-store' })
 })

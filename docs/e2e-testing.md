@@ -70,7 +70,7 @@ cd e2e && BASE_URL=http://localhost:5173 API_URL=http://localhost:8787 E2E_ADMIN
 
 - **Navigation**: all three pages accessible, active link highlighting, logo/link navigation, SPA routing
 - **Theme**: light/dark toggle, persistence, icon updates
-- **Home / Voting**: matchup loads, cards display, vote buttons work, vote submission, sequential voting, button disabled during submission
+- **Home / Voting**: matchup loads, cards display, vote buttons work, vote submission, sequential voting, button disabled during submission, a pair already seen in this browser is replaced by one fresh fetch on initial load and prefetch (one retry only; if the server keeps returning it, the user sees the seen pair after one retry, no loop)
 - **Leaderboard**: all lunches shown, rank badges (gold/silver/bronze), ratings, Glicko updates after voting, thumbnails/placeholders
 - **Add Lunch**: mode switching, text-only add, authentication, error states, image upload area, client-side file validation
 - **API**: health, matchup, vote (win + tie), invalid requests, auth, image upload rejection

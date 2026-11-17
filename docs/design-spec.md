@@ -310,16 +310,16 @@ Centered in the page content area, vertical flex, gap 16px.
 
 ### Exhausted matchups state
 
-Shown when the user has seen every available pair (seen-pairs localStorage set covers all combinations in the current lunch pool). Replaces the vote arena — navigation and other UI remain intact.
+Shown when the user has seen every available pair (`GET /api/matchup` returns `{ "status": "exhausted" }` for this session and vegan mode). Replaces the vote arena — navigation and other UI remain intact.
 
 - Icon: 🎉 or ✅ (celebratory, not an error)
 - Heading: "You've seen them all!"
 - Subtext: "New matchups may appear as lunches are added. Check back later."
 - CTA: secondary button linking to `/leaderboard` — "See the leaderboard"
 
-**Detection**: the prefetch IIFE in `home.ts` tries up to 3 `GET /api/matchup` calls. If every returned pair is in the seen-pairs set, exhaustion is declared and this state is rendered instead of a seen pair.
+**Detection**: the server decides exhaustion from acknowledged pairs (`POST /api/matchup/seen`). The client also keeps rendered pairs in localStorage (`lb_seen_pairs`, id order normalized, newest 2000). When `GET /api/matchup` returns a pair already in that set, the client fetches once more and uses the fresh result. It never retries twice. If the retry fails or returns no pair, the original pair renders. This applies to every matchup the home page fetches: the initial load, the prefetched next pair, and the refetch after a vote or skip when the prefetch failed.
 
-**Reset**: no explicit user action needed. When new lunches are added (expanding the pair pool beyond what localStorage covers), unseen pairs will appear naturally on the next visit.
+**Reset**: no explicit user action needed. When new lunches are added, unseen pairs appear naturally on the next visit.
 
 ---
 

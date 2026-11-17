@@ -6,6 +6,10 @@ import { ADMIN_MANAGER_PASSWORD, API_URL, getAdminSessionToken, verifyPassword }
 // been shown in matchups. Vegan lunches, because the seed has none, so the vegan pool is small and
 // a session can be shown every pair in it.
 
+// Lunches this spec created; afterEach deletes them, pass or fail, so later specs see only the
+// seed's (zero) vegan lunches.
+const created: number[] = []
+
 async function addVeganLunch(name: string): Promise<number> {
   const res = await fetch(`${API_URL}/api/lunches`, {
     method: 'POST',
@@ -13,7 +17,9 @@ async function addVeganLunch(name: string): Promise<number> {
     body: JSON.stringify({ name, is_vegan: true }),
   })
   expect(res.status).toBe(201)
-  return ((await res.json()) as { lunch: { id: number } }).lunch.id
+  const id = ((await res.json()) as { lunch: { id: number } }).lunch.id
+  created.push(id)
+  return id
 }
 
 // Shows one session every vegan pair: GET /api/matchup and POST /seen until exhausted.
@@ -50,6 +56,11 @@ async function openAdmin(page: Page): Promise<void> {
 }
 
 test.describe('Admin lunch delete', () => {
+  // Deleting an id that is already gone also answers 200.
+  test.afterEach(async () => {
+    for (const id of created.splice(0)) expect(await adminDelete(id)).toBe(200)
+  })
+
   test('deletes a lunch that has been shown in matchups and shows success', async ({ page }) => {
     const suffix = randomUUID().slice(0, 8)
     const target = await addVeganLunch(`Delete Me ${suffix}`)
@@ -67,10 +78,7 @@ test.describe('Admin lunch delete', () => {
     await expect(page.locator('#admin-alert')).toHaveClass(/alert-success/)
     await expect(row).toHaveCount(0)
     expect((await fetch(`${API_URL}/api/lunches/${target}`)).status).toBe(404)
-
-    // Clean up so later specs see only the seed's (zero) vegan lunches.
-    expect(await adminDelete(other)).toBe(200)
-    expect((await fetch(`${API_URL}/api/lunches/${other}`)).status).toBe(404)
+    expect((await fetch(`${API_URL}/api/lunches/${other}`)).status).toBe(200)
   })
 
   test('a failed delete shows an error and keeps the row', async ({ page }) => {
@@ -89,7 +97,5 @@ test.describe('Admin lunch delete', () => {
     await expect(page.locator('#admin-alert')).toHaveClass(/alert-error/)
     await expect(row).toBeVisible()
     expect((await fetch(`${API_URL}/api/lunches/${target}`)).status).toBe(200)
-
-    expect(await adminDelete(target)).toBe(200)
   })
 })

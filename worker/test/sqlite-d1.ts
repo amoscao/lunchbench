@@ -11,7 +11,7 @@ type SqliteStatement = {
   all(...values: unknown[]): Row[]
   run(...values: unknown[]): { changes: number | bigint }
 }
-type SqliteDatabase = { exec(sql: string): void; prepare(sql: string): SqliteStatement }
+type SqliteDatabase = { exec(sql: string): void; prepare(sql: string): SqliteStatement; readonly isTransaction: boolean }
 
 const MIGRATIONS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'migrations')
 
@@ -64,7 +64,8 @@ export function createTestD1(): { db: D1Database; sqlite: SqliteDatabase } {
         sqlite.exec('COMMIT')
         return results
       } catch (error) {
-        sqlite.exec('ROLLBACK')
+        // SQLite may have rolled back already; a second ROLLBACK would hide the real error.
+        if (sqlite.isTransaction) sqlite.exec('ROLLBACK')
         throw error
       }
     },

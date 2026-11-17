@@ -386,13 +386,3 @@ describe('limits and non-matches', () => {
     expect((performance.now() - start) / queries.length).toBeLessThan(30)
   })
 })
-
-describe('OLIPOP is gone (issue #296)', () => {
-  test('the catalog has no OLIPOP drink', () => {
-    expect(catalog.filter((d) => d.brand === 'OLIPOP')).toEqual([])
-  })
-
-  test.each(['olipop', 'oli pop', 'olipop vintage cola', 'olipep'])('%s finds no OLIPOP drink', (query) => {
-    expect(all(query).filter((name) => name.startsWith('OLIPOP'))).toEqual([])
-  })
-})

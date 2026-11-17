@@ -124,15 +124,29 @@ describe('inactive drinks are excluded everywhere', () => {
     expect(body.barcodes.filter((row) => olipop.includes(row.soda_id))).toEqual([])
   })
 
-  test('a former OLIPOP barcode is unknown and gets logged', async () => {
+  test('a former OLIPOP code can be learned for the drink a voter picks instead', async () => {
     const { send, sqlite } = setup()
     // A real OLIPOP Vintage Cola code from the shipped barcode seed (0014).
     const shipped = readFileSync(fileURLToPath(new URL('../../migrations/0014_soda_barcodes_seed.sql', import.meta.url)), 'utf8')
     const code = shipped.match(/\('(\d{13})', '7097351727'\)/)![1]
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM soda_barcodes WHERE code = ?').get(code)!.n).toBe(0)
-    const res = await send(sodaRouter, 'POST', '/unknown-scans', { barcode: code, format: 'ean_13' }, { 'X-Lunchbench-Session': VOTER })
-    expect(res.status).toBeLessThan(300)
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM soda_unknown_scans WHERE code = ?').get(code)!.n).toBe(1)
+    const zevia = Number(sqlite.prepare("SELECT id FROM sodas WHERE walmart_item_id = '2444526495'").get()!.id)
+    const voter = { 'X-Lunchbench-Session': VOTER }
+
+    expect((await send(sodaRouter, 'POST', '/unknown-scans', { barcode: code, format: 'ean_13' }, voter)).status).toBeLessThan(300)
+    const res = await send(sodaRouter, 'POST', '/reports', { soda_id: zevia, verdict: 'like', barcode: code }, voter)
+    expect(res.status).toBe(200)
+    // Had 0015 kept the OLIPOP seed mapping, ON CONFLICT DO NOTHING would block this and return null.
+    expect(await res.json()).toEqual({ ok: true, barcode_soda_id: zevia })
+    expect(sqlite.prepare('SELECT soda_id, source FROM soda_barcodes WHERE code = ?').get(code)).toEqual({ soda_id: zevia, source: 'voter' })
+  })
+
+  test('admin unknown-scan picks mark a removed drink "(removed)"', async () => {
+    const { env, sqlite, olipop } = setup()
+    sqlite.prepare("INSERT INTO soda_unknown_scans (code, format, session_key, resolved_soda_id, resolved_by) VALUES ('0012345678905', 'ean_13', ?, ?, 'voter')")
+      .run(VOTER, olipop[0])
+    const res = await adminRouter.request('/soda/unknown-scans', { headers: { Authorization: 'Bearer admin-token' } }, env)
+    const body = await res.json() as { codes: Array<{ picks: Array<{ soda_id: number; name: string }> }> }
+    expect(body.codes[0].picks).toEqual([expect.objectContaining({ soda_id: olipop[0], name: expect.stringMatching(/^OLIPOP .+ \(removed\)$/) })])
   })
 
   test('swipes, reports and admin barcode mappings to an inactive drink are rejected', async () => {

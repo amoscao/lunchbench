@@ -317,7 +317,7 @@ Shown when the user has seen every available pair (`GET /api/matchup` returns `{
 - Subtext: "New matchups may appear as lunches are added. Check back later."
 - CTA: secondary button linking to `/leaderboard` — "See the leaderboard"
 
-**Detection**: the server decides exhaustion from acknowledged pairs (`POST /api/matchup/seen`). The client also keeps rendered pairs in localStorage (`lb_seen_pairs`, id order normalized, newest 2000). When `GET /api/matchup` returns a pair already in that set, the client fetches once more and uses the fresh result. It never retries twice. If the retry fails or returns no pair, the original pair renders. This applies to the initial load and to the prefetched next pair used after a vote or skip.
+**Detection**: the server decides exhaustion from acknowledged pairs (`POST /api/matchup/seen`). The client also keeps rendered pairs in localStorage (`lb_seen_pairs`, id order normalized, newest 2000). When `GET /api/matchup` returns a pair already in that set, the client fetches once more and uses the fresh result. It never retries twice. If the retry fails or returns no pair, the original pair renders. This applies to every matchup the home page fetches: the initial load, the prefetched next pair, and the refetch after a vote or skip when the prefetch failed.
 
 **Reset**: no explicit user action needed. When new lunches are added, unseen pairs appear naturally on the next visit.
 

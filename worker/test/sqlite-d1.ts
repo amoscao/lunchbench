@@ -29,6 +29,11 @@ export function createTestD1(): { db: D1Database; sqlite: SqliteDatabase } {
 
   function statement(sql: string, values: unknown[] = []) {
     const stmt = () => sqlite.prepare(sql)
+    const allSync = <T>() => ({ results: stmt().all(...values).map((row) => ({ ...row })) as T[], success: true, meta: {} })
+    const runSync = () => {
+      const result = stmt().run(...values)
+      return { success: true, results: [], meta: { changes: Number(result.changes) } }
+    }
     return {
       sql,
       bind: (...next: unknown[]) => statement(sql, next),
@@ -38,20 +43,30 @@ export function createTestD1(): { db: D1Database; sqlite: SqliteDatabase } {
         return (column ? row[column] : row) as T
       },
       async all<T>() {
-        return { results: stmt().all(...values).map((row) => ({ ...row })) as T[], success: true, meta: {} }
+        return allSync<T>()
       },
       async run() {
-        const result = stmt().run(...values)
-        return { success: true, results: [], meta: { changes: Number(result.changes) } }
+        return runSync()
       },
+      // Batch-only: one synchronous step inside the batch transaction.
+      step: () => (/^\s*(SELECT|WITH)\b|\bRETURNING\b/i.test(sql) ? allSync() : runSync()),
     }
   }
 
   const db = {
     prepare: (sql: string) => statement(sql),
-    // Like D1: every result has rows (for reads) and meta.changes (for writes).
+    // Like D1: one transaction, rolled back whole if any statement fails; every result has rows
+    // (for reads) and meta.changes (for writes).
     async batch(statements: ReturnType<typeof statement>[]) {
-      return Promise.all(statements.map((s) => (/^\s*(SELECT|WITH)\b|\bRETURNING\b/i.test(s.sql) ? s.all() : s.run())))
+      sqlite.exec('BEGIN')
+      try {
+        const results = statements.map((s) => s.step())
+        sqlite.exec('COMMIT')
+        return results
+      } catch (error) {
+        sqlite.exec('ROLLBACK')
+        throw error
+      }
     },
   }
   return { db: db as unknown as D1Database, sqlite }

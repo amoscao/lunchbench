@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { waitForMatchup, castVote, API_URL } from './helpers'
 
 type LunchSnapshot = {
@@ -103,10 +103,15 @@ test.describe('Home / Voting', () => {
       await route.abort()
     })
     await page.route('/api/matchup**', async (route) => {
+      // Skip POST /api/matchup/seen: its body has no pair.
+      if (route.request().method() !== 'GET') {
+        await route.continue()
+        return
+      }
       const response = await route.fetch()
       if (response.status() === 200) {
-        const body = await response.json() as { left: LunchSnapshot; right: LunchSnapshot }
-        initialMatchup ??= body
+        const body = await response.json() as { status: string; left: LunchSnapshot; right: LunchSnapshot }
+        if (body.status === 'ok') initialMatchup ??= body
         await route.fulfill({ response, json: body })
         return
       }

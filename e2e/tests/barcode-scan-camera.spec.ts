@@ -1,6 +1,6 @@
 // Runs in the `camera-blank` project: a touch device whose fake camera shows a blank frame,
 // so scanning keeps running until the test ends it.
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { expectCameraOff, liveTracks, openReport, trackCameraStreams } from './camera-helpers'
 
 test.describe('Barcode scan mode: camera lifecycle', () => {

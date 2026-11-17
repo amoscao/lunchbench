@@ -9,8 +9,10 @@
 //   node scripts/import-barcodes.mjs match [--cache DIR]
 //     Match cached products to catalog drinks and write scripts/data/soda-barcodes.json.
 //
-//   node scripts/import-barcodes.mjs sql
-//     Write migrations/0014_soda_barcodes_seed.sql from scripts/data/soda-barcodes.json.
+//   node scripts/import-barcodes.mjs sql [--force]
+//     Write migrations/0014_soda_barcodes_seed.sql from scripts/data/soda-barcodes.json. 0014 has shipped
+//     and the JSON has changed since (OLIPOP removed, #296), so this refuses to overwrite it unless --force
+//     is given for a deliberate, reviewed rebuild. Barcode changes go in a new migration.
 //
 // Codes are stored as 13-digit GTINs: UPC-E is expanded to UPC-A, then UPC-A and EAN-8 are
 // zero-padded. Every code has a valid check digit. The migration keys drinks by walmart_item_id,
@@ -273,6 +275,12 @@ function sqlString(value) {
 }
 
 function writeSql() {
+  // 0014_soda_barcodes_seed.sql has shipped (it ran in production). Migrations are append-only, and the source data
+  // has since changed (OLIPOP removed by 0015, issue #296), so regenerating would rewrite history.
+  // Data changes go in a new migration. --force exists only for a deliberate, reviewed rebuild.
+  if (existsSync(MIGRATION_FILE) && !process.argv.includes('--force')) {
+    throw new Error(`${MIGRATION_FILE} already shipped; write a new migration instead (or pass --force deliberately)`)
+  }
   const data = JSON.parse(readFileSync(BARCODES_FILE, 'utf8'))
   const rows = []
   for (const [itemId, entry] of Object.entries(data)) {

@@ -20,14 +20,28 @@ const rows = migration.split('\n')
   .filter((match): match is RegExpMatchArray => match !== null)
   .map((match) => match.slice(1, 6).map(unquote))
 
+// 0012 shipped with the full catalog and can't be edited. Drinks taken off later (0015, issue #296)
+// are deactivated by migration and dropped from sodas.json, so the source data matches what is live.
+const removal = readFileSync(fileURLToPath(new URL('migrations/0015_remove_olipop.sql', root)), 'utf8')
+const removedIds = new Set(
+  removal.slice(removal.indexOf('UPDATE sodas')).match(/'(\d+)'/g)!.map((quoted) => quoted.slice(1, -1))
+)
+const liveRows = rows.filter((row) => !removedIds.has(row[0]))
+
 describe('0012_soda_catalog.sql', () => {
-  test('has one row per drink in scripts/data/sodas.json, in order', () => {
-    expect(rows).toHaveLength(sodas.length)
-    expect(rows.map((row) => row[0])).toEqual(sodas.map((soda) => soda.walmart_item_id))
+  test('0015 removes exactly the 9 OLIPOP drinks', () => {
+    expect([...removedIds].sort()).toEqual(rows.filter((row) => row[1] === 'OLIPOP').map((row) => row[0]).sort())
+    expect(removedIds.size).toBe(9)
   })
 
-  test('matches brand, flavor, type and image key for every drink', () => {
-    rows.forEach(([itemId, brand, flavor, type, key], index) => {
+  test('minus removed drinks, has one row per drink in scripts/data/sodas.json, in order', () => {
+    expect(liveRows).toHaveLength(sodas.length)
+    expect(liveRows.map((row) => row[0])).toEqual(sodas.map((soda) => soda.walmart_item_id))
+    expect(sodas.some((soda) => removedIds.has(soda.walmart_item_id))).toBe(false)
+  })
+
+  test('matches brand, flavor, type and image key for every live drink', () => {
+    liveRows.forEach(([itemId, brand, flavor, type, key], index) => {
       const soda = sodas[index]
       expect({ itemId, brand, flavor, type, key }).toEqual({
         itemId: soda.walmart_item_id,
@@ -52,5 +66,20 @@ describe('0012_soda_catalog.sql', () => {
     const seedRows = seed.split('\n').map((line) => line.match(ROW_RE)).filter((m): m is RegExpMatchArray => m !== null)
     expect(seedRows.length).toBe(14)
     for (const match of seedRows) expect(match[5]).toBe(catalogKeys.get(match[1]))
+    expect(seedRows.some((match) => removedIds.has(match[1]))).toBe(false)
+  })
+})
+
+describe('0014_soda_barcodes_seed.sql', () => {
+  const barcodeMigration = readFileSync(fileURLToPath(new URL('migrations/0014_soda_barcodes_seed.sql', root)), 'utf8')
+  const shipped = [...barcodeMigration.matchAll(/\('(\d{13})', '(\d+)'\)/g)].map((m) => ({ code: m[1], item: m[2] }))
+  const source = JSON.parse(readFileSync(fileURLToPath(new URL('scripts/data/soda-barcodes.json', root)), 'utf8')) as Record<string, { codes: Array<{ code: string }> }>
+
+  test('minus removed drinks, matches scripts/data/soda-barcodes.json', () => {
+    const live = shipped.filter((row) => !removedIds.has(row.item)).map((row) => `${row.item}:${row.code}`).sort()
+    const fromSource = Object.entries(source).flatMap(([item, entry]) => entry.codes.map((c) => `${item}:${c.code}`)).sort()
+    expect(live).toEqual(fromSource)
+    expect(Object.keys(source).some((item) => removedIds.has(item))).toBe(false)
+    expect(shipped.filter((row) => removedIds.has(row.item))).toHaveLength(19)
   })
 })

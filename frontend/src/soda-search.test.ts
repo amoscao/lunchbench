@@ -13,7 +13,7 @@ import {
 type Row = { brand: string; flavor: string; type: 'soda' | 'seltzer' }
 type Drink = SearchableSoda & { name: string }
 
-// The REAL 124-drink catalog, in the order GET /api/soda/catalog returns it:
+// The REAL catalog (115 active drinks since OLIPOP was removed in #296), in the order GET /api/soda/catalog returns it:
 // ORDER BY brand ASC, flavor ASC, id ASC (SQLite binary collation, so "Zevia" sorts before "bubly").
 const binary = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 const catalog: Drink[] = (catalogJson as Row[])
@@ -25,7 +25,7 @@ const all = (query: string) => names(query, 1000)
 const first = (query: string) => names(query)[0]
 
 test('the fixture is the full catalog', () => {
-  expect(catalog).toHaveLength(124)
+  expect(catalog).toHaveLength(115)
 })
 
 describe('normalization', () => {
@@ -58,7 +58,7 @@ describe('normalization', () => {
 
 describe('typos', () => {
   test.each([
-    ['olipep', 'OLIPOP'],
+    ['zevai', 'Zevia'],
     ['spirte', 'Sprite'],
     ['lacrox', 'LaCroix'],
   ])('%s finds only %s', (query, brand) => {
@@ -189,8 +189,6 @@ describe('aliases', () => {
     'great value': (d) => d.brand === 'Great Value',
     'walmart': (d) => d.brand === 'Great Value',
     'walmart brand': (d) => d.brand === 'Great Value',
-    'olipop': (d) => d.brand === 'OLIPOP',
-    'oli pop': (d) => d.brand === 'OLIPOP',
     'poppy': (d) => d.brand === 'poppi',
     'seltzer': (d) => d.type === 'seltzer',
     'seltzers': (d) => d.type === 'seltzer',
@@ -242,7 +240,6 @@ describe('aliases', () => {
     ['dp', 'Dr Pepper'],
     ['la croix', 'LaCroix'],
     ['bubbly', 'bubly'],
-    ['olipop', 'OLIPOP'],
     ['poppy', 'poppi'],
   ])('%s only finds %s', (query, brand) => {
     const results = all(query)
@@ -251,7 +248,7 @@ describe('aliases', () => {
   })
 
   test('creme soda finds cream sodas', () => {
-    expect(names('creme soda').slice(0, 2)).toEqual(['OLIPOP Cream Soda', 'poppi Cream Soda'])
+    expect(names('creme soda')[0]).toBe('poppi Cream Soda')
   })
 
   test('diet cherry ranks Coca-Cola Diet Cherry first', () => {
@@ -262,7 +259,7 @@ describe('aliases', () => {
     const expected = catalog.filter((s) => /root beer/i.test(s.flavor)).map((s) => s.name).sort()
     expect(expected).toEqual(expect.arrayContaining([
       'A&W Root Beer', "Barq's Root Beer", 'Mug Root Beer', 'Great Value Root Beer',
-      'OLIPOP Classic Root Beer', 'Zevia Creamy Root Beer', 'Bloom Nutrition Root Beer Float',
+      'Zevia Creamy Root Beer', 'Bloom Nutrition Root Beer Float',
     ]))
     expect(all('root beer').sort()).toEqual(expected)
     expect(all('rootbeer').sort()).toEqual(expected)
@@ -383,7 +380,7 @@ describe('limits and non-matches', () => {
   })
 
   test('stays fast over the full catalog', () => {
-    const queries = ['coke', 'baja blsat', 'lemon strawberry poppi', 'olipep', 'walmart brand', 's', 'coka cola', 'rasberry']
+    const queries = ['coke', 'baja blsat', 'lemon strawberry poppi', 'zevai', 'walmart brand', 's', 'coka cola', 'rasberry']
     const start = performance.now()
     for (const query of queries) searchSodas(query, catalog)
     expect((performance.now() - start) / queries.length).toBeLessThan(30)

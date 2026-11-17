@@ -1,8 +1,6 @@
 import { submitSodaReport, type Soda } from '../api'
-import { fuzzyFilter } from '../fuzzy'
+import { MAX_RESULTS, searchSodas } from '../soda-search'
 import { escapeHtml } from '../utils/escape-html'
-
-const MAX_SUGGESTIONS = 6
 
 export type ReportModal = { close: () => void }
 
@@ -36,8 +34,8 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
       </div>
       <div class="alert alert-error soda-report-error" hidden>Report failed</div>
       <div class="soda-report-actions">
-        <button type="button" class="btn btn-primary soda-report-like" disabled>Like</button>
         <button type="button" class="btn soda-report-hate" disabled>Hate</button>
+        <button type="button" class="btn btn-primary soda-report-like" disabled>Like</button>
       </div>
     </section>
   `
@@ -68,10 +66,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
       hideSuggestions()
       return
     }
-    suggestions = fuzzyFilter(query, catalog)
-      .slice(0, MAX_SUGGESTIONS)
-      .map((match) => byId.get(match.id))
-      .filter((soda): soda is Soda => soda !== undefined)
+    suggestions = searchSodas(query, catalog, MAX_RESULTS)
     highlighted = suggestions.length > 0 ? 0 : -1
     list.innerHTML = suggestions.map((soda, index) => `
       <li role="option" aria-selected="${index === highlighted}">

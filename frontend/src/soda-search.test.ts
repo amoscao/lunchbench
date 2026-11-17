@@ -259,7 +259,10 @@ describe('aliases', () => {
     expect(all('grapefruit')).toEqual([
       'bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'Fresca Original Citrus', 'LaCroix Pamplemousse',
     ])
-    expect(all('grapefruits').sort()).toEqual(all('grapefruit').sort())
+    // The plural ranks Fresca first: its two-word alias match outscores the exact "grapefruit" hits.
+    expect(all('grapefruits')).toEqual([
+      'Fresca Original Citrus', 'bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'LaCroix Pamplemousse',
+    ])
   })
 
   test.each(['fresca grapefruit', 'grapefruit fresca', 'grapefruit soda', 'grapefruit pop', 'fresca grape', 'fresca'])(
@@ -273,12 +276,14 @@ describe('aliases', () => {
     expect(all(query)).toEqual(['LaCroix Pamplemousse'])
   })
 
-  test('grapefruit seltzer leaves Fresca out', () => {
-    expect(all('grapefruit seltzer')).toEqual(['bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'LaCroix Pamplemousse'])
+  test.each(['grapefruit seltzer', 'grapefruits seltzer'])('%s leaves Fresca out', (query) => {
+    expect(all(query)).toEqual(['bubly Grapefruit', 'Polar Ruby Red Grapefruit', 'LaCroix Pamplemousse'])
   })
 
-  test('grapef lists Fresca and Pamplemousse while typing grapefruit', () => {
-    expect(all('grapef')).toEqual(expect.arrayContaining(['Fresca Original Citrus', 'LaCroix Pamplemousse']))
+  test('grapef lists Fresca and Pamplemousse after the literal matches while typing grapefruit', () => {
+    expect(all('grapef')).toEqual([
+      'bubly Grapefruit', 'Bloom Nutrition Grape Freeze', 'Polar Ruby Red Grapefruit', 'Fresca Original Citrus', 'LaCroix Pamplemousse',
+    ])
   })
 
   test('diet cherry ranks Coca-Cola Diet Cherry first', () => {

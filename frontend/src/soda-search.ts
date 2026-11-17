@@ -63,10 +63,11 @@ export const SODA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'orange': ['orange', 'tangerine', 'mandarin'],
   'cherry': ['cherry'],
   // Grapefruit drinks without "grapefruit" in the name (#301): Fresca's flagship, which Walmart and the
-  // catalog call "Original Citrus", and LaCroix Pamplemousse (French for grapefruit). Not "fresca …":
-  // the typed "fresca" already takes the brand word, so "fresca grapefruit" works too.
+  // catalog call "Original Citrus", and LaCroix Pamplemousse (French for grapefruit). No "fresca grapefruit"
+  // key is needed: "fresca" matches the brand and "grapefruit" the flavor through this alias.
   'grapefruit': GRAPEFRUIT,
-  'grapefruits': GRAPEFRUIT,
+  // The plural lists "grapefruit" too, so the Grapefruit drinks match exactly instead of by typo.
+  'grapefruits': ['grapefruit', ...GRAPEFRUIT],
   'lemon lime': ['lemon lime', 'sprite original', 'sprite zero', '7up original'],
   'creme': ['cream'],
 }

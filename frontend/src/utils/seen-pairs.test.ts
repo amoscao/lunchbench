@@ -121,6 +121,15 @@ describe('fetchUnseenMatchup', () => {
     expect(fetchMatchup).toHaveBeenCalledTimes(2)
   })
 
+  test('uses the retry result even when it is another seen pair', async () => {
+    markSeen(1, 2)
+    markSeen(3, 4)
+    const fetchMatchup = fetcher(pair(1, 2), pair(3, 4))
+
+    await expect(fetchUnseenMatchup(fetchMatchup)).resolves.toEqual(pair(3, 4))
+    expect(fetchMatchup).toHaveBeenCalledTimes(2)
+  })
+
   test('falls back to the original pair when the retry fails or has no pair', async () => {
     for (const retry of [new Error('network'), { status: 'exhausted' } as const, null]) {
       markSeen(1, 2)

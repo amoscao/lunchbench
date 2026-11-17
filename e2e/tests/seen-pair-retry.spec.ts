@@ -129,6 +129,7 @@ test.describe('Client-side seen pair retry', () => {
     expect(server.callsAtFirstAck()).toBe(2)
     // Prefetch: original + one retry, then no more requests.
     await expect.poll(() => server.calls()).toBe(4)
+    // Deliberate quiet window: a retry loop would exceed 4 calls within milliseconds.
     await page.waitForTimeout(1000)
     expect(server.calls()).toBe(4)
     expect(server.acks).toEqual(['ab-2'])

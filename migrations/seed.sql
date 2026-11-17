@@ -18,7 +18,7 @@ INSERT OR IGNORE INTO sodas (walmart_item_id, brand, flavor, type, image_key) VA
   ('100175342', 'Canada Dry', 'Ginger Ale Caffeine-Free', 'soda', 'images/96c25a56-aff8-5e3f-966d-cd9bb41d1749.jpg'),
   ('16777401', 'A&W', 'Root Beer', 'soda', 'images/47e021a2-160e-5613-abf1-6224b2b2f0f3.jpg'),
   ('1695005554', 'poppi', 'Strawberry Lemon', 'soda', 'images/fdbb8063-1f25-50f5-838e-7d4de5480b2d.jpg'),
-  ('7097351727', 'OLIPOP', 'Vintage Cola', 'soda', 'images/8ea569f5-d4e8-5a3e-9afd-167de89aef9f.jpg'),
+  ('2444526495', 'Zevia', 'Cola', 'soda', 'images/94320218-b23f-5046-8c5d-43801c741419.jpg'),
   ('490194997', 'bubly', 'Grapefruit', 'seltzer', 'images/419f1ff4-c34f-5370-a5e8-19dcfbafb868.jpg'),
   ('36333049', 'LaCroix', 'Lime', 'seltzer', 'images/7ea3bd53-a7c8-5154-8b1d-319c6d16d20c.png'),
   ('342409802', 'Polar', 'Original', 'seltzer', 'images/67d35bc6-51bc-5e24-aa4f-ea66b0ee26ea.jpg'),

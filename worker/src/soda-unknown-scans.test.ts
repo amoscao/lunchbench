@@ -5,7 +5,7 @@ function scan(code: string, session: string, at: string, resolved: number | null
   return { code, format: 'upc_a', session_key: session, created_at: at, resolved_soda_id: resolved, resolved_by: by }
 }
 
-const names = new Map([[1, 'OLIPOP Vintage Cola'], [2, 'Coca-Cola Original']])
+const names = new Map([[1, 'Zevia Cola'], [2, 'Coca-Cola Original']])
 
 describe('groupUnknownScans', () => {
   test('groups by code with scan counts, distinct voters, first and last seen', () => {
@@ -31,7 +31,7 @@ describe('groupUnknownScans', () => {
     ], new Map(), names)
 
     expect(group.picks).toEqual([
-      { soda_id: 1, name: 'OLIPOP Vintage Cola', count: 2 },
+      { soda_id: 1, name: 'Zevia Cola', count: 2 },
       { soda_id: 2, name: 'Coca-Cola Original', count: 1 },
     ])
   })
@@ -44,7 +44,7 @@ describe('groupUnknownScans', () => {
 
     expect(groups.map((group) => [group.code, group.mapped_name, group.mapped_source])).toEqual([
       ['OPEN', null, null],
-      ['MAPPED', 'OLIPOP Vintage Cola', 'voter'],
+      ['MAPPED', 'Zevia Cola', 'voter'],
     ])
   })
 

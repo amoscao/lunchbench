@@ -5,7 +5,7 @@ import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildFeed, sessionTieKey } from '../soda-deck'
-import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
+import { hasData, rankForLeaderboard, scoreDrinks, sodaName, type DrinkStats } from '../soda-score'
 import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
 import { imageUrl, isSodaBanned, loadDrinkStats, loadScoringStats, shownSodaSql, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 import { isBarcodeFormat, normalizeBarcode } from '../barcode'
@@ -59,7 +59,8 @@ soda.get('/catalog', async (c) => {
   )
 })
 
-// The voter's whole feed: every active drink they have not swiped, in priority order.
+// The voter's whole feed: every active drink they have not swiped, in a random order weighted
+// toward drinks people like (see buildFeed).
 soda.get('/deck', async (c) => {
   const sessionKey = parseSessionKey(c.req.header('X-Lunchbench-Session') ?? null)
   const [drinks, swipes] = await Promise.all([
@@ -71,16 +72,16 @@ soda.get('/deck', async (c) => {
       : Promise.resolve({ results: [] as { soda_id: number }[] }),
   ])
   const swiped = new Set(swipes.results.map((row) => row.soda_id))
-  // A per-drink key seeded by session keeps each drink's place stable across swipes and reloads.
-  // Without a session, ties are random per request.
+  // A per-drink random key seeded by session keeps each drink's place stable across swipes and
+  // reloads. Without a session, the order is random per request.
   const randomKeys = new Map<number, number>()
-  const tieKey = sessionKey
+  const randomKey = sessionKey
     ? sessionTieKey(sessionKey, seededRandom)
     : (id: number) => {
       if (!randomKeys.has(id)) randomKeys.set(id, Math.random())
       return randomKeys.get(id)!
     }
-  const feed = buildFeed(drinks, swiped, tieKey)
+  const feed = buildFeed(scoreDrinks(drinks), swiped, randomKey)
   return c.json({ sodas: feed.map(sodaCard) }, 200, { 'Cache-Control': 'no-store' })
 })
 

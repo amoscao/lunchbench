@@ -1,70 +1,104 @@
 import { describe, expect, test } from 'vitest'
-import { buildFeed, DECK_BIAS_POWER, deckWeight, sessionTieKey, type DeckDrink } from './soda-deck'
+import {
+  buildFeed,
+  DECK_MAX_WEIGHT,
+  DECK_MIN_WEIGHT,
+  deckWeight,
+  sessionTieKey,
+  type DeckDrink,
+} from './soda-deck'
 import { seededRandom } from './soda-order'
+import { scoreDrinks, type DrinkStats, type SodaType } from './soda-score'
 
 function drink(id: number, overrides: Partial<DeckDrink> = {}): DeckDrink {
-  return { id, score: 0.5, ...overrides }
+  return { id, score: 0.5, type_mean: 0.5, right_swipes: 0, reporters: 0, ...overrides }
 }
 
-const byId = (id: number) => id
+/** A fixed key strictly inside (0, 1), so tests exercise real sampling rather than the clamp. */
+const fixedKey = (id: number) => (id % 997) / 1000 + 0.0005
+
+function voterKey(i: number) {
+  return sessionTieKey(`voter-${i}`, seededRandom)
+}
+
+/** Rough shape of the real catalog: many brands, several flavors each, sodas and seltzers. */
+function catalog(): DrinkStats[] {
+  const brands: Array<[string, SodaType, number]> = [
+    ['Pepsi', 'soda', 8], ['Coca-Cola', 'soda', 8], ['poppi', 'soda', 12], ['Great Value', 'soda', 10],
+    ['Mountain Dew', 'soda', 8], ['Zevia', 'soda', 8], ['Canada Dry', 'soda', 6], ['Sprite', 'soda', 4],
+    ['LaCroix', 'seltzer', 10], ['bubly', 'seltzer', 8], ['Polar', 'seltzer', 8], ['Waterloo', 'seltzer', 6],
+  ]
+  const drinks: DrinkStats[] = []
+  for (const [brand, type, count] of brands) {
+    for (let i = 0; i < count; i++) {
+      drinks.push({
+        id: drinks.length + 1, brand, flavor: `Flavor ${i}`, type, image_key: null,
+        right_swipes: 0, left_swipes: 0, likes: 0, hates: 0, reporters: 0,
+      })
+    }
+  }
+  return drinks
+}
+
+function withReports(drinks: DrinkStats[], brand: string, flavors: number, likes: number, hates: number): DrinkStats[] {
+  let left = flavors
+  return drinks.map((d) => {
+    if (d.brand !== brand || left === 0) return d
+    left -= 1
+    return { ...d, likes, hates, reporters: likes + hates }
+  })
+}
+
+/** Average count, per voter, of drinks matching `pick` among the first `n` of the feed. */
+function shareOfFirst(drinks: DrinkStats[], pick: (d: DrinkStats) => boolean, n = 10, voters = 2000): number {
+  const scored = scoreDrinks(drinks)
+  let total = 0
+  for (let i = 0; i < voters; i++) {
+    total += buildFeed(scored, new Set(), voterKey(i)).slice(0, n).filter(pick).length
+  }
+  return total / voters
+}
+
+describe('deckWeight', () => {
+  test('is 1 for a drink at its type mean', () => {
+    expect(deckWeight(drink(1, { score: 0.4, type_mean: 0.4 }))).toBeCloseTo(1)
+    expect(deckWeight(drink(1, { score: 0.7, type_mean: 0.7, reporters: 2 }))).toBeCloseTo(1)
+  })
+
+  test('drinks with their own evidence use odds ratio squared', () => {
+    // odds 0.75 / odds 0.6 = 3 / 1.5 = 2, squared 4.
+    expect(deckWeight(drink(1, { score: 0.75, type_mean: 0.6, reporters: 1 }))).toBeCloseTo(4)
+    expect(deckWeight(drink(1, { score: 0.6, type_mean: 0.75, right_swipes: 1 }))).toBeCloseTo(1 / 4)
+  })
+
+  test('untried drinks lean on their brand more softly: odds ratio, not squared', () => {
+    expect(deckWeight(drink(1, { score: 0.75, type_mean: 0.6 }))).toBeCloseTo(2)
+    expect(deckWeight(drink(1, { score: 0.6, type_mean: 0.75 }))).toBeCloseTo(1 / 2)
+  })
+
+  test('is capped to [DECK_MIN_WEIGHT, DECK_MAX_WEIGHT]', () => {
+    expect(deckWeight(drink(1, { score: 0.99, type_mean: 0.5, reporters: 5 }))).toBe(DECK_MAX_WEIGHT)
+    expect(deckWeight(drink(1, { score: 0.01, type_mean: 0.5, reporters: 5 }))).toBe(DECK_MIN_WEIGHT)
+    expect(deckWeight(drink(1, { score: 1, type_mean: 0 }))).toBe(DECK_MAX_WEIGHT)
+  })
+})
 
 describe('buildFeed', () => {
   test('returns every unswiped drink, with no deck size cap', () => {
     const drinks = Array.from({ length: 124 }, (_, i) => drink(i + 1))
-    expect(buildFeed(drinks, new Set(), byId)).toHaveLength(124)
-  })
-
-  test('weights a drink by its posterior odds to the power DECK_BIAS_POWER', () => {
-    expect(DECK_BIAS_POWER).toBe(2)
-    expect(deckWeight(0.5)).toBeCloseTo(1)
-    expect(deckWeight(0.8)).toBeCloseTo(16)
-    expect(deckWeight(0.2)).toBeCloseTo(1 / 16)
-    expect(Number.isFinite(deckWeight(1))).toBe(true)
-    expect(deckWeight(0)).toBeGreaterThan(0)
-  })
-
-  test('liked drinks come early far more often, disliked ones late, across voters', () => {
-    // 10 liked (0.8), 100 unrated (0.5), 10 disliked (0.25).
-    const drinks = [
-      ...Array.from({ length: 10 }, (_, i) => drink(i + 1, { score: 0.8 })),
-      ...Array.from({ length: 100 }, (_, i) => drink(i + 11, { score: 0.5 })),
-      ...Array.from({ length: 10 }, (_, i) => drink(i + 111, { score: 0.25 })),
-    ]
-    const kind = (id: number) => (id <= 10 ? 'liked' : id <= 110 ? 'unrated' : 'disliked')
-    const firstTen = { liked: 0, unrated: 0, disliked: 0 }
-    const sessions = 2000
-    for (let i = 0; i < sessions; i++) {
-      const feed = buildFeed(drinks, new Set(), sessionTieKey(`voter-${i}`, seededRandom))
-      for (const d of feed.slice(0, 10)) firstTen[kind(d.id)] += 1
-    }
-    // Uniform would put 1 of 12 liked drinks in a voter's first ten (10/120 * 10 per voter).
-    expect(firstTen.liked / sessions).toBeGreaterThan(4)
-    expect(firstTen.disliked / sessions).toBeLessThan(0.1)
-    expect(firstTen.unrated).toBeGreaterThan(0)
-  })
-
-  test('with no ratings at all the order is a uniform shuffle', () => {
-    const drinks = Array.from({ length: 50 }, (_, i) => drink(i + 1))
-    const firsts = new Set<number>()
-    for (let i = 0; i < 500; i++) firsts.add(buildFeed(drinks, new Set(), sessionTieKey(`v${i}`, seededRandom))[0].id)
-    expect(firsts.size).toBeGreaterThan(40)
-  })
-
-  test('a disliked drink is still reachable: it stays in the feed', () => {
-    const drinks = [drink(1, { score: 0.05 }), drink(2, { score: 0.9 }), drink(3)]
-    expect(buildFeed(drinks, new Set(), byId).map((d) => d.id).sort()).toEqual([1, 2, 3])
+    expect(buildFeed(drinks, new Set(), fixedKey)).toHaveLength(124)
   })
 
   test('never includes a drink this voter already swiped', () => {
-    const drinks = Array.from({ length: 30 }, (_, i) => drink(i + 1, { score: (i + 1) / 31 }))
+    const drinks = Array.from({ length: 30 }, (_, i) => drink(i + 1, { score: (i + 1) / 31, reporters: 1 }))
     const swiped = new Set([1, 2, 3, 10, 20, 30])
-    const feed = buildFeed(drinks, swiped, byId)
+    const feed = buildFeed(drinks, swiped, fixedKey)
     expect(feed).toHaveLength(24)
     expect(feed.some((d) => swiped.has(d.id))).toBe(false)
   })
 
   test('is empty once every drink is swiped (no wraparound)', () => {
-    expect(buildFeed([drink(1), drink(2)], new Set([1, 2]), byId)).toEqual([])
+    expect(buildFeed([drink(1), drink(2)], new Set([1, 2]), fixedKey)).toEqual([])
   })
 
   test('order follows a per-session key that does not depend on input order', () => {
@@ -85,7 +119,7 @@ describe('buildFeed', () => {
     expect(after).toEqual(before.filter((id) => !swiped.has(id)))
   })
 
-  test('equal-score drinks are spread evenly across voters (no drink is everyone\'s first)', () => {
+  test('equal-weight drinks are spread evenly across voters (no drink is everyone\'s first)', () => {
     const drinks = Array.from({ length: 124 }, (_, i) => drink(i + 1))
     const sessions = 5000
     const rng = seededRandom('uuid-generator')
@@ -104,5 +138,53 @@ describe('buildFeed', () => {
       expect(firstCount.get(d.id) ?? 0, `first ${d.id}`).toBeLessThanOrEqual(2 * uniformFirst)
       expect(topFiveCount.get(d.id) ?? 0, `top five ${d.id}`).toBeGreaterThanOrEqual(0.5 * uniformTopFive)
     }
+  })
+})
+
+describe('buildFeed on scored catalogs', () => {
+  const isSeltzer = (d: DrinkStats) => d.type === 'seltzer'
+
+  test('with no ratings at all every weight is 1 and the order is a uniform shuffle', () => {
+    const scored = scoreDrinks(catalog())
+    for (const d of scored) expect(deckWeight(d)).toBeCloseTo(1)
+    const expected = (10 * catalog().filter(isSeltzer).length) / catalog().length
+    expect(shareOfFirst(catalog(), isSeltzer)).toBeCloseTo(expected, 0)
+  })
+
+  test('hates on one brand do not reshuffle the other brands or the other type', () => {
+    const base = shareOfFirst(catalog(), isSeltzer)
+    const pepsiHated = withReports(catalog(), 'Pepsi', 5, 0, 2)
+    const after = shareOfFirst(pepsiHated, isSeltzer)
+    expect(after / base).toBeGreaterThan(0.75)
+    expect(after / base).toBeLessThan(1.4)
+  })
+
+  test('likes on one brand do not push the other type out of the feed', () => {
+    const base = shareOfFirst(catalog(), isSeltzer)
+    const poppiLiked = withReports(catalog(), 'poppi', 4, 2, 0)
+    expect(shareOfFirst(poppiLiked, isSeltzer) / base).toBeGreaterThan(0.6)
+  })
+
+  test('liked drinks come earliest; untried drinks of the same brand next; other brands after', () => {
+    const drinks = withReports(catalog(), 'poppi', 4, 2, 0)
+    const liked = (d: DrinkStats) => d.brand === 'poppi' && d.reporters > 0
+    const untriedPoppi = (d: DrinkStats) => d.brand === 'poppi' && d.reporters === 0
+    const other = (d: DrinkStats) => d.brand !== 'poppi'
+    const perDrink = (pick: (d: DrinkStats) => boolean) => shareOfFirst(drinks, pick) / drinks.filter(pick).length
+    expect(perDrink(liked)).toBeGreaterThan(perDrink(untriedPoppi))
+    expect(perDrink(untriedPoppi)).toBeGreaterThan(perDrink(other))
+  })
+
+  test('a hated drink comes late but is not buried: some voters still see it early', () => {
+    const drinks = withReports(catalog(), 'Pepsi', 5, 0, 2)
+    const hated = (d: DrinkStats) => d.brand === 'Pepsi' && d.reporters > 0
+    const untriedPepsi = (d: DrinkStats) => d.brand === 'Pepsi' && d.reporters === 0
+    const neutral = (d: DrinkStats) => d.brand === 'Coca-Cola'
+    const perDrink = (pick: (d: DrinkStats) => boolean) => shareOfFirst(drinks, pick, 20) / drinks.filter(pick).length
+    expect(perDrink(hated)).toBeLessThan(perDrink(neutral) / 3)
+    // A drink in a voter's first 20 for at least 1% of voters is reachable in practice.
+    expect(perDrink(hated)).toBeGreaterThan(0.01)
+    expect(perDrink(untriedPepsi)).toBeLessThan(perDrink(neutral))
+    expect(perDrink(untriedPepsi)).toBeGreaterThan(perDrink(hated))
   })
 })

@@ -443,9 +443,12 @@ The voter's whole swipe feed: every active drink this voter has not swiped yet. 
 
 Order: a random order weighted toward drinks people like, so voters mostly see promising drinks instead of wading through ones the office dislikes (`worker/src/soda-deck.ts`).
 
-- Each drink's weight is `w = (θ/(1−θ))^2` (`DECK_BIAS_POWER = 2`), where θ is its posterior mean from the scoring model below (brand prior included, left swipes not counted), clamped to 0.02–0.98. A drink scored 0.8 is weighted 16x an unrated drink (0.5); one scored 0.3 is weighted about 0.18x. With no ratings anywhere, every weight is 1 and the order is a uniform shuffle.
-- Weighted sampling without replacement (Efraimidis–Spirakis): key `u^(1/w)`, sorted largest first, with `u` from `"<session key>:<drink id>"` hashed and passed through a PRNG finalizer. Every drink keeps a nonzero chance at every position.
-- Each drink keeps its place relative to the others across swipes and reloads, as long as scores don't change. Without a session header, the order is random per request. Swiped drinks never come back. Once every drink is swiped, the list is empty.
+- Each drink is weighed against its own category: `w = (odds(θ) / odds(m_type))^p`, where `odds(x) = x/(1−x)`, θ is the drink's posterior mean from the scoring model below (brand prior included, left swipes not counted), and `m_type` is its type mean. Reports on one brand move that brand's drinks and the type mean together, so they do not reshuffle every other brand or the other type.
+- `p = 2` (`DECK_BIAS_POWER`) for drinks with their own evidence (a right swipe or a report). `p = 1` (`DECK_PRIOR_POWER`) for untried drinks, whose θ is just their brand prior: an untried flavor of a loved brand comes early, but behind drinks people actually liked; one of a hated brand comes late.
+- Weights are capped to `[1/8, 16]` (`DECK_MIN_WEIGHT`, `DECK_MAX_WEIGHT`), so a hated drink is rare near the top but still turns up early for some voters and can still collect right swipes.
+- With no ratings anywhere, every weight is 1 and the order is a uniform shuffle.
+- Weighted sampling without replacement (Efraimidis–Spirakis): key `u^(1/w)`, sorted largest first, with `u` from `"<session key>:<drink id>"` hashed and passed through a PRNG finalizer.
+- The order is stable across reloads while ratings don't change. The voter's own right swipes and reports count as ratings, so they can shift the rest of their feed a little. Without a session header, the order is random per request. Swiped drinks never come back. Once every drink is swiped, the list is empty.
 
 **Response 200:** `{ "sodas": [Soda] }`
 

@@ -10,6 +10,25 @@ async function barcodes(): Promise<{ code: string; soda_id: number }[]> {
 }
 
 test.describe('Barcode scan mode: unknown code', () => {
+  // Runs first: it scans the unknown code but never reports it, so the code stays unmapped.
+  test('the "not found" notice clears when scan mode reopens', async ({ page }) => {
+    await page.goto('/soda')
+    const dialog = await openReport(page)
+    const notice = dialog.locator('.soda-report-notice')
+    await expect(notice).toHaveText('Barcode not found. Try searching for the drink instead.')
+
+    // Hold the next camera request open, so the modal stays in scan mode instead of rescanning.
+    await page.evaluate(() => {
+      navigator.mediaDevices.getUserMedia = () => new Promise<MediaStream>(() => {})
+    })
+    await dialog.getByRole('button', { name: 'Scan barcode' }).click()
+    await expect(dialog.getByRole('heading')).toHaveText('Scan the soda barcode')
+    await expect(notice).toBeHidden()
+    await expect(notice).toHaveText('')
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await expect(dialog).toBeHidden()
+  })
+
   test('unknown code is logged, picked manually, then mapped so the next scan matches', async ({ page }) => {
     expect((await barcodes()).some((row) => row.code === UNKNOWN_GTIN)).toBe(false)
     await trackCameraStreams(page)

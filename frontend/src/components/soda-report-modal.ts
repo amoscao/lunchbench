@@ -39,7 +39,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
         </button>
       </div>
       <div class="soda-report-scan" hidden></div>
-      <p class="soda-report-notice" role="status"></p>
+      <div class="soda-report-notice-region" role="status"><p class="soda-report-notice"></p></div>
       <div class="soda-report-search">
         <input class="form-input soda-report-input" type="text" autocomplete="off" spellcheck="false"
           placeholder="Soda or seltzer" aria-label="Soda or seltzer"
@@ -108,7 +108,8 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
     picked = null
     unknownScan = unknown
     // A scan that matched nothing lands here; say so, or dropping into search looks like a glitch.
-    // The status region stays in the DOM (empty when idle) so screen readers announce the change.
+    // The role="status" wrapper is always rendered (never display: none), so it stays in the
+    // accessibility tree and screen readers announce the text when it is set. Only the inner box hides.
     notice.textContent = unknown ? NOT_FOUND_NOTICE : ''
     setButtons()
     if (!closed) input.focus()

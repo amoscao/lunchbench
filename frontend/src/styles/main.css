@@ -42,6 +42,9 @@
   --report-like-hover: #166534;
   --report-hate: #b91c1c;
   --report-hate-hover: #991b1b;
+  /* Warning notices (amber). */
+  --warn-bg: #fef3c7;
+  --warn-text: #92400e;
   --tag-seltzer-bg: #dbeafe;
   --tag-seltzer-text: #1e3a8a;
   --modal-scrim: rgba(17, 17, 16, 0.4);
@@ -62,6 +65,8 @@
   --accent-subtle: hsl(168, 60%, 12%);
   --accent2:      hsl(282, 82%, 68%);
   --hate:         #60a5fa;
+  --warn-bg:      hsl(38, 70%, 14%);
+  --warn-text:    #fcd34d;
   --tag-seltzer-bg: hsl(217, 50%, 18%);
   --tag-seltzer-text: #bfdbfe;
   --modal-scrim: rgba(0, 0, 0, 0.6);
@@ -2293,13 +2298,12 @@ body.soda-route { overflow-x: clip; }
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 600;
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 
+/* Only the inner box hides; the role="status" wrapper must stay rendered to be announced. */
 .soda-report-notice:empty { display: none; }
-
-[data-theme="dark"] .soda-report-notice { background: hsl(38, 70%, 14%); color: #fcd34d; }
 
 .soda-report-actions {
   display: grid;

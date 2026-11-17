@@ -1,7 +1,13 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { Hono } from 'hono'
 import { captureMessage } from '@sentry/cloudflare'
-import { hashClientIp, rateLimitedResponse, type RateLimitBlocked } from './rate-limit'
+import {
+  hashClientIp,
+  RATE_LIMIT_REPORT_INTERVAL_MS,
+  rateLimitedResponse,
+  resetRateLimitReports,
+  type RateLimitBlocked,
+} from './rate-limit'
 import type { Bindings } from './types'
 
 // #262: every 429 is reported to Sentry as a warning, with a keyed IP hash and never the raw IP.
@@ -34,6 +40,11 @@ function swipe(headers: Record<string, string>, ipHashKey = 'test-ip-hash-key'):
 describe('rateLimitedResponse', () => {
   beforeEach(() => {
     capture.mockReset()
+    resetRateLimitReports()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   test('returns the usual 429 body and sends one warning with route, action, count, limit and IP hash', async () => {
@@ -56,6 +67,7 @@ describe('rateLimitedResponse', () => {
 
   test('never sends the raw IP, from either IP header', async () => {
     await swipe({ 'CF-Connecting-IP': RAW_IP })
+    resetRateLimitReports()
     await swipe({ 'X-Forwarded-For': `${RAW_IP}, 10.0.0.1` })
 
     expect(capture).toHaveBeenCalledTimes(2)
@@ -79,6 +91,20 @@ describe('rateLimitedResponse', () => {
     expect(hash).toMatch(/^[0-9a-f]{16}$/)
     expect(await hashClientIp(RAW_IP, undefined)).toBe(hash)
     expect(await hashClientIp(RAW_IP, '')).toBe(hash)
+  })
+
+  test('reports at most once per action and IP per interval; every request still gets 429', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-17T12:00:00.000Z'))
+    for (let i = 0; i < 3; i++) expect((await swipe({ 'CF-Connecting-IP': RAW_IP })).status).toBe(429)
+    expect(capture).toHaveBeenCalledTimes(1)
+
+    expect((await swipe({ 'CF-Connecting-IP': '198.51.100.7' })).status).toBe(429)
+    expect(capture).toHaveBeenCalledTimes(2)
+
+    vi.setSystemTime(new Date(Date.now() + RATE_LIMIT_REPORT_INTERVAL_MS))
+    await swipe({ 'CF-Connecting-IP': RAW_IP })
+    expect(capture).toHaveBeenCalledTimes(3)
   })
 
   test('a request with no IP header reports ip_hash "unknown"', async () => {

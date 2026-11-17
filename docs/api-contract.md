@@ -125,7 +125,7 @@ Both lunches in the pair always share the same `is_vegan` value.
 Legacy lunches (`is_legacy = 1`, Paula Legacy Lunch) are never served. Only non-legacy lunches enter the matchup pool. They still appear on the leaderboard and count toward `rank`. The admin PDF export leaves them out and renumbers ranks.
 Selection weights the anchor lunch by `glicko_rd`, excludes session-seen pairs, avoids recent voted pairs when possible, then samples an opponent with a score based on rating proximity, opponent uncertainty, session presentation freshness, and small random jitter. Left/right sides are assigned randomly.
 If the requested group has fewer than 2 lunches, the endpoint returns 204. If the requested session and vegan mode has seen every available pair, the endpoint returns 200 with `{ "status": "exhausted" }`.
-Session history is capped (#249): selection reads only the 500 most recent acknowledged pairs for the session and vegan mode. Older pairs can be served again. A session that has seen more than 500 pairs never gets `exhausted`; it cycles back to its oldest pairs.
+Session history is capped (#249): selection reads only the 500 most recent acknowledged pairs for the session and vegan mode. Older pairs can be served again. A session that has seen more than 500 pairs never gets `exhausted`; it cycles back to its oldest pairs. Acknowledging a pair again (`POST /api/matchup/seen`) refreshes its presentation time, so it moves back into the window and the next-oldest pair drops out.
 Each lunch includes `rank`, its leaderboard position among lunches of the same vegan category by `conservative_rating`.
 `matchup_token` is an opaque token for the served pair. The client sends it to `POST /api/matchup/seen` only after the matchup renders; prefetching a matchup does not mark it seen.
 
@@ -172,7 +172,7 @@ Records that a rendered matchup was presented to the user.
 { "token": "550e8400-e29b-41d4-a716-446655440000" }
 ```
 
-The token must come from a prior successful `GET /api/matchup` response. Duplicate acknowledgements for the same token are treated as success.
+The token must come from a prior successful `GET /api/matchup` response. Duplicate acknowledgements for the same token are treated as success. Acknowledging a pair the session has seen before updates its presentation time (see the history cap above).
 
 **Response 200:**
 ```json
@@ -305,8 +305,10 @@ Every `429 RATE_LIMITED` response (Sodabench writes and `POST /api/admin/verify`
 - Tags: `route` (method and route pattern, e.g. `PUT /api/soda/swipes`), `rate_limit_action` (e.g. `soda_swipe`), `ip_hash`.
 - Extra: `count` (requests in the current window), `limit`.
 - Grouped per action (fingerprint `rate-limited` + action).
+- Throttled: at most one event per action and `ip_hash` per minute in each Worker isolate, so a client looping on a limited route cannot use up the Sentry event quota. Every request still gets its 429. `count` shows how far over the limit the window is.
 - `ip_hash` is the first 16 hex chars of HMAC-SHA-256(client IP, `IP_HASH_KEY`), or `unknown` when the request has no IP header. The raw IP is never sent. If `IP_HASH_KEY` is unset, a random key per Worker isolate is used, so hashes only match within one isolate.
 - The Worker Sentry client keeps `sendDefaultPii` off, so Sentry also strips IP headers from request data.
+- `beforeSend` (`worker/src/sentry.ts`) drops the request body, cookies, and the `Authorization` and `X-Lunchbench-Session` headers from every Worker event. Without it the SDK attaches the JSON body, so a 429 on `POST /api/admin/verify` would carry the typed password.
 - With `SENTRY_DSN` empty (tests, local dev) the capture is a no-op. A failed report never changes the 429.
 
 The lunch routes have no rate limits (#264).

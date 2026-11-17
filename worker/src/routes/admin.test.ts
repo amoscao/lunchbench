@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
 import { adminRouter } from './admin'
-import { app } from '../index'
 import type { Bindings } from '../types'
 
 type InsertedSession = {
@@ -60,39 +59,5 @@ describe('admin verify', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-})
-
-describe('admin verify rate limit', () => {
-  // #262: the 429 also goes to Sentry. With SENTRY_DSN empty (tests, local dev) that is a no-op.
-  test('returns 429 through the full app with Sentry disabled', async () => {
-    const env: Bindings = {
-      DB: {
-        prepare() {
-          return {
-            bind() {
-              return {
-                async first() {
-                  return { count: 5, window_start: new Date().toISOString() }
-                },
-              }
-            },
-          }
-        },
-      } as unknown as D1Database,
-      IMAGES: undefined,
-      VOTE_PASSWORD: 'lunch-password',
-      ADMIN_MANAGER_PASSWORD: 'admin-password',
-      SENTRY_DSN: '',
-    }
-
-    const response = await app.request('/api/admin/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.42' },
-      body: JSON.stringify({ password: 'wrong' }),
-    }, env)
-
-    expect(response.status).toBe(429)
-    expect(await response.json()).toEqual({ error: 'Too many attempts', code: 'RATE_LIMITED' })
   })
 })

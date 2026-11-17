@@ -147,6 +147,7 @@ export function getClientIp(request: Request): string {
 // Fallback HMAC key when IP_HASH_KEY is unset (local dev, tests): random per isolate, so hashes
 // still never reveal the IP but only correlate within one isolate.
 let isolateIpHashKey: string | null = null
+let cachedHmacKey: { raw: string; key: Promise<CryptoKey> } | null = null
 
 /**
  * HMAC-SHA-256 of the client IP, first 16 hex chars. Keyed so the hash cannot be reversed by
@@ -158,17 +159,39 @@ export async function hashClientIp(ip: string, key: string | undefined): Promise
     key = isolateIpHashKey
   }
   const encoder = new TextEncoder()
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw', encoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  )
-  const mac = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(ip))
+  if (cachedHmacKey?.raw !== key) {
+    cachedHmacKey = {
+      raw: key,
+      key: crypto.subtle.importKey('raw', encoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']),
+    }
+  }
+  const mac = await crypto.subtle.sign('HMAC', await cachedHmacKey.key, encoder.encode(ip))
   return Array.from(new Uint8Array(mac).slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+// At most one Sentry report per action and IP hash per minute in each isolate, so a client
+// hammering a limited route cannot burn the Sentry event quota. The 429s themselves are unchanged.
+export const RATE_LIMIT_REPORT_INTERVAL_MS = 60_000
+const MAX_REPORT_KEYS = 1000
+const lastReportAt = new Map<string, number>()
+
+function shouldReport(key: string, now: number): boolean {
+  const last = lastReportAt.get(key)
+  if (last !== undefined && now - last < RATE_LIMIT_REPORT_INTERVAL_MS) return false
+  if (lastReportAt.size >= MAX_REPORT_KEYS) lastReportAt.clear()
+  lastReportAt.set(key, now)
+  return true
+}
+
+/** Test hook: forget report times. */
+export function resetRateLimitReports(): void {
+  lastReportAt.clear()
+}
+
 /**
- * The 429 response for a blocked rate-limit check. Every 429 goes through here, so each one is
- * also sent to Sentry as a warning: route, action, count, limit and a keyed IP hash, never the
- * raw IP. With no SENTRY_DSN the Sentry client is disabled and the capture does nothing.
+ * The 429 response for a blocked rate-limit check. Every 429 goes through here and is reported to
+ * Sentry as a warning (throttled, see above): route, action, count, limit and a keyed IP hash,
+ * never the raw IP. With no SENTRY_DSN the Sentry client is disabled and the capture does nothing.
  * Reporting never changes the response.
  */
 export async function rateLimitedResponse(
@@ -179,16 +202,18 @@ export async function rateLimitedResponse(
   try {
     const ip = getClientIp(c.req.raw)
     const ipHash = ip === 'unknown' ? 'unknown' : await hashClientIp(ip, c.env.IP_HASH_KEY)
-    captureMessage('Rate limit exceeded', {
-      level: 'warning',
-      fingerprint: ['rate-limited', blocked.action],
-      tags: {
-        route: `${c.req.method} ${routePath(c)}`,
-        rate_limit_action: blocked.action,
-        ip_hash: ipHash,
-      },
-      extra: { count: blocked.count, limit: blocked.limit },
-    })
+    if (shouldReport(`${blocked.action}:${ipHash}`, Date.now())) {
+      captureMessage('Rate limit exceeded', {
+        level: 'warning',
+        fingerprint: ['rate-limited', blocked.action],
+        tags: {
+          route: `${c.req.method} ${routePath(c)}`,
+          rate_limit_action: blocked.action,
+          ip_hash: ipHash,
+        },
+        extra: { count: blocked.count, limit: blocked.limit },
+      })
+    }
   } catch (e) {
     console.error('Rate limit report failed', e)
   }

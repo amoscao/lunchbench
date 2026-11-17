@@ -86,22 +86,23 @@ function fakeDb(rows: LunchRow[] = ALL_ROWS): D1Database & {
               low_lunch_id: lowLunchId,
               high_lunch_id: highLunchId,
             })
-          } else if (sql.includes('INSERT OR IGNORE INTO matchup_presentations')) {
+          } else if (sql.includes('INSERT INTO matchup_presentations')) {
+            // Upsert that refreshes presented_at: the row moves to the newest end.
+            expect(sql).toContain('DO UPDATE SET presented_at = excluded.presented_at')
             const [sessionKey, veganOnly, lowLunchId, highLunchId] = bound as [string, number, number, number]
-            const exists = db.presentations.some((row) =>
+            const existing = db.presentations.findIndex((row) =>
               row.session_key === sessionKey &&
               row.vegan_only === veganOnly &&
               row.low_lunch_id === lowLunchId &&
               row.high_lunch_id === highLunchId
             )
-            if (!exists) {
-              db.presentations.push({
-                session_key: sessionKey,
-                vegan_only: veganOnly,
-                low_lunch_id: lowLunchId,
-                high_lunch_id: highLunchId,
-              })
-            }
+            if (existing !== -1) db.presentations.splice(existing, 1)
+            db.presentations.push({
+              session_key: sessionKey,
+              vegan_only: veganOnly,
+              low_lunch_id: lowLunchId,
+              high_lunch_id: highLunchId,
+            })
           }
           return { success: true, meta: { changes: 1 } }
         },
@@ -309,7 +310,12 @@ describe('matchup history cap (#249)', () => {
   async function getMatchup(db: ReturnType<typeof fakeDb>) {
     const res = await matchupRouter.request('/', { headers: { 'X-Lunchbench-Session': SESSION } }, env(db))
     expect(res.status).toBe(200)
-    return await res.json() as { status: string; left?: LunchRow; right?: LunchRow }
+    return await res.json() as { status: string; matchup_token?: string; left?: LunchRow; right?: LunchRow }
+  }
+
+  function pairOf(body: { left?: LunchRow; right?: LunchRow }): string {
+    const [low, high] = [body.left!.id, body.right!.id].sort((a, b) => a - b)
+    return `${low}:${high}`
   }
 
   test('reads only the most recent rows', async () => {
@@ -337,8 +343,31 @@ describe('matchup history cap (#249)', () => {
     for (let i = 0; i < 20; i++) {
       const body = await getMatchup(db)
       expect(body.status).toBe('ok')
-      const [low, high] = [body.left!.id, body.right!.id].sort((a, b) => a - b)
-      expect(oldest.has(`${low}:${high}`)).toBe(true)
+      expect(oldest.has(pairOf(body))).toBe(true)
     }
+  })
+
+  test('past the cap, acknowledging a re-served pair moves it back into the window, so the session cycles', async () => {
+    const db = fakeDb(lunches(33))
+    presentAllPairs(db, 33)
+    const outside = new Set(db.presentations.slice(0, 528 - MATCHUP_HISTORY_LIMIT)
+      .map((p) => `${p.low_lunch_id}:${p.high_lunch_id}`))
+    const served = new Set<string>()
+
+    // Each acknowledged pair re-enters the window and pushes the next-oldest out, so 28 rounds
+    // serve 28 different pairs instead of repeating the same oldest ones.
+    for (let i = 0; i < outside.size; i++) {
+      const body = await getMatchup(db)
+      expect(body.status).toBe('ok')
+      const pair = pairOf(body)
+      expect(served.has(pair)).toBe(false)
+      served.add(pair)
+      const ack = await matchupRouter.request('/seen', {
+        method: 'POST',
+        body: JSON.stringify({ token: body.matchup_token }),
+      }, env(db))
+      expect(ack.status).toBe(200)
+    }
+    expect(db.presentations).toHaveLength(528)
   })
 })

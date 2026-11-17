@@ -27,7 +27,7 @@ test.describe('Sodabench report a soda', () => {
   test('Like and Hate stay disabled until a drink is picked', async ({ page }) => {
     await page.goto('/soda')
     const dialog = await openReport(page)
-    const like = dialog.getByRole('button', { name: 'Like' })
+    const like = dialog.getByRole('button', { name: 'I like' })
     const hate = dialog.getByRole('button', { name: 'Hate' })
 
     await expect(like).toBeDisabled()
@@ -52,7 +52,7 @@ test.describe('Sodabench report a soda', () => {
     await page.goto('/soda')
     const dialog = await openReport(page)
     await pick(page, 'sprite', 'Sprite Original')
-    await dialog.getByRole('button', { name: 'Like' }).click()
+    await dialog.getByRole('button', { name: 'I like' }).click()
 
     await expect(dialog).toBeHidden()
     await expect(page.locator('.alert:visible')).toHaveCount(0)
@@ -66,7 +66,7 @@ test.describe('Sodabench report a soda', () => {
     await page.goto('/soda')
     let dialog = await openReport(page)
     await pick(page, 'pepper', 'Dr Pepper Original')
-    await dialog.getByRole('button', { name: 'Like' }).click()
+    await dialog.getByRole('button', { name: 'I like' }).click()
     await expect(dialog).toBeHidden()
     await expect.poll(async () => (await getSodaRow(id)).likes).toBe(before.likes + 1)
 
@@ -92,7 +92,7 @@ test.describe('Sodabench report a soda', () => {
     await dialog.getByRole('combobox').fill('polar')
     await page.keyboard.press('Enter')
     await expect(dialog.getByRole('combobox')).toHaveValue(/^Polar /)
-    await expect(dialog.getByRole('button', { name: 'Like' })).toBeEnabled()
+    await expect(dialog.getByRole('button', { name: 'I like' })).toBeEnabled()
 
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
@@ -147,7 +147,7 @@ test.describe('Sodabench report a soda', () => {
     const suggestion = dialog.locator('.soda-suggest-item').first()
     await expect(suggestion).toHaveText('Sprite Original')
     await suggestion.click()
-    await dialog.getByRole('button', { name: 'Like' }).click()
+    await dialog.getByRole('button', { name: 'I like' }).click()
 
     await expect(dialog).toBeHidden()
     await expect.poll(async () => (await getSodaRow(id)).likes).toBe(before.likes + 1)
@@ -171,12 +171,12 @@ test.describe('Sodabench report a soda', () => {
     const dialog = await openReport(page)
     await pick(page, 'sprite', 'Sprite Original')
     const hate = dialog.getByRole('button', { name: 'Hate' })
-    const like = dialog.getByRole('button', { name: 'Like' })
+    const like = dialog.getByRole('button', { name: 'I like' })
 
     const hateBox = (await hate.boundingBox())!
     const likeBox = (await like.boundingBox())!
     expect(hateBox.x).toBeLessThan(likeBox.x)
-    expect(await dialog.locator('.soda-report-actions button').allTextContents()).toEqual(['Hate', 'Like'])
+    expect(await dialog.locator('.soda-report-actions button').allTextContents()).toEqual(['Hate', 'I like'])
 
     await hate.focus()
     await page.keyboard.press('Tab')

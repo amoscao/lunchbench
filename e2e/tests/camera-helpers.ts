@@ -39,7 +39,9 @@ export async function expectCameraOff(page: Page): Promise<void> {
 
 export async function openReport(page: Page) {
   await page.getByRole('button', { name: 'Report a soda' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Report a soda' })
+  // The title follows the mode ("Scan the soda barcode" while scanning, "Report a soda" otherwise),
+  // so find the dialog by role alone: it is the only one.
+  const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   return dialog
 }

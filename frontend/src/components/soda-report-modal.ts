@@ -8,9 +8,13 @@ export type ReportModal = { close: () => void }
 
 const CAMERA_ICON = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8"/><path d="M10 8v8"/><path d="M13 8v8"/><path d="M17 8v8"/></svg>'
 
+/** Dialog title while the camera is scanning; manual search and a scanned match use REPORT_TITLE. */
+const SCAN_TITLE = 'Scan the soda barcode'
+const REPORT_TITLE = 'Report a soda'
+
 /**
- * Report a soda: type-ahead over the catalog, then Like or Hate.
- * Like and Hate stay disabled until a drink is picked. A successful submit closes the modal.
+ * Report a soda: type-ahead over the catalog, then "I like" or Hate.
+ * "I like" and Hate stay disabled until a drink is picked. A successful submit closes the modal.
  * On touch devices it opens in scan mode (barcode-scanner.ts); "Select manually" switches to the search.
  */
 export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null, onClose: () => void): ReportModal {
@@ -26,7 +30,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
   backdrop.innerHTML = `
     <section class="soda-report-modal" role="dialog" aria-modal="true" aria-labelledby="soda-report-title">
       <div class="soda-report-head">
-        <h2 class="soda-report-title" id="soda-report-title">Report a soda</h2>
+        <h2 class="soda-report-title" id="soda-report-title">${REPORT_TITLE}</h2>
         <button type="button" class="modal-close soda-report-scan-open" aria-label="Scan barcode" hidden>${CAMERA_ICON}</button>
         <button type="button" class="modal-close" aria-label="Close">
           <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
@@ -42,11 +46,12 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
       <div class="alert alert-error soda-report-error" hidden>Report failed</div>
       <div class="soda-report-actions">
         <button type="button" class="btn soda-report-hate" disabled>Hate</button>
-        <button type="button" class="btn btn-primary soda-report-like" disabled>Like</button>
+        <button type="button" class="btn soda-report-like" disabled>I like</button>
       </div>
     </section>
   `
   const modal = backdrop.querySelector<HTMLElement>('.soda-report-modal')!
+  const title = backdrop.querySelector<HTMLElement>('.soda-report-title')!
   const input = backdrop.querySelector<HTMLInputElement>('.soda-report-input')!
   const list = backdrop.querySelector<HTMLUListElement>('.soda-suggest')!
   const error = backdrop.querySelector<HTMLElement>('.soda-report-error')!
@@ -70,9 +75,11 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
     search.hidden = true
     scanOpenBtn.hidden = true
     scanSlot.hidden = false
+    title.textContent = SCAN_TITLE
     scanPanel = mountScanPanel(scanSlot, catalog, {
       onMatch: (soda) => {
         picked = soda
+        title.textContent = REPORT_TITLE
         setButtons()
       },
       onManual: (unknown) => enterManualMode(unknown),
@@ -91,6 +98,7 @@ export function openSodaReportModal(catalog: Soda[], opener: HTMLElement | null,
     scanSlot.hidden = true
     scanSlot.innerHTML = ''
     search.hidden = false
+    title.textContent = REPORT_TITLE
     scanOpenBtn.hidden = cameraFailed || !cameraSupported()
     picked = null
     unknownScan = unknown

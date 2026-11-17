@@ -3,6 +3,7 @@ import {
   commitDirection,
   dragProgress,
   flingStartSpeed,
+  flingOpacity,
   planFling,
   rotationFor,
   springSettled,
@@ -68,19 +69,29 @@ describe('commit rule', () => {
 })
 
 describe('fling', () => {
-  const base = { dx: 150, dy: 20, rotation: 10, vx: 1, vy: 0.3, cardLeft: 450, cardWidth: WIDTH, cardHeight: 440, viewportWidth: 1280 }
+  const base = { dx: 150, dy: 20, rotation: 10, vx: 1, vy: 0.3, cardWidth: WIDTH }
 
-  test('travels until the rotated card is fully off-screen', () => {
+  test('travels a short hop: one card width from rest, in the swipe direction', () => {
     const plan = planFling({ ...base, direction: 'right' })
-    const reach = Math.hypot(WIDTH, 440) / 2
-    const endCenter = base.cardLeft + WIDTH / 2 + plan.toX
-    expect(endCenter - reach).toBeGreaterThanOrEqual(base.viewportWidth)
-
+    expect(plan.toX).toBe(WIDTH)
     const left = planFling({ ...base, dx: -150, rotation: -10, vx: -1, direction: 'left' })
-    expect(base.cardLeft + WIDTH / 2 + left.toX + reach).toBeLessThanOrEqual(0)
+    expect(left.toX).toBe(-WIDTH)
   })
 
-  test('faster flicks exit sooner, within 100-600 ms', () => {
+  test('a card released far out still moves on before it is gone', () => {
+    const plan = planFling({ ...base, dx: 360, direction: 'right' })
+    expect(plan.toX - 360).toBeCloseTo(SWIPE.flingMinExtraWidths * WIDTH)
+  })
+
+  test('fades out: solid at first, gone at the end', () => {
+    expect(flingOpacity(0)).toBe(1)
+    expect(flingOpacity(SWIPE.flingFadeStart)).toBe(1)
+    expect(flingOpacity(0.7)).toBeGreaterThan(0)
+    expect(flingOpacity(0.7)).toBeLessThan(1)
+    expect(flingOpacity(1)).toBe(0)
+  })
+
+  test('faster flicks exit sooner, within 50-260 ms', () => {
     const slow = planFling({ ...base, vx: 1.3, direction: 'right' })
     const fast = planFling({ ...base, vx: 4, direction: 'right' })
     expect(fast.durationMs).toBeLessThan(slow.durationMs)
@@ -89,14 +100,13 @@ describe('fling', () => {
   })
 
   test.each([
-    ['desktop', 1280, 450],
-    ['phone', 390, 5],
-  ])('keeps the hand\'s momentum on %s: start speed within 20%% of the release speed', (_, viewportWidth, cardLeft) => {
-    const width = Math.min(WIDTH, viewportWidth - 10)
+    ['desktop', 380],
+    ['phone', 340],
+  ])('keeps the hand\'s momentum on %s: start speed within 20%% of the release speed', (_, width) => {
     for (const vx of [1.5, 2, 3, 4]) {
       for (const direction of ['right', 'left'] as const) {
         const sign = direction === 'right' ? 1 : -1
-        const input = { ...base, dx: sign * 120, rotation: sign * 8, vx: sign * vx, cardLeft, cardWidth: width, viewportWidth, direction }
+        const input = { ...base, dx: sign * 120, rotation: sign * 8, vx: sign * vx, cardWidth: width, direction }
         const plan = planFling(input)
         const speed = flingStartSpeed(plan, input.dx)
         expect(speed / vx, `${direction} ${vx}`).toBeGreaterThan(0.8)

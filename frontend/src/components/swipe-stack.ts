@@ -1,6 +1,7 @@
 import {
   commitDirection,
   dragProgress,
+  flingOpacity,
   planFling,
   rotationFor,
   springSettled,
@@ -297,10 +298,6 @@ export class SwipeStack<T> {
 
     const stamp = direction === 'right' ? card.likeStamp : card.nopeStamp
     if (stamp) stamp.style.opacity = '1'
-    // The bounding box of a rotated card is wider than the card, so use its center (rotation does
-    // not move the center) to find where the card sits at rest.
-    const rect = card.el.getBoundingClientRect()
-    const restLeft = rect.left + rect.width / 2 - release.pose.x - card.el.offsetWidth / 2
     const plan = planFling({
       direction,
       dx: release.pose.x,
@@ -308,10 +305,7 @@ export class SwipeStack<T> {
       rotation: release.pose.rotation,
       vx: release.vx,
       vy: release.vy,
-      cardLeft: restLeft,
       cardWidth: card.el.offsetWidth,
-      cardHeight: card.el.offsetHeight,
-      viewportWidth: window.innerWidth,
     })
     const from = release.pose
     const start = performance.now()
@@ -325,6 +319,7 @@ export class SwipeStack<T> {
         y: from.y + (plan.toY - from.y) * e,
         rotation: from.rotation + (plan.toRotation - from.rotation) * e,
       })
+      card.el.style.opacity = String(flingOpacity(t))
       if (t < 1 && !this.destroyed) requestAnimationFrame(step)
       else card.el.remove()
     }

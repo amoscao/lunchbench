@@ -393,7 +393,7 @@ Mockups live outside the repo; this section is the source of truth.
 - Swipe physics (`frontend/src/utils/swipe-physics.ts`): pointer events, `requestAnimationFrame` and CSS transforms only.
   - **Drag:** the card follows the pointer 1:1 in x and y. Rotation is 0.07°/px, capped at ±20°, and the sign flips when the card is grabbed in its bottom half.
   - **Commit:** |dx| > 35% of the card width, or a flick faster than 0.5 px/ms (measured over the last 100 ms) in the same direction.
-  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning until its rotated box is fully off-screen. Duration is distance / speed, clamped to 100-600 ms. The rest position is taken from the box center, which rotation does not move.
+  - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning for a short hop: it ends one card width from rest (at least 0.4 card widths past where it was released) and fades out over the last 65% of the hop. It does not cross the screen. Duration is distance / speed, clamped to 50-260 ms.
   - **Snap back:** a damped spring with a slight overshoot.
   - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
   - **Stamps:** LIKE (`--accent`, top left) and NOPE (`--hate`, top right) fade in and tilt with |dx|.
@@ -412,7 +412,7 @@ Mockups live outside the repo; this section is the source of truth.
 
 ### Report modal
 - Centered dialog (440px, 120px from top) over a `--modal-scrim` backdrop. Below 640px it is a bottom sheet (full width, top corners rounded).
-- Title "Report a soda", close button (×, 44px).
+- Title "Report a soda" ("Scan the soda barcode" while the camera is scanning), close button (×, 44px).
 - Text field with autocomplete over the full catalog, up to 8 suggestions with a 32px thumbnail. ↑ / ↓ move, Enter picks, Escape closes.
 - Search (`frontend/src/soda-search.ts`, local, no request per keystroke):
   - Normalization ignores case, punctuation, apostrophes, accents and the spaces in brand names: "dr pepper" = "Dr. Pepper", "la croix" = "LaCroix", "a and w" / "aw" = "A&W", "barqs" = "Barq's".
@@ -431,13 +431,13 @@ Mockups live outside the repo; this section is the source of truth.
     7. shorter names, not counting "Original"/"Pure", so a brand query ("coke", "polar") lists the flagship first;
     8. catalog order.
   - Only the first 8 words of a query count, which keeps every keystroke instant.
-- Two 52px buttons: **Hate** (`--hate` outline) on the left and **Like** (primary) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
+- Two 52px buttons: **Hate** (solid red `--report-hate`, white text) on the left and **I like** (solid green `--report-like`, white text) on the right, matching the swipe direction. DOM, visual and tab order agree. Disabled until a suggestion is picked; editing the text disables them again.
 - Submitting closes the modal. Nothing else is shown.
 - Scan mode (`frontend/src/components/barcode-scanner.ts`):
   - Default only on touch-first devices (`(pointer: coarse)`). Desktop opens in manual mode.
   - Head row: a "Scan barcode" icon button (camera brackets, 44px, `aria-label="Scan barcode"`) left of close. Shown in manual mode when the browser has a camera API and the camera has not failed in this modal.
-  - Scan view: live rear-camera preview (`facingMode: environment`, 4:3, `--radius-md`, black behind), a scan frame (3px `--accent` border, the area outside dimmed), and a secondary "Select manually" button (always shown). Like and Hate stay visible and disabled.
-  - Match: the camera stops; the preview is replaced by the drink image (180px, `--product-bg`) and name (`--text-lg`, 700). Like and Hate enable. "Select manually" stays.
+  - Scan view: live rear-camera preview (`facingMode: environment`, square 1:1 so a barcode fits held horizontally or vertically, `--radius-md`, black behind), a square scan frame (inset 14%, 3px `--accent` border, the area outside dimmed), and a secondary "Select manually" button (always shown). The view is capped at 45vh so the dialog fits short screens. Both decoders read barcodes in either orientation (ZXing `tryRotate`). "I like" and Hate stay visible and disabled.
+  - Match: the camera stops; the preview is replaced by the drink image (180px, `--product-bg`) and name (`--text-lg`, 700). "I like" and Hate enable. The title returns to "Report a soda". "Select manually" stays.
   - Unknown code: the code is logged, the camera stops, and the modal switches to manual search with the field focused. The code goes with the manual report so the next scan matches.
   - Permission denied, no camera, no camera API, or no decoder: straight to manual search. No error screen. The "Scan barcode" button hides.
   - The camera stops (every track) on close, match, "Select manually", route change, page hidden (`visibilitychange`; the modal falls back to manual), and errors, including while the decoder is still loading. A camera that ends on its own drops to manual search.

@@ -22,6 +22,8 @@ export async function decodeImageData(image: ImageData, tryHarder: boolean): Pro
   const results = await readBarcodes(image, {
     formats: ['EAN13', 'EAN8', 'UPCA', 'UPCE'],
     tryHarder,
+    // Also read barcodes held vertically (rotated 90 degrees). This is the library default; stated so it stays on.
+    tryRotate: true,
     maxNumberOfSymbols: 1,
   })
   return results

@@ -1,3 +1,5 @@
+import type { MatchupResult } from '../api'
+
 const KEY = 'lb_seen_pairs'
 const MAX = 2000
 
@@ -14,6 +16,22 @@ export function markSeen(leftId: number, rightId: number): void {
   const next = load().filter(item => item !== key)
   next.push(key)
   save(next.slice(-MAX))
+}
+
+// Returns the first matchup unless this browser already rendered that pair. Then it
+// fetches one fresh matchup and uses it. Only one retry, so an exhausted pool cannot
+// loop. If the retry fails or returns no pair, the original pair is used.
+export async function fetchUnseenMatchup(
+  fetchMatchup: () => Promise<MatchupResult>
+): Promise<MatchupResult> {
+  const first = await fetchMatchup()
+  if (first?.status !== 'ok' || !hasSeen(first.left.id, first.right.id)) return first
+  try {
+    const fresh = await fetchMatchup()
+    return fresh?.status === 'ok' ? fresh : first
+  } catch {
+    return first
+  }
 }
 
 function load(): string[] {

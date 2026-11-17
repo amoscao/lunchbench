@@ -246,7 +246,7 @@ export function buildOrderList(drinks: DrinkStats[], options: OrderOptions): Ord
 
 export function orderParams(seed: string, recentTrialIds: number[]): Record<string, unknown> {
   return {
-    model: 'beta-brand-prior-v4',
+    model: 'beta-brand-prior-v5',
     seed,
     score: SODA_SCORE_PARAMS,
     order: ORDER_PARAMS,

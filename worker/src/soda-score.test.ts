@@ -280,6 +280,14 @@ describe('auto-ban after 5 Hate reports (#298)', () => {
     expect(ids([changed])).toEqual([1])
   })
 
+  test('an admin unban (ban_offset) exempts the drink until SODA_BAN_HATES more hates arrive', () => {
+    // Unbanned at 5 hates: ban_offset = 5, so the threshold becomes 10.
+    expect(isBanned(drink(1, { hates: 5, ban_offset: 5 }))).toBe(false)
+    expect(isBanned(drink(1, { hates: 9, ban_offset: 5 }))).toBe(false)
+    expect(isBanned(drink(1, { hates: 10, ban_offset: 5 }))).toBe(true)
+    expect(ids([drink(1, { hates: 9, reporters: 9, ban_offset: 5 }), drink(2, { hates: 10, reporters: 10, ban_offset: 5 })])).toEqual([1])
+  })
+
   test('a banned drink still counts toward its brand prior, but not the type mean', () => {
     const mate = drink(1, { brand: 'Bad', right_swipes: 2 })
     const other = drink(2, { brand: 'Other', likes: 2, reporters: 2 })

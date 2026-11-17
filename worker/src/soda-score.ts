@@ -16,6 +16,8 @@ export type DrinkStats = {
   hates: number
   /** n: distinct reporters (likes + hates). */
   reporters: number
+  /** Hate count when an admin last unbanned the drink (soda_ban_overrides); 0 or absent if never. */
+  ban_offset?: number
 }
 
 /** Pseudo-counts from a drink's own swipes and reports. No prior. */
@@ -43,9 +45,12 @@ export const SODA_NEUTRAL_MEAN = 0.5
 /** A drink with this many distinct voters reporting Hate is banned everywhere (computed, never stored). */
 export const SODA_BAN_HATES = 5
 
-/** Banned: at least SODA_BAN_HATES voters' latest report on the drink is a Hate. */
-export function isBanned(drink: Pick<DrinkStats, 'hates'>): boolean {
-  return drink.hates >= SODA_BAN_HATES
+/**
+ * Banned: at least SODA_BAN_HATES voters' latest report on the drink is a Hate. After an admin unban,
+ * `ban_offset` is the Hate count at that moment, so SODA_BAN_HATES new Hates are needed to ban again.
+ */
+export function isBanned(drink: Pick<DrinkStats, 'hates' | 'ban_offset'>): boolean {
+  return drink.hates >= SODA_BAN_HATES + (drink.ban_offset ?? 0)
 }
 
 export const SODA_SCORE_PARAMS = {

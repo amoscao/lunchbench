@@ -5,9 +5,9 @@ import { validateAdminSession } from '../helpers'
 import { checkRateLimit, getClientIp } from '../rate-limit'
 import { parseSessionKey } from './matchup'
 import { buildFeed, sessionTieKey } from '../soda-deck'
-import { hasData, isBanned, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
+import { hasData, rankForLeaderboard, sodaName, type DrinkStats } from '../soda-score'
 import { seededRandom, weekStartFor, type OrderItem } from '../soda-order'
-import { imageUrl, isSodaBanned, loadDrinkStats, shownSodaSql, writeWeeklyOrder, type BuyListRow } from '../soda-data'
+import { imageUrl, isSodaBanned, loadDrinkStats, loadScoringStats, shownSodaSql, writeWeeklyOrder, type BuyListRow } from '../soda-data'
 import { isBarcodeFormat, normalizeBarcode } from '../barcode'
 
 const soda = new Hono<{ Bindings: Bindings }>()
@@ -80,7 +80,7 @@ soda.get('/deck', async (c) => {
       if (!randomKeys.has(id)) randomKeys.set(id, Math.random())
       return randomKeys.get(id)!
     }
-  const feed = buildFeed(drinks.filter((drink) => !isBanned(drink)), swiped, tieKey)
+  const feed = buildFeed(drinks, swiped, tieKey)
   return c.json({ sodas: feed.map(sodaCard) }, 200, { 'Cache-Control': 'no-store' })
 })
 
@@ -212,7 +212,8 @@ soda.post('/unknown-scans', async (c) => {
 })
 
 soda.get('/leaderboard', async (c) => {
-  const ranked = rankForLeaderboard(await loadDrinkStats(c.env.DB))
+  // Scoring stats include banned drinks for their brand evidence; rankForLeaderboard leaves them out.
+  const ranked = rankForLeaderboard(await loadScoringStats(c.env.DB))
   return c.json(
     {
       sodas: ranked.map((drink, index) => ({

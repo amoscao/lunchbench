@@ -1,4 +1,4 @@
-import { SODA_BAN_HATES, type DrinkStats } from './soda-score'
+import { isBanned, SODA_BAN_HATES, type DrinkStats } from './soda-score'
 import {
   addDays,
   buildOrderList,
@@ -29,8 +29,9 @@ export async function isSodaBanned(db: D1Database, sodaId: number): Promise<bool
 }
 
 /**
- * Per-drink counts for every active drink, banned ones included (scoring needs their evidence for
- * the brand prior; scoreDrinks and the feed leave them out).
+ * Per-drink counts for every active drink, banned ones included. loadScoringStats returns them all
+ * (scoreDrinks needs banned evidence for the brand prior and leaves banned drinks out of its output);
+ * loadDrinkStats returns only drinks that may be shown.
  * Swipes and reports both keep one row per voter per drink (latest wins on write).
  */
 export const DRINK_STATS_SQL = `
@@ -60,9 +61,15 @@ export const DRINK_STATS_SQL = `
   WHERE s.is_active = 1
 `
 
-export async function loadDrinkStats(db: D1Database): Promise<DrinkStats[]> {
+/** Every active drink with counts, banned ones included: scoring needs their brand evidence. */
+export async function loadScoringStats(db: D1Database): Promise<DrinkStats[]> {
   const result = await db.prepare(DRINK_STATS_SQL).all<DrinkStats>()
   return result.results
+}
+
+/** Active drinks that may be shown: banned drinks (5+ Hate reports) are left out. */
+export async function loadDrinkStats(db: D1Database): Promise<DrinkStats[]> {
+  return (await loadScoringStats(db)).filter((drink) => !isBanned(drink))
 }
 
 export function imageUrl(imageKey: string | null): string | null {
@@ -102,7 +109,7 @@ export async function writeWeeklyOrder(
 ): Promise<string> {
   const weekStart = weekStartFor(now)
   const [drinks, recentTrialIds] = await Promise.all([
-    loadDrinkStats(db),
+    loadScoringStats(db),
     loadRecentTrialIds(db, weekStart),
   ])
   const items = buildOrderList(drinks, { seed: weekStart, recentTrialIds })

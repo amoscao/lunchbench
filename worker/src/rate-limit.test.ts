@@ -3,6 +3,7 @@ import {
   checkCooldown,
   checkRateLimit,
   clearRateLimit,
+  getClientIp,
   incrementRateLimit,
   peekRateLimit,
 } from './rate-limit'
@@ -180,5 +181,63 @@ describe('checkRateLimit', () => {
     await expect(checkCooldown(db, 'pair', 'vote_pair', 86400)).resolves.toEqual({
       allowed: true,
     })
+  })
+})
+
+// #307: the Worker trusts the proxy-forwarded visitor IP only with the right PROXY_SECRET.
+describe('getClientIp', () => {
+  const EDGE_IP = '2a06:98c0:3600::103'
+  const VISITOR_IP = '203.0.113.42'
+  const SECRET = 'proxy-secret-value'
+
+  function request(headers: Record<string, string>): Request {
+    return new Request('https://api.example/api/soda/swipes', { headers })
+  }
+
+  test('ignores a forwarded IP sent without the secret header', () => {
+    const req = request({ 'CF-Connecting-IP': EDGE_IP, 'X-Lunchbench-Client-IP': VISITOR_IP })
+    expect(getClientIp(req, SECRET)).toBe(EDGE_IP)
+  })
+
+  test('ignores a forwarded IP sent with the wrong secret', () => {
+    for (const wrong of ['wrong-secret', SECRET.slice(0, -1), `${SECRET}x`, '']) {
+      const req = request({
+        'CF-Connecting-IP': EDGE_IP,
+        'X-Lunchbench-Client-IP': VISITOR_IP,
+        'X-Lunchbench-Proxy-Secret': wrong,
+      })
+      expect(getClientIp(req, SECRET)).toBe(EDGE_IP)
+    }
+  })
+
+  test('uses the forwarded IP with the correct secret', () => {
+    const req = request({
+      'CF-Connecting-IP': EDGE_IP,
+      'X-Lunchbench-Client-IP': ` ${VISITOR_IP} `,
+      'X-Lunchbench-Proxy-Secret': SECRET,
+    })
+    expect(getClientIp(req, SECRET)).toBe(VISITOR_IP)
+  })
+
+  test('falls back to CF-Connecting-IP when the correct secret comes with no forwarded IP', () => {
+    const req = request({ 'CF-Connecting-IP': EDGE_IP, 'X-Lunchbench-Client-IP': ' ', 'X-Lunchbench-Proxy-Secret': SECRET })
+    expect(getClientIp(req, SECRET)).toBe(EDGE_IP)
+  })
+
+  test('with PROXY_SECRET unset, ignores both headers whatever they say', () => {
+    const headers = {
+      'CF-Connecting-IP': EDGE_IP,
+      'X-Lunchbench-Client-IP': VISITOR_IP,
+      'X-Lunchbench-Proxy-Secret': SECRET,
+    }
+    expect(getClientIp(request(headers), undefined)).toBe(EDGE_IP)
+    expect(getClientIp(request(headers), '')).toBe(EDGE_IP)
+    expect(getClientIp(request({ ...headers, 'X-Lunchbench-Proxy-Secret': '' }), '')).toBe(EDGE_IP)
+  })
+
+  test('keeps the old fallbacks when no proxy headers are sent', () => {
+    expect(getClientIp(request({ 'CF-Connecting-IP': EDGE_IP }), SECRET)).toBe(EDGE_IP)
+    expect(getClientIp(request({ 'X-Forwarded-For': `${VISITOR_IP}, 10.0.0.1` }), undefined)).toBe(VISITOR_IP)
+    expect(getClientIp(request({}), SECRET)).toBe('unknown')
   })
 })

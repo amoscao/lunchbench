@@ -40,7 +40,7 @@ Code:
 - `worker/src/soda-deck.ts`: per-voter deck order (pure).
 - `worker/src/soda-data.ts`: D1 aggregation and snapshot writes.
 - `worker/src/routes/soda.ts`: `/api/soda/*` routes.
-- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot and prunes unknown scans older than 180 days.
+- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot, prunes unknown scans older than 180 days, and prunes `rate_limits` rows (keyed by client IP) older than a day.
 - `worker/src/barcode.ts`: UPC/EAN normalization to 13-digit GTINs (pure). `frontend/src/utils/barcode.ts` has the same rules.
 - `worker/src/soda-unknown-scans.ts`: groups the unknown-scan log for the admin view (pure).
 - `frontend/src/components/barcode-scanner.ts`: scan mode of the report modal. Camera preview, decode loop, lookup, unknown-scan logging.
@@ -102,6 +102,15 @@ Set by `frontend/functions/_middleware.ts` on HTML responses:
 
 The frontend proxies `/api/*` requests to the worker using a Cloudflare Pages Function at `frontend/functions/api/[[path]].ts`. This avoids CORS issues and keeps the API under the same domain.
 
+The proxy re-fetches the Worker's public `workers.dev` URL, so the Worker's `CF-Connecting-IP` is a Cloudflare egress address, the same for every visitor (#307). To keep per-IP limits per visitor:
+
+- The proxy strips client-sent `X-Lunchbench-Client-IP` and `X-Lunchbench-Proxy-Secret`.
+- With `PROXY_SECRET` set on the Pages project, it sends the visitor's `CF-Connecting-IP` as `X-Lunchbench-Client-IP` and the secret as `X-Lunchbench-Proxy-Secret`.
+- The Worker's `getClientIp` trusts `X-Lunchbench-Client-IP` only when its own `PROXY_SECRET` matches (constant-time). Otherwise it uses `CF-Connecting-IP`. A direct `workers.dev` caller cannot pick its IP.
+- The Sentry header allowlist (`worker/src/sentry.ts`) drops both headers from events.
+
+A service binding with `workers_dev` off was rejected: the Pages deploy would have to land before the Worker deploy (CI does the reverse), or the site's API goes down.
+
 ## Secrets
 
 | Secret | Where | Purpose |
@@ -109,6 +118,7 @@ The frontend proxies `/api/*` requests to the worker using a Cloudflare Pages Fu
 | `ADMIN_TOKEN` | Worker secret + `.dev.vars` | Protects lunch creation and image upload routes |
 | `PURCHASER_PASSWORD` | Worker secret + `.dev.vars` | Mints `purchaser` sessions for `/chris` and `GET /api/soda/order/latest` |
 | `IP_HASH_KEY` | Worker secret (optional) | HMAC key for the IP hash in rate-limit Sentry warnings |
+| `PROXY_SECRET` | Worker secret + Pages project secret (optional, same value) | Lets the Worker trust the visitor IP the Pages proxy forwards (#307) |
 | `CLOUDFLARE_API_TOKEN` | GitHub Actions secret | Allows CI to deploy worker and pages |
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret | Identifies Cloudflare account in CI |
 

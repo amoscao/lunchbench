@@ -20,7 +20,7 @@ const capture = vi.mocked(captureMessage)
 const RAW_IP = '203.0.113.42'
 const BLOCKED: RateLimitBlocked = { allowed: false, retryAfter: 1200, action: 'soda_swipe', count: 1201, limit: 1200 }
 
-function env(ipHashKey?: string): Bindings {
+function env(ipHashKey?: string, proxySecret?: string): Bindings {
   return {
     DB: {} as D1Database,
     IMAGES: undefined,
@@ -28,6 +28,7 @@ function env(ipHashKey?: string): Bindings {
     ADMIN_MANAGER_PASSWORD: 'admin-password',
     SENTRY_DSN: '',
     IP_HASH_KEY: ipHashKey,
+    PROXY_SECRET: proxySecret,
   }
 }
 
@@ -80,6 +81,20 @@ describe('rateLimitedResponse', () => {
     const [first, second] = capture.mock.calls.map((call) => (call[1] as { tags: { ip_hash: string } }).tags.ip_hash)
     expect(first).toMatch(/^[0-9a-f]{16}$/)
     expect(second).toBe(first)
+  })
+
+  test('hashes the proxy-forwarded visitor IP only when the proxy secret matches (#307)', async () => {
+    const EDGE_IP = '2a06:98c0:3600::103'
+    const proxied = (secret: string) => app.request('/api/soda/swipes', {
+      method: 'PUT',
+      headers: { 'CF-Connecting-IP': EDGE_IP, 'X-Lunchbench-Client-IP': RAW_IP, 'X-Lunchbench-Proxy-Secret': secret },
+    }, env('test-ip-hash-key', 'proxy-secret'))
+    const ipHash = () => (capture.mock.calls.at(-1)![1] as { tags: { ip_hash: string } }).tags.ip_hash
+
+    await proxied('proxy-secret')
+    expect(ipHash()).toBe(await hashClientIp(RAW_IP, 'test-ip-hash-key'))
+    await proxied('wrong-secret')
+    expect(ipHash()).toBe(await hashClientIp(EDGE_IP, 'test-ip-hash-key'))
   })
 
   test('the hash is keyed: same IP and key match, another key or IP does not', async () => {

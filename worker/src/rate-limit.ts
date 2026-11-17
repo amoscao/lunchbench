@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { routePath } from 'hono/route'
 import { captureMessage } from '@sentry/cloudflare'
 import type { Bindings } from './types'
+import { constantTimeEquals } from './helpers'
 
 /** A blocked result carries what the 429 report needs (#262). */
 export type RateLimitBlocked = {
@@ -15,6 +16,8 @@ export type RateLimitBlocked = {
 export type RateLimitResult = { allowed: true } | RateLimitBlocked
 type RateLimitRow = { count: number; window_start: string }
 
+// Keep every window at most a day: the weekly cron (runWeeklyOrder in index.ts) deletes rows whose
+// window started more than a day ago.
 function getWindowStart(now: Date, windowSeconds: number): string {
   return new Date(
     Math.floor(now.getTime() / (windowSeconds * 1000)) * windowSeconds * 1000
@@ -136,7 +139,24 @@ export async function checkCooldown(
   return { allowed: false, retryAfter }
 }
 
-export function getClientIp(request: Request): string {
+// The Pages Function proxy (frontend/functions/api/[[path]].ts) fetches this Worker, so the
+// Worker's CF-Connecting-IP is a Cloudflare egress address shared by every visitor (#307). The
+// proxy forwards the visitor IP in CLIENT_IP_HEADER plus PROXY_SECRET in PROXY_SECRET_HEADER.
+// Keep both names in sync with the proxy.
+export const CLIENT_IP_HEADER = 'X-Lunchbench-Client-IP'
+export const PROXY_SECRET_HEADER = 'X-Lunchbench-Proxy-Secret'
+
+/**
+ * The visitor IP for rate limits, barcode learning and the 429 IP hash. CLIENT_IP_HEADER is
+ * trusted only when PROXY_SECRET is set and PROXY_SECRET_HEADER matches it, so a direct caller of
+ * the workers.dev URL cannot pick an IP. Anything else falls back to CF-Connecting-IP.
+ */
+export function getClientIp(request: Request, proxySecret: string | undefined): string {
+  if (proxySecret) {
+    const sentSecret = request.headers.get(PROXY_SECRET_HEADER)
+    const forwardedIp = request.headers.get(CLIENT_IP_HEADER)?.trim()
+    if (sentSecret && forwardedIp && constantTimeEquals(sentSecret, proxySecret)) return forwardedIp
+  }
   return (
     request.headers.get('CF-Connecting-IP') ||
     request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
@@ -200,7 +220,7 @@ export async function rateLimitedResponse(
   error: string
 ): Promise<Response> {
   try {
-    const ip = getClientIp(c.req.raw)
+    const ip = getClientIp(c.req.raw, c.env.PROXY_SECRET)
     const ipHash = ip === 'unknown' ? 'unknown' : await hashClientIp(ip, c.env.IP_HASH_KEY)
     if (shouldReport(`${blocked.action}:${ipHash}`, Date.now())) {
       captureMessage('Rate limit exceeded', {

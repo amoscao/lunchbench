@@ -313,6 +313,17 @@ Every `429 RATE_LIMITED` response (Sodabench writes and `POST /api/admin/verify`
 
 The lunch routes have no rate limits (#264).
 
+### Client IP
+
+Per-IP limits, voter barcode learning and `ip_hash` all use one client IP from `getClientIp` (`worker/src/rate-limit.ts`):
+
+1. `X-Lunchbench-Client-IP`, only when the Worker has `PROXY_SECRET` and the request's `X-Lunchbench-Proxy-Secret` matches it. The Pages `/api` proxy sends both (#307).
+2. Otherwise `CF-Connecting-IP`, then the first `X-Forwarded-For` entry, then `unknown`.
+
+Clients cannot set these headers through the site: the proxy replaces them. Direct callers of the Worker URL without the secret get rule 2. See `PROXY_SECRET` in `docs/13-environment-and-deployment-config.md`.
+
+`rate_limits` rows are keyed by raw client IP. The weekly cron deletes rows whose window started more than a day ago (every window is at most an hour).
+
 ---
 
 ## Lunch Object Shape
@@ -732,4 +743,4 @@ There is no inventory or purchase tracking.
 **Errors:** `400 BAD_REQUEST`, `401 UNAUTHORIZED`
 
 ### Weekly cron
-`worker/wrangler.toml` triggers the Worker `scheduled` handler at `0 12 * * 1` (Monday 12:00 UTC, 7–8 am Eastern). It writes the week's snapshot to `soda_buy_lists` with `INSERT OR IGNORE`, so a repeat firing keeps the frozen list. It then deletes `soda_unknown_scans` rows older than 180 days.
+`worker/wrangler.toml` triggers the Worker `scheduled` handler at `0 12 * * 1` (Monday 12:00 UTC, 7–8 am Eastern). It writes the week's snapshot to `soda_buy_lists` with `INSERT OR IGNORE`, so a repeat firing keeps the frozen list. It then deletes `soda_unknown_scans` rows older than 180 days and `rate_limits` rows whose window started more than a day ago.

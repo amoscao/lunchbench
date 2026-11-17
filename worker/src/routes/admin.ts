@@ -20,7 +20,7 @@ const ADMIN_SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000
 const admin = new Hono<{ Bindings: Bindings }>()
 
 admin.post('/verify', async (c) => {
-  const ip = getClientIp(c.req.raw)
+  const ip = getClientIp(c.req.raw, c.env.PROXY_SECRET)
   const rl = await peekRateLimit(c.env.DB, ip, 'admin_verify', 5, 3600)
   if (!rl.allowed) return rateLimitedResponse(c, rl, 'Too many attempts')
 

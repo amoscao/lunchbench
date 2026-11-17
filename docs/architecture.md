@@ -40,7 +40,7 @@ Code:
 - `worker/src/soda-deck.ts`: per-voter deck order (pure).
 - `worker/src/soda-data.ts`: D1 aggregation and snapshot writes.
 - `worker/src/routes/soda.ts`: `/api/soda/*` routes.
-- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot and prunes unknown scans older than 180 days.
+- `worker/src/index.ts`: exports `{ fetch, scheduled }`. The scheduled handler writes the weekly snapshot, prunes unknown scans older than 180 days, and prunes `rate_limits` rows (keyed by client IP) older than a day.
 - `worker/src/barcode.ts`: UPC/EAN normalization to 13-digit GTINs (pure). `frontend/src/utils/barcode.ts` has the same rules.
 - `worker/src/soda-unknown-scans.ts`: groups the unknown-scan log for the admin view (pure).
 - `frontend/src/components/barcode-scanner.ts`: scan mode of the report modal. Camera preview, decode loop, lookup, unknown-scan logging.

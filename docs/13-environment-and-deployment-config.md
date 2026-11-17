@@ -126,9 +126,9 @@ printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/
 unset PROXY_SECRET_VALUE
 ```
 
-Then redeploy Pages so the new deployment picks up the secret. Re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run rerun <run-id>`), or push to `main`.
+A Pages secret reaches only Pages deployments made after it is set. If the next Pages deploy is still to come (for example, the secret is set before merging the PR that needs it), nothing more is needed. Otherwise redeploy Pages: re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run list --workflow=deploy.yml --branch=main --limit 1`, then `gh run rerun <run-id>`; GitHub allows re-runs for 30 days), or push to `main`.
 
-Rotation: run the same steps. Between the Worker update and the Pages redeploy the values differ, so limits are site-wide for that window.
+Rotation: the Worker secret changes at once, the Pages one at the next Pages deploy. While they differ, limits are site-wide (no errors). To keep that window short: set the Pages secret first, start the Pages redeploy, and run the Worker `wrangler secret put` when the run reaches its Pages deploy step. Keep the value in the same shell variable until both are set.
 
 Pages preview deployments do not get the secret (`wrangler pages secret put` sets production only), so previews keep site-wide limits.
 

@@ -30,5 +30,7 @@ export const onRequest = async (context: ProxyContext): Promise<Response> => {
     method: request.method,
     headers,
     body: request.body,
+    // The request carries PROXY_SECRET, so never follow a redirect away from the Worker.
+    redirect: 'manual',
   })
 }

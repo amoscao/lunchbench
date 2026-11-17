@@ -29,7 +29,7 @@
   printf '%s' "$PROXY_SECRET_VALUE" | (cd frontend && ../worker/node_modules/.bin/wrangler pages secret put PROXY_SECRET --project-name=lunchbench)
   unset PROXY_SECRET_VALUE
   ```
-- **Then redeploy Pages**: a Pages secret applies to new deployments only. Re-run the latest `Deploy to Cloudflare` workflow run (`gh run rerun <run-id>`) or push to `main`.
+- **Pages redeploy**: a Pages secret applies to new deployments only. If no Pages deploy is still to come, re-run the latest `Deploy to Cloudflare` workflow run on `main` (`gh run rerun <run-id>`, within 30 days of that run) or push to `main`. Rotation order and details in `docs/13-environment-and-deployment-config.md`.
 - **Local**: not needed. Never put it in a log, a Sentry event, a doc or a PR.
 
 ## CLOUDFLARE_API_TOKEN

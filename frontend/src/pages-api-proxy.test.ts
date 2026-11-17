@@ -13,7 +13,7 @@ async function proxy(headers: Record<string, string>, env: { PROXY_SECRET?: stri
   expect(res.status).toBe(200)
   expect(fetchMock).toHaveBeenCalledTimes(1)
   const [url, init] = fetchMock.mock.calls[0]
-  return { url, method: init?.method, sent: new Headers(init?.headers) }
+  return { url, method: init?.method, redirect: init?.redirect, sent: new Headers(init?.headers) }
 }
 
 describe('Pages /api proxy', () => {
@@ -22,12 +22,13 @@ describe('Pages /api proxy', () => {
   })
 
   test('forwards the visitor IP and secret when PROXY_SECRET is set', async () => {
-    const { url, method, sent } = await proxy(
+    const { url, method, redirect, sent } = await proxy(
       { 'CF-Connecting-IP': VISITOR_IP, 'X-Lunchbench-Session': 'session-key' },
       { PROXY_SECRET: 'proxy-secret' }
     )
     expect(url).toBe('https://lunchbench-api.woodamca.workers.dev/api/soda/feed?limit=5')
     expect(method).toBe('GET')
+    expect(redirect).toBe('manual')
     expect(sent.get('X-Lunchbench-Client-IP')).toBe(VISITOR_IP)
     expect(sent.get('X-Lunchbench-Proxy-Secret')).toBe('proxy-secret')
     expect(sent.get('X-Lunchbench-Session')).toBe('session-key')

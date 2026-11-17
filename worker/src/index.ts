@@ -44,7 +44,7 @@ app.post('/api/lunches/:id/image', async (c) => {
 })
 
 // Weekly cron (wrangler.toml [triggers]). INSERT OR IGNORE, so a repeat firing keeps the frozen snapshot.
-// It also prunes unknown-scan rows older than 180 days.
+// It also prunes unknown-scan rows older than 180 days and rate-limit rows older than a day.
 // Errors are logged and rethrown so the cron run shows as failed; withSentry reports them.
 export async function runWeeklyOrder(controller: ScheduledController, env: Bindings): Promise<void> {
   try {
@@ -52,6 +52,11 @@ export async function runWeeklyOrder(controller: ScheduledController, env: Bindi
     // Privacy: the unknown-scan log keeps 180 days.
     await env.DB.prepare(
       "DELETE FROM soda_unknown_scans WHERE created_at < datetime('now', '-180 days')"
+    ).run()
+    // Privacy: rate_limits keys are raw client IPs (#307). Every window is at most an hour, so a
+    // row older than a day is never read again.
+    await env.DB.prepare(
+      "DELETE FROM rate_limits WHERE unixepoch(window_start) < unixepoch('now', '-1 day')"
     ).run()
   } catch (error) {
     console.error('Weekly soda order failed', controller.cron, error)

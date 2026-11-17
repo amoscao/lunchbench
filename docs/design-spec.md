@@ -448,7 +448,7 @@ Mockups live outside the repo; this section is the source of truth.
 - A drink whose latest report from 5 or more distinct voters is Hate disappears on its own, with no admin step: from the swipe feed, report search, the soda leaderboard, the weekly order list and barcode matches. A scanned banned can goes to manual search.
 - The current week's order list on `/chris` loses the drink at once, without a regenerate. The rows below move up one rank; no replacement is added until the next weekly list.
 - A ban does not lift on its own: reports on a banned drink are rejected, so they cannot change. Only an admin unban brings it back.
-- Admin "Banned drinks" tab: a table with Drink, Hates, Likes and an **Unban** button per row (secondary, small), most hated first; "No banned drinks" when empty. Unban shows "Unbanned!" and reloads the list. An unbanned drink is shown again until it gets 5 new Hates, then it is banned again and returns to the list.
+- Admin "Banned drinks" tab: a table with Drink, Hates, Likes and an **Unban** button per row (secondary, small), most hated first; "No banned drinks" when empty. Unban shows "Unbanned!" and reloads the list. An unbanned drink is shown again until its Hate count reaches the count at unban + 5 (at least 5 new Hates, more if earlier haters switch to Like), then it is banned again and returns to the list.
 - Pages opened before the ban:
   - Swiping a card of a drink that was banned since the feed loaded counts as done: no "Swipe not saved" alert.
   - Reporting it shows "This drink has been removed" in the modal's error slot, clears the pick and drops the drink from that page's search and scan matches.

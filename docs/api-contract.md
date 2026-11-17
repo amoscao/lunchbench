@@ -395,7 +395,7 @@ Writes require a valid session header and return `400 BAD_REQUEST` without one.
 Writes are rate-limited per client IP: swipes 1200 per hour, reports 60 per hour, unknown scans 60 per hour (`429 RATE_LIMITED`). Voter-learned barcode mappings are capped separately at 20 per hour; over that cap the report still counts but the mapping is skipped.
 
 **Accepted risk: ballot stuffing.** Voters have no login. The session UUID is client-generated, so one person can clear localStorage (or script fresh UUIDs) and swipe or report the same drink many times. The per-IP rate limits cap the damage, but a shared office IP means they must stay loose. Lunchbench accepts this for an internal office tool. The order list is advisory and Chris can skip any row.
-Stuffing also reaches the auto-ban (#298): 5 Hate reports from fresh UUIDs ban a drink for everyone, and it drops off Chris's list at once, mid-week included. The mitigation is the admin "Banned drinks" tab: an admin sees every ban with its hate and like counts, and Unban (`POST /api/admin/soda/banned/:id/unban`) brings the drink back. An unbanned drink stays shown until it collects 5 more Hates, so the same stuffing has to be repeated in full.
+Stuffing also reaches the auto-ban (#298): 5 Hate reports from fresh UUIDs ban a drink for everyone, and it drops off Chris's list at once, mid-week included. The mitigation is the admin "Banned drinks" tab: an admin sees every ban with its hate and like counts, and Unban (`POST /api/admin/soda/banned/:id/unban`) brings the drink back. An unbanned drink stays shown until its Hate count reaches the count at unban + 5 (at least 5 more Hates), so the same stuffing has to be repeated in full.
 Writes come only from allowed browser origins (see `docs/13-environment-and-deployment-config.md`).
 
 ### Soda Object Shape
@@ -429,7 +429,7 @@ Pure functions in `worker/src/soda-score.ts`. Per drink:
 - Inactive drinks (`sodas.is_active = 0`) are excluded everywhere, including the type and brand means.
 - **Auto-ban (#298).** A drink is **banned** when at least `SODA_BAN_HATES = 5` distinct voters' latest report on it is a Hate. Reports from barcode scans and from manual search count alike; likes do not offset hates.
   - The ban is computed from `soda_reports` on every read; only admin unbans are stored. Once banned, a drink stays banned: its reports can no longer change (`409 SODA_BANNED`), so it comes back only through an admin unban (or a direct data fix).
-  - **Admin unban.** `POST /api/admin/soda/banned/:id/unban` records the drink's current Hate count in `soda_ban_overrides.hates_at_override`. The drink is then banned only at `hates >= SODA_BAN_HATES + hates_at_override`, i.e. after 5 new Hates. A second unban moves the override to the new count.
+  - **Admin unban.** `POST /api/admin/soda/banned/:id/unban` records the drink's current Hate count in `soda_ban_overrides.hates_at_override`. The drink is then banned only at `hates >= SODA_BAN_HATES + hates_at_override`, i.e. after at least 5 new Hates (more if earlier haters switch to Like, since the threshold is fixed at unban time). A second unban moves the override to the new count.
   - A banned drink disappears everywhere an inactive one does: the swipe feed, catalog and report search, leaderboard, weekly order selection (favorites, trials and the type mean), and `/api/soda/barcodes`. A scanned banned can therefore falls through to manual search and is logged as an unknown scan.
   - It also leaves the current week's order list at once: `GET /api/soda/order/latest` drops banned and inactive drinks from the stored snapshot when it reads it (see that endpoint). Replacements are not recomputed mid-week.
   - Its own evidence still counts toward **its brand's prior**, so a bad brand keeps paying for it.
@@ -674,7 +674,7 @@ There is no inventory or purchase tracking.
 **Errors:** `401 UNAUTHORIZED`
 
 ### POST /api/admin/soda/banned/:id/unban
-**Requires admin auth.** Lifts a drink's auto-ban. Stores the drink's current Hate count in `soda_ban_overrides` (one row per drink, replaced on a later unban), so the drink is shown again until it gets `SODA_BAN_HATES` (5) new Hates from distinct voters.
+**Requires admin auth.** Lifts a drink's auto-ban. Stores the drink's current Hate count in `soda_ban_overrides` (one row per drink, replaced on a later unban), so the drink is shown again until its Hate count reaches that count + `SODA_BAN_HATES` (5): at least 5 new Hates from distinct voters, more if earlier haters switch to Like.
 
 **Response 200:** `{ "id": 12, "hates_at_override": 5 }`
 

@@ -1,5 +1,5 @@
 // Runs in the `camera-unknown` project: the fake camera shows a valid UPC-A that no drink has.
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { UNKNOWN_GTIN } from '../fixtures/barcode-video'
 import { API_URL } from './helpers'
 import { expectCameraOff, openReport, recordRequests, trackCameraStreams } from './camera-helpers'

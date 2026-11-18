@@ -1,5 +1,5 @@
 // Runs in the `camera-known` project: the fake camera shows the UPC-A of a Coca-Cola 12 oz can.
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { KNOWN_GTIN } from '../fixtures/barcode-video'
 import { ADMIN_MANAGER_PASSWORD, API_URL, getSodaRow, verifyPassword } from './helpers'
 import { expectCameraOff, openReport, recordRequests, trackCameraStreams } from './camera-helpers'

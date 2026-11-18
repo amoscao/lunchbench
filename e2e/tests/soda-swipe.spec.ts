@@ -177,6 +177,59 @@ test.describe('SodaArena swipe feed', () => {
     await expect(page.locator('.soda-end-title')).toHaveText("You've rated everything")
   })
 
+  test('dragging shows a green LIKE or red DISLIKE overlay on the card that grows with the drag', async ({ page }) => {
+    await page.goto('/soda')
+    await topId(page)
+    const card = page.locator(TOP)
+    const opacity = (selector: string) => card.locator(selector).evaluate((el) => Number(getComputedStyle(el).opacity))
+    await expect(card.locator('.soda-stamp-like')).toHaveText('LIKE')
+    await expect(card.locator('.soda-stamp-nope')).toHaveText('DISLIKE')
+    expect(await opacity('.soda-stamp-like')).toBe(0)
+
+    const box = (await card.boundingBox())!
+    const x = box.x + box.width / 2
+    const y = box.y + box.height * 0.3
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    // A short drag: partly visible. Further: fully visible, still short of a commit on release.
+    await page.mouse.move(x + box.width * 0.08, y, { steps: 4 })
+    await expect.poll(() => opacity('.soda-stamp-like')).toBeGreaterThan(0)
+    const partial = await opacity('.soda-tint-like')
+    expect(partial).toBeGreaterThan(0)
+    expect(partial).toBeLessThan(1)
+    expect(await opacity('.soda-stamp-nope')).toBe(0)
+    await page.mouse.move(x + box.width * 0.34, y, { steps: 6 })
+    await expect.poll(() => opacity('.soda-tint-like')).toBeGreaterThan(partial)
+
+    // The overlay is inside the card, so it moves and tilts with it.
+    const stamp = (await card.locator('.soda-stamp-like').boundingBox())!
+    const moved = (await card.boundingBox())!
+    expect(stamp.x).toBeGreaterThan(moved.x)
+    expect(stamp.x + stamp.width).toBeLessThan(moved.x + moved.width)
+
+    // Back across to the left: LIKE goes away, red DISLIKE appears.
+    await page.mouse.move(x - box.width * 0.3, y, { steps: 10 })
+    await expect.poll(() => opacity('.soda-stamp-nope')).toBeGreaterThan(0.5)
+    expect(await opacity('.soda-stamp-like')).toBe(0)
+    expect(await opacity('.soda-tint-like')).toBe(0)
+    const colors = await card.evaluate((el) => ({
+      like: getComputedStyle(el.querySelector('.soda-stamp-like')!).color,
+      nope: getComputedStyle(el.querySelector('.soda-stamp-nope')!).color,
+    }))
+    // Green and red: compare the dominant channel.
+    const rgb = (c: string) => c.match(/\d+/g)!.slice(0, 3).map(Number)
+    const [lr, lg] = rgb(colors.like)
+    const [nr, ng] = rgb(colors.nope)
+    expect(lg).toBeGreaterThan(lr)
+    expect(nr).toBeGreaterThan(ng)
+
+    // Release near the middle: spring back, overlays fade out.
+    await page.mouse.move(x, y, { steps: 6 })
+    await page.mouse.up()
+    await expect.poll(() => opacity('.soda-stamp-nope')).toBe(0)
+    await expect.poll(() => opacity('.soda-tint-nope')).toBe(0)
+  })
+
   test('flung cards hop about one card width in the swipe direction and fade out', async ({ page }) => {
     type Exit = { shift: number; width: number; opacity: number }
     await page.addInitScript(() => {

@@ -31,7 +31,14 @@ export type SwipeStackOptions<T> = {
   onTop?: (item: T) => void
 }
 
-type Card<T> = { item: T; el: HTMLElement; likeStamp: HTMLElement | null; nopeStamp: HTMLElement | null }
+type Card<T> = {
+  item: T
+  el: HTMLElement
+  likeStamp: HTMLElement | null
+  nopeStamp: HTMLElement | null
+  likeTint: HTMLElement | null
+  nopeTint: HTMLElement | null
+}
 
 type Pose = { x: number; y: number; rotation: number }
 
@@ -147,6 +154,8 @@ export class SwipeStack<T> {
         el,
         likeStamp: el.querySelector<HTMLElement>('.soda-stamp-like'),
         nopeStamp: el.querySelector<HTMLElement>('.soda-stamp-nope'),
+        likeTint: el.querySelector<HTMLElement>('.soda-tint-like'),
+        nopeTint: el.querySelector<HTMLElement>('.soda-tint-nope'),
       })
     }
     for (const item of this.queue.slice(0, PRELOAD_AHEAD)) this.imageFor(item)
@@ -191,6 +200,9 @@ export class SwipeStack<T> {
       card.nopeStamp.style.opacity = pose.x < 0 ? String(progress) : '0'
       card.nopeStamp.style.transform = `rotate(${12 + tilt}deg) scale(${0.9 + 0.1 * progress})`
     }
+    // The colour wash fades in with its stamp. Both are children of the card, so they move with it.
+    if (card.likeTint) card.likeTint.style.opacity = pose.x > 0 ? String(progress) : '0'
+    if (card.nopeTint) card.nopeTint.style.opacity = pose.x < 0 ? String(progress) : '0'
     // Reduced motion: the cards underneath stay put instead of scaling with the drag.
     this.layout(reducedMotion() ? 0 : progress)
   }
@@ -298,6 +310,8 @@ export class SwipeStack<T> {
 
     const stamp = direction === 'right' ? card.likeStamp : card.nopeStamp
     if (stamp) stamp.style.opacity = '1'
+    const tint = direction === 'right' ? card.likeTint : card.nopeTint
+    if (tint) tint.style.opacity = '1'
     const plan = planFling({
       direction,
       dx: release.pose.x,

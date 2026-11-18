@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { ADMIN_MANAGER_PASSWORD, API_URL } from './helpers'
 
 // Issue #298: Hate reports from 5 distinct voters ban a drink everywhere.

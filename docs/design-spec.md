@@ -380,13 +380,18 @@ After `Promise.all` settles, the code does `next = await (nextMatchupPromise ?? 
 
 Mockups live outside the repo; this section is the source of truth.
 
-**Rule: no subtitles or helper text.** Only titles, labels, and controls. No explanatory lines such as "swipe right on sodas you like".
+**Rule: no subtitles or helper text** on the page itself. Only titles, labels, and controls. No explanatory lines such as "swipe right on sodas you like". The one exception is the first-visit explainer dialog below.
 
 **Nav:** LunchArena (`/`) · SodaArena (`/soda`) · Leaderboard. `/chris` is not in the nav. Internally the feature is still called Sodabench (code, routes, API, tables).
 
 ### Swipe deck (`/soda`)
 - Max content width 640px.
-- Header row: page heading "SodaArena" left, primary button "+ Report a soda" right.
+- Header row: page heading "SodaArena" left. Right: a 44px round help button (?, `aria-label="How SodaArena works"`, `--text-secondary`), then primary button "+ Report a soda".
+- Explainer (`frontend/src/components/soda-explainer.ts`): a dialog titled "How SodaArena works" in the report modal's frame (bottom sheet under 640px). It opens on a browser's first visit to `/soda` and again from the help button. Three rows, each a stamp-style badge plus one line:
+  - green **LIKE →**: "Swipe right on drinks you want in the fridge."
+  - red **← DISLIKE**: "Swipe left on ones you don't."
+  - grey **+ Report**: "Tried one? Report it to say you like it or hate it."
+  - Primary button "Start swiping" (focused on open), plus ×, Escape and backdrop click. Any close sets `localStorage.lb_soda_explainer_seen = '1'`. If storage is unavailable it is treated as seen. Arrow-key swipes and "Report a soda" are ignored while it is open.
 - One continuous feed. There are no decks, no progress counter and no "Start over". It shows the next drink until the voter has swiped every active drink.
 - Card: 380px max, 440px tall (380px under 640px wide), `--bg-surface`, `--border-accent` border, `--radius-lg`, `--shadow-md`. Image well 320px (260px) on `--product-bg` (white in both themes, product shots are on white), image `object-fit: contain`. Below: brand (uppercase `--text-sm`, `--text-secondary`) and flavor (`--text-lg`, 700, two lines max).
 - Card stack (`frontend/src/components/swipe-stack.ts`): the top card plus two real cards underneath, fully rendered. Each card's `<img>` is created and decoded ahead of time, and images for the next four drinks are decoded beyond that. When the top card leaves, the next card is promoted in place (same element, no re-render) and a new card is appended at the bottom.
@@ -396,7 +401,7 @@ Mockups live outside the repo; this section is the source of truth.
   - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning for a short hop: it ends one card width from rest (at least 0.4 card widths past where it was released) and fades out over the last 65% of the hop. It does not cross the screen. Duration is distance / speed, clamped to 50-260 ms.
   - **Snap back:** a damped spring with a slight overshoot.
   - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
-  - **Stamps:** LIKE (`--accent`, top left) and NOPE (`--hate`, top right) fade in and tilt with |dx|.
+  - **Stamps and wash:** as the card is dragged, a LIKE stamp (`--swipe-like` green, top left, rotated −12°) or a DISLIKE stamp (`--swipe-dislike` red, top right, +12°) fades in, tilts and grows with |dx|. A colour wash over the whole card (green from the left edge, red from the right) fades in with it. Both are children of the card, so they move and rotate with it. Opacity is 0 at rest and 1 at the commit threshold; the committed side stays at 1 while the card flies out. 32px, weight 900, 4px border.
   - **Input:** the flying card ignores input; the promoted card can be dragged at once, so rapid swipes work. Holding an arrow key counts once (auto-repeat is ignored). A lost pointer capture, or a mouse move with no button held, ends the drag with a snap back. Swipe requests are fire-and-forget, retried once, with a "Swipe not saved" alert on a second failure.
   - **Screen readers:**
     - each card is named "Brand Flavor";
@@ -405,7 +410,7 @@ Mockups live outside the repo; this section is the source of truth.
     - when the feed empties, focus moves to its title instead of falling to the page body.
   - **Touch:** `touch-action: pan-y` keeps vertical page scroll on phones; pointer capture holds the drag.
   - While on `/soda`, `body` gets `overflow-x: clip` so flung cards never flash a horizontal scrollbar.
-- Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with `--border-accent`, arrow ←, `aria-label="Swipe left"`. Right: `--accent` fill, arrow →, `aria-label="Swipe right"`. Buttons and arrow keys trigger the same fling with a default velocity and a slight upward arc.
+- Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with a 2px `--swipe-dislike` (red) border and red arrow ←, `aria-label="Swipe left"`. Right: `--report-like` (green) fill, white arrow →, `aria-label="Swipe right"`. Buttons and arrow keys trigger the same fling with a default velocity and a slight upward arc.
 - Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal is open or a text field has focus.
 - End: after the last drink, a card titled "You've rated everything" ("No drinks yet" if the catalog itself is empty). No subtitle. "Report a soda" stays available.
 - `prefers-reduced-motion`: the card fades out in 120 ms. There is no fling, no spring, and no scaling: the cards underneath neither scale with the drag nor animate when promoted.

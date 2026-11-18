@@ -42,6 +42,9 @@
   --report-like-hover: #166534;
   --report-hate: #b91c1c;
   --report-hate-hover: #991b1b;
+  /* Swipe stamps and colour wash: LIKE (right) green, DISLIKE (left) red. */
+  --swipe-like: #15803d;
+  --swipe-dislike: #dc2626;
   /* Warning notices (amber). */
   --warn-bg: #fef3c7;
   --warn-text: #92400e;
@@ -51,6 +54,8 @@
 }
 
 [data-theme="dark"] {
+  --swipe-like: #4ade80;
+  --swipe-dislike: #f87171;
   --bg-primary:   hsl(222, 35%, 6%);
   --bg-surface:   hsl(223, 28%, 10%);
   --bg-hover:     hsl(223, 22%, 14%);
@@ -1971,6 +1976,24 @@ img {
 
 .soda-header .page-heading { margin: 0; }
 
+.soda-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.soda-help-open {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 999px;
+}
+
+.soda-help-open:hover { background: var(--bg-hover); color: var(--text-primary); }
+
 .soda-report-open { padding: 10px 16px; }
 
 .soda-stage {
@@ -2041,30 +2064,48 @@ body.soda-route { overflow-x: clip; }
   .soda-card.settling { transition: none; }
 }
 
+/* Colour wash over the whole card, strongest on the stamp's side. Opacity follows the drag. */
+.soda-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.soda-tint-like {
+  background: linear-gradient(to right, color-mix(in srgb, var(--swipe-like) 45%, transparent), color-mix(in srgb, var(--swipe-like) 12%, transparent) 70%);
+}
+
+.soda-tint-nope {
+  background: linear-gradient(to left, color-mix(in srgb, var(--swipe-dislike) 45%, transparent), color-mix(in srgb, var(--swipe-dislike) 12%, transparent) 70%);
+}
+
 .soda-stamp {
   position: absolute;
-  top: 20px;
-  z-index: 1;
-  border: 3px solid currentColor;
+  top: 28px;
+  z-index: 2;
+  border: 4px solid currentColor;
   background: var(--bg-surface);
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.1;
   letter-spacing: 0.08em;
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 4px 14px;
+  border-radius: 10px;
   opacity: 0;
   pointer-events: none;
 }
 
 .soda-stamp-like {
-  left: 18px;
-  color: var(--accent);
+  left: 20px;
+  color: var(--swipe-like);
   transform: rotate(-12deg);
 }
 
 .soda-stamp-nope {
-  right: 18px;
-  color: var(--hate);
+  right: 20px;
+  color: var(--swipe-dislike);
   transform: rotate(12deg);
 }
 
@@ -2179,13 +2220,19 @@ body.soda-route { overflow-x: clip; }
 .soda-swipe-btn:hover { background: var(--bg-hover); }
 .soda-swipe-btn:active { transform: scale(0.98); }
 
-.soda-swipe-right {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
+/* Left = dislike (red outline), right = like (green fill), matching the stamps. */
+.soda-swipe-left {
+  border: 2px solid var(--swipe-dislike);
+  color: var(--swipe-dislike);
 }
 
-.soda-swipe-right:hover { background: var(--accent-hover); }
+.soda-swipe-right {
+  background: var(--report-like);
+  border: 2px solid var(--report-like);
+  color: #fff;
+}
+
+.soda-swipe-right:hover { background: var(--report-like-hover); }
 
 .soda-swipe-btn:disabled {
   opacity: 0.6;
@@ -2245,6 +2292,42 @@ body.soda-route { overflow-x: clip; }
 }
 
 .modal-close:hover { background: var(--bg-hover); }
+
+/* SodaArena explainer (soda-explainer.ts): shares the report modal's frame. */
+.soda-explainer-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.soda-explainer-row {
+  display: grid;
+  grid-template-columns: 124px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-primary);
+}
+
+.soda-explainer-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 3px solid currentColor;
+  border-radius: 8px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.soda-explainer-like .soda-explainer-badge { color: var(--swipe-like); transform: rotate(-6deg); }
+.soda-explainer-dislike .soda-explainer-badge { color: var(--swipe-dislike); transform: rotate(6deg); }
+.soda-explainer-report .soda-explainer-badge { color: var(--text-secondary); border-width: 2px; letter-spacing: 0; }
+
+.soda-explainer-start { min-height: 48px; }
 
 .soda-report-search { position: relative; }
 

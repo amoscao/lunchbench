@@ -1,4 +1,5 @@
 import { getSodaCatalog, getSodaDeck, isSodaBannedError, submitSodaSwipe, type Soda } from '../api'
+import { openSodaExplainer, sodaExplainerSeen, type SodaExplainer } from '../components/soda-explainer'
 import { openSodaReportModal, type ReportModal } from '../components/soda-report-modal'
 import { SwipeStack } from '../components/swipe-stack'
 import { escapeHtml } from '../utils/escape-html'
@@ -6,6 +7,7 @@ import type { Direction } from '../utils/swipe-physics'
 
 const ARROW_LEFT = '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>'
 const ARROW_RIGHT = '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>'
+const HELP = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>'
 const PLUS = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'
 
 /** A card for one drink. The image element arrives preloaded from the stack. */
@@ -15,8 +17,10 @@ function renderSodaCard(soda: Soda, image: HTMLImageElement | null): HTMLElement
   card.dataset.sodaId = String(soda.id)
   card.setAttribute('aria-label', soda.name)
   card.innerHTML = `
+    <div class="soda-tint soda-tint-like" aria-hidden="true"></div>
+    <div class="soda-tint soda-tint-nope" aria-hidden="true"></div>
     <div class="soda-stamp soda-stamp-like" aria-hidden="true">LIKE</div>
-    <div class="soda-stamp soda-stamp-nope" aria-hidden="true">NOPE</div>
+    <div class="soda-stamp soda-stamp-nope" aria-hidden="true">DISLIKE</div>
     <div class="soda-card-image">
       ${image ? '' : `<span class="soda-card-initial">${escapeHtml(soda.brand.charAt(0))}</span>`}
     </div>
@@ -39,7 +43,10 @@ export function renderSoda(container: HTMLElement): () => void {
   content.innerHTML = `
     <div class="soda-header">
       <h1 class="page-heading">SodaArena</h1>
-      <button type="button" class="btn btn-primary soda-report-open">${PLUS}Report a soda</button>
+      <div class="soda-header-actions">
+        <button type="button" class="soda-help-open" aria-label="How SodaArena works">${HELP}</button>
+        <button type="button" class="btn btn-primary soda-report-open">${PLUS}Report a soda</button>
+      </div>
     </div>
     <div class="alert alert-error soda-alert" role="alert" hidden>Swipe not saved</div>
     <div class="visually-hidden soda-announce" aria-live="polite" aria-atomic="true"></div>
@@ -61,6 +68,7 @@ export function renderSoda(container: HTMLElement): () => void {
   const leftBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-left')!
   const rightBtn = content.querySelector<HTMLButtonElement>('.soda-swipe-right')!
   const reportBtn = content.querySelector<HTMLButtonElement>('.soda-report-open')!
+  const helpBtn = content.querySelector<HTMLButtonElement>('.soda-help-open')!
   const alertEl = content.querySelector<HTMLElement>('.soda-alert')!
   const announcer = content.querySelector<HTMLElement>('.soda-announce')!
 
@@ -68,6 +76,7 @@ export function renderSoda(container: HTMLElement): () => void {
   let catalog: Soda[] = []
   let catalogPromise: Promise<Soda[]> | null = null
   let modal: ReportModal | null = null
+  let explainer: SodaExplainer | null = null
 
   function setButtons(enabled: boolean): void {
     leftBtn.disabled = !enabled
@@ -168,7 +177,7 @@ export function renderSoda(container: HTMLElement): () => void {
 
   // Scoped to this page: added on render, removed by the router cleanup.
   function onKeydown(event: KeyboardEvent): void {
-    if (modal || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+    if (modal || explainer || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
     // Holding an arrow key auto-repeats; one press is one vote.
     if (event.repeat && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
       event.preventDefault()
@@ -190,7 +199,7 @@ export function renderSoda(container: HTMLElement): () => void {
   // A flag, not `disabled`: disabling the focused button would drop focus before the modal records its opener.
   let opening = false
   reportBtn.addEventListener('click', async () => {
-    if (modal || opening) return
+    if (modal || explainer || opening) return
     opening = true
     try {
       await loadCatalog()
@@ -199,14 +208,27 @@ export function renderSoda(container: HTMLElement): () => void {
     } finally {
       opening = false
     }
-    if (destroyed || modal) return
+    if (destroyed || modal || explainer) return
     modal = openSodaReportModal(catalog, reportBtn, () => {
       modal = null
     })
   })
+  function showExplainer(opener: HTMLElement | null): void {
+    if (explainer || modal || opening) return
+    explainer = openSodaExplainer(opener, () => {
+      explainer = null
+      // First-visit open has no opener: keep keyboard focus on the page, not <body>.
+      if (!opener && !destroyed && (document.activeElement === document.body || !document.activeElement)) {
+        ;(rightBtn.disabled ? helpBtn : rightBtn).focus()
+      }
+    })
+  }
+  helpBtn.addEventListener('click', () => showExplainer(helpBtn))
   document.addEventListener('keydown', onKeydown)
 
   void loadFeed()
+  // First visit in this browser: explain the swipe directions before the first card.
+  if (!sodaExplainerSeen()) showExplainer(null)
   void loadCatalog().catch(() => undefined)
 
   return () => {
@@ -215,5 +237,6 @@ export function renderSoda(container: HTMLElement): () => void {
     stack.destroy()
     document.removeEventListener('keydown', onKeydown)
     modal?.close()
+    explainer?.close()
   }
 }

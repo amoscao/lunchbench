@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures'
 import { API_URL, getSodaRow } from './helpers'
 
 async function sodaIdByName(name: string): Promise<number> {

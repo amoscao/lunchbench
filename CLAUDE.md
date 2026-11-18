@@ -16,7 +16,6 @@ Before code changes, read the docs relevant to the task:
 - CI: `docs/11-continuous-integration.md`
 - D1 migrations: `docs/12-database-migrations.md`
 - Environment config: `docs/13-environment-and-deployment-config.md`
-- Communication style: `docs/15-caveman-compression-spec.md`
 
 ## Cloudflare Credentials
 

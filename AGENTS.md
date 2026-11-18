@@ -1,7 +1,5 @@
 # Lunchbench Agent Guide
 
-@docs/15-caveman-compression-spec.md
-
 @/home/amos/.codex/RTK.md
 
 Lunchbench is a greenfield lunch-ranking app. Keep changes small, direct, and aligned with the docs in this repo.
@@ -34,7 +32,6 @@ Lunchbench is a greenfield lunch-ranking app. Keep changes small, direct, and al
 - CI and release behavior: `docs/11-continuous-integration.md`
 - D1 migration rules: `docs/12-database-migrations.md`
 - Environment and deployment config: `docs/13-environment-and-deployment-config.md`
-- Communication style: `docs/15-caveman-compression-spec.md`
 
 If a task changes behavior, API shape, schema, deployment, or validation, update the matching doc in the same branch.
 

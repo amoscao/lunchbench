@@ -223,11 +223,47 @@ test.describe('SodaArena swipe feed', () => {
     expect(lg).toBeGreaterThan(lr)
     expect(nr).toBeGreaterThan(ng)
 
-    // Release near the middle: spring back, overlays fade out.
-    await page.mouse.move(x, y, { steps: 6 })
+    // Release short of the threshold, held still so there is no flick: the card springs back
+    // and the overlay fades out with it (it is visible at release).
+    await page.mouse.move(x - box.width * 0.2, y, { steps: 4 })
+    await page.waitForTimeout(200)
+    const id = await card.getAttribute('data-soda-id')
+    expect(await opacity('.soda-tint-nope')).toBeGreaterThan(0.3)
     await page.mouse.up()
     await expect.poll(() => opacity('.soda-stamp-nope')).toBe(0)
     await expect.poll(() => opacity('.soda-tint-nope')).toBe(0)
+    await expect(page.locator(TOP)).toHaveAttribute('data-soda-id', id!)
+  })
+
+  test('a card flung right shows only LIKE while it flies out, even when pressed mid snap-back from the left', async ({ page }) => {
+    await page.goto('/soda')
+    const first = await topId(page)
+    const card = page.locator(TOP)
+    const box = (await card.boundingBox())!
+    const x = box.x + box.width / 2
+    const y = box.y + box.height * 0.3
+    // Record the flying card's overlay opacities as it leaves.
+    await card.evaluate((el) => {
+      const w = window as unknown as { leaving?: Record<string, string> }
+      new MutationObserver(() => {
+        if (!el.classList.contains('leaving') || w.leaving) return
+        const read = (s: string) => (el.querySelector(s) as HTMLElement).style.opacity
+        w.leaving = {
+          like: read('.soda-stamp-like'), likeTint: read('.soda-tint-like'),
+          nope: read('.soda-stamp-nope'), nopeTint: read('.soda-tint-nope'),
+        }
+      }).observe(el, { attributes: true, attributeFilter: ['class', 'style'] })
+    })
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x - box.width * 0.25, y, { steps: 4 })
+    await page.waitForTimeout(200)
+    await page.mouse.up()
+    // Mid snap-back, the DISLIKE side is still partly visible; the button flings it right.
+    await page.getByRole('button', { name: 'Swipe right' }).click()
+    await expectDismissed(page, first)
+    const leaving = await page.evaluate(() => (window as unknown as { leaving?: Record<string, string> }).leaving)
+    expect(leaving).toEqual({ like: '1', likeTint: '1', nope: '0', nopeTint: '0' })
   })
 
   test('flung cards hop about one card width in the swipe direction and fade out', async ({ page }) => {

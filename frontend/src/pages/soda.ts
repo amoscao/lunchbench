@@ -208,15 +208,19 @@ export function renderSoda(container: HTMLElement): () => void {
     } finally {
       opening = false
     }
-    if (destroyed || modal) return
+    if (destroyed || modal || explainer) return
     modal = openSodaReportModal(catalog, reportBtn, () => {
       modal = null
     })
   })
   function showExplainer(opener: HTMLElement | null): void {
-    if (explainer || modal) return
+    if (explainer || modal || opening) return
     explainer = openSodaExplainer(opener, () => {
       explainer = null
+      // First-visit open has no opener: keep keyboard focus on the page, not <body>.
+      if (!opener && !destroyed && (document.activeElement === document.body || !document.activeElement)) {
+        ;(rightBtn.disabled ? helpBtn : rightBtn).focus()
+      }
     })
   }
   helpBtn.addEventListener('click', () => showExplainer(helpBtn))

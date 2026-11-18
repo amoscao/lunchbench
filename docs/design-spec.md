@@ -401,7 +401,7 @@ Mockups live outside the repo; this section is the source of truth.
   - **Fling:** the card keeps its momentum. It moves at constant velocity, starting at the release speed, keeps its vertical velocity and keeps spinning for a short hop: it ends one card width from rest (at least 0.4 card widths past where it was released) and fades out over the last 65% of the hop. It does not cross the screen. Duration is distance / speed, clamped to 50-260 ms.
   - **Snap back:** a damped spring with a slight overshoot.
   - **Next card:** scales 0.95 → 1 and lifts 10px in proportion to drag progress, then finishes as the top card flies out.
-  - **Stamps and wash:** as the card is dragged, a LIKE stamp (`--swipe-like` green, top left, rotated −12°) or a DISLIKE stamp (`--swipe-dislike` red, top right, +12°) fades in, tilts and grows with |dx|. A colour wash over the whole card (green from the left edge, red from the right) fades in with it. Both are children of the card, so they move and rotate with it. Opacity is 0 at rest and 1 at the commit threshold; the committed side stays at 1 while the card flies out. 32px, weight 900, 4px border.
+  - **Stamps and wash:** as the card is dragged, a LIKE stamp (`--swipe-like` green, top left, rotated −12°) or a DISLIKE stamp (`--swipe-dislike` red, top right, +12°) fades in, tilts and grows with |dx|. A colour wash over the whole card (green from the left edge, red from the right) fades in with it. Both are children of the card, so they move and rotate with it. Opacity is 0 at rest and 1 at the commit threshold; the committed side goes to 1 and the other side to 0 while the card flies out. 32px, weight 900, 4px border.
   - **Input:** the flying card ignores input; the promoted card can be dragged at once, so rapid swipes work. Holding an arrow key counts once (auto-repeat is ignored). A lost pointer capture, or a mouse move with no button held, ends the drag with a snap back. Swipe requests are fire-and-forget, retried once, with a "Swipe not saved" alert on a second failure.
   - **Screen readers:**
     - each card is named "Brand Flavor";
@@ -411,7 +411,7 @@ Mockups live outside the repo; this section is the source of truth.
   - **Touch:** `touch-action: pan-y` keeps vertical page scroll on phones; pointer capture holds the drag.
   - While on `/soda`, `body` gets `overflow-x: clip` so flung cards never flash a horizontal scrollbar.
 - Buttons: two pill buttons in a 2-column grid, 56px tall. Left: surface with a 2px `--swipe-dislike` (red) border and red arrow ←, `aria-label="Swipe left"`. Right: `--report-like` (green) fill, white arrow →, `aria-label="Swipe right"`. Buttons and arrow keys trigger the same fling with a default velocity and a slight upward arc.
-- Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal is open or a text field has focus.
+- Keyboard: ← / → swipe while the page is mounted. The listener is removed when the route changes and ignored while the report modal or the explainer is open, or a text field has focus.
 - End: after the last drink, a card titled "You've rated everything" ("No drinks yet" if the catalog itself is empty). No subtitle. "Report a soda" stays available.
 - `prefers-reduced-motion`: the card fades out in 120 ms. There is no fling, no spring, and no scaling: the cards underneath neither scale with the drag nor animate when promoted.
 

@@ -308,10 +308,13 @@ export class SwipeStack<T> {
       return
     }
 
-    const stamp = direction === 'right' ? card.likeStamp : card.nopeStamp
-    if (stamp) stamp.style.opacity = '1'
-    const tint = direction === 'right' ? card.likeTint : card.nopeTint
-    if (tint) tint.style.opacity = '1'
+    // The committed side shows fully; the other side clears (e.g. a button press mid snap-back).
+    const right = direction === 'right'
+    for (const [el, on] of [
+      [card.likeStamp, right], [card.likeTint, right], [card.nopeStamp, !right], [card.nopeTint, !right],
+    ] as const) {
+      if (el) el.style.opacity = on ? '1' : '0'
+    }
     const plan = planFling({
       direction,
       dx: release.pose.x,

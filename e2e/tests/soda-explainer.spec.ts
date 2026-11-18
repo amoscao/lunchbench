@@ -33,12 +33,22 @@ test.describe('SodaArena explainer', () => {
     await page.goto('/soda')
     const dialog = page.getByRole('dialog', { name: 'How SodaArena works' })
     await expect(dialog).toBeVisible()
+    // The swipe buttons enable once the feed loads.
+    await expect(page.locator(TOP)).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
+    expect(await page.evaluate(() => localStorage.getItem('lb_soda_explainer_seen'))).toBe('1')
+    // First-visit close has no opener: focus lands on the page's swipe button, not <body>.
+    await expect(page.getByRole('button', { name: 'Swipe right' })).toBeFocused()
 
     const help = page.getByRole('button', { name: 'How SodaArena works' })
     await help.click()
     await expect(dialog).toBeVisible()
+    // Tab stays inside the dialog.
+    await page.keyboard.press('Tab')
+    await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(dialog.getByRole('button', { name: 'Start swiping' })).toBeFocused()
     await dialog.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).toHaveCount(0)
     await expect(help).toBeFocused()
